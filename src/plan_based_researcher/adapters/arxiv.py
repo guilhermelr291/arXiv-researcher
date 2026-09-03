@@ -8,9 +8,11 @@ from datetime import date, datetime, timezone
 from urllib.parse import urlparse
 
 import arxiv
+import httpx
 from langchain_community.document_loaders import ArxivLoader
 
-from plan_based_researcher.ports.papers import PaperHit
+from plan_based_researcher.policy import Policy
+from plan_based_researcher.ports.papers import HtmlLoadResult, PaperHit
 
 _ABS_ID_RE = re.compile(
     r"(?:/abs/)?(?P<arxiv_id>\d{4}\.\d{4,5}|[a-z-]+/\d{7})(?:v(?P<version>\d+))?",
@@ -19,6 +21,8 @@ _ABS_ID_RE = re.compile(
 
 _CLIENT = arxiv.Client(page_size=8, delay_seconds=3.0)
 _REQUEST_LOCK = asyncio.Lock()
+_HTML_USER_AGENT = "plan-based-researcher/0.1 (research tool; not a crawler)"
+_HTML_TIMEOUT = httpx.Timeout(30.0)
 
 
 def _parse_arxiv_id_and_version(entry_id: str) -> tuple[str, str] | None:
@@ -102,12 +106,38 @@ def _load_pdf_text_sync(arxiv_id: str, version: str) -> str:
     return _sanitize_pdf_text("".join(doc.page_content or "" for doc in docs))
 
 
+def _load_html_sync(arxiv_id: str, version: str) -> HtmlLoadResult:
+    url = Policy.html_url(arxiv_id, version)
+    response = httpx.get(
+        url,
+        headers={"User-Agent": _HTML_USER_AGENT},
+        timeout=_HTML_TIMEOUT,
+        follow_redirects=True,
+    )
+    content_type = response.headers.get("content-type", "")
+    if response.status_code != 200:
+        return HtmlLoadResult(status="missing", content_type=content_type)
+    body = response.content
+    if not body:
+        return HtmlLoadResult(status="empty", content_type=content_type)
+    media_type = content_type.split(";", 1)[0].strip().lower()
+    if media_type == "application/pdf" or body.startswith(b"%PDF"):
+        return HtmlLoadResult(
+            status="not_html", body=body, content_type=content_type
+        )
+    return HtmlLoadResult(status="ok", body=body, content_type=content_type)
+
+
 class ArxivPaperAdapter:
     """PaperPort backed by a shared arXiv Client and LangChain ArxivLoader."""
 
     async def search(self, query: str, *, max_results: int) -> list[PaperHit]:
         async with _REQUEST_LOCK:
             return await asyncio.to_thread(_search_sync, query, max_results)
+
+    async def load_html(self, arxiv_id: str, version: str) -> HtmlLoadResult:
+        async with _REQUEST_LOCK:
+            return await asyncio.to_thread(_load_html_sync, arxiv_id, version)
 
     async def load_pdf_text(self, arxiv_id: str, version: str) -> str:
         async with _REQUEST_LOCK:
