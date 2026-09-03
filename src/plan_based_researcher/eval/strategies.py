@@ -159,7 +159,7 @@ def _retrieve_checklist() -> str:
         "Chunks must be numbered [n] and come only from already-admitted papers.\n"
         "Chunks must match the retrieve task.\n"
         "A T3 query miss is a retrieve query rewrite on the same papers, "
-        "not a new PDF walk.\n"
+        "not a new HTML walk.\n"
         "Return status pass, retry, or fail with feedback. "
         "Set plan_inadequate if the admitted paper set cannot satisfy this task."
     )
@@ -457,7 +457,7 @@ class RetrieveEvalStrategy:
                 status="fail",
                 plan_inadequate=True,
                 feedback=(
-                    "T2a: at least one passed ranking ingested no usable PDF; "
+                    "T2a: at least one passed ranking ingested no usable HTML; "
                     "hybrid ran on living papers. Do not retry the retrieve query."
                 ),
             )
