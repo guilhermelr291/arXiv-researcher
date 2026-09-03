@@ -6,7 +6,9 @@
 **Architecture constraints:** `.specs/features/arxiv-grounded-research/context.md` (2026-08-26)  
 **Design:** `.specs/features/arxiv-grounded-research/design.md` (draft)
 
-**Loop amendment (approved 2026-08-27):** `.specs/features/orchestrator-eval-replan/spec.md` supersedes **ORCH-01**, **ORCH-02**, **CAP-01 retry count**, **PLAN-01 agent set** (combined `researcher`), and **THR-02 mechanism** (`reuse_existing_papers`). Unchanged here: Gate, ORCH-03, ARX-*, GROUND-*, SSE event names, UI-*, `max_steps=8`, `max_papers=8`, timeout.
+**Loop amendment (approved 2026-08-27):** `.specs/features/orchestrator-eval-replan/spec.md` supersedes **ORCH-01**, **ORCH-02**, **CAP-01 retry count**, **PLAN-01 agent set** (combined `researcher`), and **THR-02 mechanism** (`reuse_existing_papers`). Unchanged here: Gate, ORCH-03, GROUND-*, SSE event names, UI-*, `max_steps=8`, `max_papers=8`, timeout.
+
+**Chunking amendment (executed 2026-09-03):** `.specs/features/structured-aware-chunking/spec.md` supersedes retrieve-side **ARX-01** / **ARX-03** PDF load (`ArxivLoader`) and the out-of-scope row “Full-text from arXiv TeX/HTML”. Search still titles+abstracts. Retrieve ingest is arXiv HTML; `retrieve_k_per_paper=5`; 512/50 applies inside a heading section.
 
 ## Problem Statement
 
@@ -26,7 +28,7 @@ Students asking AI/ML questions get fluent answers that mix parametric memory wi
 | Tavily / general web search                                                       | Evidence is arXiv only                                                   |
 | Persistent corpus search over all ingested papers                                 | RAG is limited to papers selected for the current thread/query           |
 | Semantic Scholar, OpenAlex, or other paper APIs                                   | Single source: arXiv                                                     |
-| Full-text from arXiv TeX/HTML (non-PDF)                                           | v1 uses PDF via LangChain `ArxivLoader`                                  |
+| Full-text from arXiv TeX/HTML (non-PDF)                                           | **Superseded** by `structured-aware-chunking` (HTML retrieve ingest)     |
 | Native hover tooltips on `[n]`                                                    | Chainlit has no native hover; v1 uses side-panel `cl.Text`               |
 | Custom Chainlit JSX citation widgets                                              | Deferred                                                                 |
 | `answer_delta` / typewriter of the Writer                                         | Answer is shown only after orchestrator eval passes                      |
@@ -186,9 +188,9 @@ Students asking AI/ML questions get fluent answers that mix parametric memory wi
 | ORCH-01        | P1: In-domain research    | Validate | ✅ Fixed (retry uses eval feedback); ⏳ UAT |
 | ORCH-02        | P1: In-domain research    | Validate | ✅ Verified (static) |
 | ORCH-03        | P1: In-domain research    | Validate | ✅ Verified (static); ⏳ UAT |
-| ARX-01         | P1: In-domain research    | Validate | ✅ Verified (adapter); ⏳ UAT |
+| ARX-01         | P1: In-domain research    | Validate | ⚠ Retrieve PDF superseded (`structured-aware-chunking` HTML-01) |
 | ARX-02         | P1: In-domain research    | Validate | ✅ Verified (static) |
-| ARX-03         | P2: Cache hit             | Validate | ✅ Fixed (dict_row mapping); ⏳ UAT |
+| ARX-03         | P2: Cache hit             | Validate | ⚠ PDF miss/hit superseded (`structured-aware-chunking` HTML-02) |
 | ARX-04         | P1: In-domain research    | Validate | ✅ Verified (static) |
 | EMB-01         | P1: In-domain research    | Validate | ✅ Fixed (RAG fetch via named columns); ⏳ UAT |
 | GROUND-01      | P1: In-domain research    | Validate | ✅ Verified (static); ⏳ UAT |
@@ -214,9 +216,9 @@ Students asking AI/ML questions get fluent answers that mix parametric memory wi
 - **ORCH-01** — Loop: assign → execute → evaluate → retry with feedback or advance.
 - **ORCH-02** — Researcher eval: ≥1 allowlisted paper in date policy (or historical), query aligned to the step.
 - **ORCH-03** — Writer eval: language, student tone, every technical claim has a real `[n]`, no extra sources.
-- **ARX-01** — LangChain arXiv search tools + `ArxivLoader` PDF; no other search vendors.
+- **ARX-01** — LangChain arXiv **search** tools remain. Retrieve full text is arXiv HTML (`structured-aware-chunking`); no other search vendors.
 - **ARX-02** — Recency: prefer last 5 years unless historical step.
-- **ARX-03** — Unique `(arxiv_id, version)`; miss downloads, hit skips PDF; RAG not over the full library.
+- **ARX-03** — Unique `(arxiv_id, version)`; miss fetches HTML, hit skips fetch when chunks exist; RAG not over the full library.
 - **ARX-04** — `max_papers=8` unique papers per run.
 - **EMB-01** — Split 500/100, `text-embedding-3-small`, store in pgvector.
 - **GROUND-01** — Chunks formatted with `[n]` before the Writer; citations only from that list.
@@ -228,7 +230,7 @@ Students asking AI/ML questions get fluent answers that mix parametric memory wi
 - **UI-01** — Chainlit owns `thread_id` in session; new chat → new id.
 - **UI-02** — Steps from SSE; final message + side-panel `cl.Text` for `[n]`.
 - **UI-03** — Chainlit is HTTP client of FastAPI only.
-- **RUN-01** — Postgres/pgvector in Docker only; API + Chainlit on host; app code async with `to_thread` for sync PDF/arXiv I/O.
+- **RUN-01** — Postgres/pgvector in Docker only; API + Chainlit on host; app code async with `to_thread` for sync HTML/arXiv I/O.
 
 **Coverage:** 24 total, 24 mapped to tasks (see `tasks.md`), 0 unmapped. 2026-08-27: ARX-03, EMB-01, RUN-01, ORCH-01, GROUND-02 fixed in code; live SSE/Chainlit UAT still pending.
 
@@ -242,6 +244,6 @@ Manual checks when the feature is runnable (no automated suite in this milestone
 - An out-of-domain question never touches arXiv.
 - Chainlit shows live steps and side-panel excerpts for `[n]`.
 - A same-thread follow-up can be answered from checkpointed papers without a new search when the Planner keeps the topic.
-- Re-selecting the same `(arxiv_id, version)` does not re-download the PDF.
+- Re-selecting the same `(arxiv_id, version)` does not re-fetch HTML.
 - Caps and timeout never produce an uncited “complete” answer.
 

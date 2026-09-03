@@ -21,7 +21,7 @@
 - Database: PostgreSQL + pgvector (Docker)
 - Checkpointer: LangGraph `AsyncPostgresSaver` (same Postgres)
 
-**Key dependencies:** LangChain, LangGraph, langchain-community arXiv tools (`ArxivRetriever` / `ArxivQueryRun`, `ArxivLoader`), `langchain_text_splitters`, OpenAI (`gpt-5.1`, `gpt-5-mini`, `text-embedding-3-small`), Chainlit, psycopg/pgvector
+**Key dependencies:** LangChain, LangGraph, langchain-community arXiv **search** tools (`ArxivRetriever` / `ArxivQueryRun`), `langchain_text_splitters`, BeautifulSoup/lxml/markdownify (HTML ingest), OpenAI (`gpt-5.1`, `gpt-5-mini`, `text-embedding-3-small`), Chainlit, psycopg/pgvector
 
 ## Scope
 
@@ -29,7 +29,7 @@
 
 - Domain gate (AI/ML only) before planning
 - Planner + orchestrator evaluate/retry loop + arXiv researcher + grounded writer
-- pgvector paper/chunk store with lazy PDF ingest, unique `(arxiv_id, version)`
+- pgvector paper/chunk store with lazy **HTML** ingest, unique `(arxiv_id, version)`
 - Single async `POST /research` SSE API and Chainlit UI
 - Thread state in Postgres for the current Chainlit chat (`thread_id`)
 
@@ -46,5 +46,5 @@
 - All project artifacts (code, docs, comments, API contracts, prompts) must be in **English**. Student-facing answer language follows the query language.
 - LLM and embeddings: OpenAI only.
 - Evidence: arXiv only; category allowlist `cs.AI`, `cs.LG`, `cs.CL`, `cs.CV`, `cs.NE`, `cs.RO`, `stat.ML`.
-- Caps: `max_steps=8`, **1 retry per step (2 attempts)**, `max_replans=1`, `max_papers=8`, timeout ~2 minutes.
-- Splitter: 500 / 100. Feature spec: `.specs/features/arxiv-grounded-research/spec.md` (v1; loop IDs superseded by orchestrator-eval-replan). Loop spec: `.specs/features/orchestrator-eval-replan/spec.md`. Admission/retrieve amendment: `.specs/features/admission-retrieve-per-topic/spec.md` + `design.md` (approved 2026-08-29). Architecture: `.specs/features/arxiv-grounded-research/context.md`.
+- Caps: `max_steps=8`, **1 retry per step (2 attempts)**, `max_replans=1`, `max_papers=8`, `retrieve_k_per_paper=5`, timeout ~2 minutes.
+- Splitter: heading split, then 512 / 50 (`cl100k_base`) **inside a section**; tables and display equations are never split. Feature spec: `.specs/features/arxiv-grounded-research/spec.md` (v1; loop IDs superseded by orchestrator-eval-replan). Loop spec: `.specs/features/orchestrator-eval-replan/spec.md`. Admission/retrieve amendment: `.specs/features/admission-retrieve-per-topic/spec.md` + `design.md` (approved 2026-08-29). Chunking: `.specs/features/structured-aware-chunking/spec.md` (HTML ingest, executed 2026-09-03). Architecture: `.specs/features/arxiv-grounded-research/context.md`.

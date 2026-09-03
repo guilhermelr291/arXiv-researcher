@@ -1,7 +1,7 @@
 # State
 
-**Last Updated:** 2026-08-31
-**Current Work:** Feature `admission-retrieve-per-topic` T1–T15 plus validation fixes (replan remap + hole_tasks). Manual UAT still pending (B-001). Quick task 011 (token chunk splitter 512/50) done.
+**Last Updated:** 2026-09-03
+**Current Work:** Feature `structured-aware-chunking` — Execute T1–T19 done. Manual UAT still pending (B-001).
 
 ---
 
@@ -98,6 +98,13 @@
 **Trade-off:** One angle per topic; T1 may spend the only replan then `insufficient`; `plan_inadequate` is overloaded on search attempt 2.
 **Impact:** Spec `.specs/features/admission-retrieve-per-topic/spec.md` (approved 2026-08-29). Design `.specs/features/admission-retrieve-per-topic/design.md` (approved 2026-08-29). Supersedes SEARCH-01 admission, SEARCH-02 verdict shape, RETR-01 global `k`, LOOP-03 on search attempt 1. Routing atlas in `graph-flow.md`.
 
+### AD-016: Structured-aware HTML chunking (2026-09-02)
+
+**Decision:** Replace retrieve PDF ingest with arXiv HTML. Tables and display equations are atomic (`content` = caption/tag + full body, never truncated). Prose is heading-split then 512/50 inside a section, with canonical placeholders in `content` and human labels in `embedding_text`. `figure.ltx_table` collapses to one table unit; image figures become caption text (no units, no assets, no LLM summaries). Schema: `kind`, `unit_id`, `embedding_text`, `content`, JSONB `{section, caption, unit_ids}`. Hybrid per paper `k=5`; vector on `embedding_text`, BM25 on `content`; overfetch ≥3×k; dedup `unit_id` + backfill to 5 unique; in-place expansion (first occurrence full body, later label only). Direct atomic hit excerpt = section + `content`. Writer and Citation share that excerpt. Local wipe of PDF chunks; no PDF fallback; missing HTML omits/walks `ranked_keys`. Graph execute unchanged.
+**Reason:** Grill-me 2026-09-02; RecursiveCharacterTextSplitter on PDF text drops section, table, and equation identity. Spike `scripts/arxiv_html_units.py` validated the parse.
+**Trade-off:** Papers without HTML contribute no chunks; large tables can inflate Writer context; no figure retrieval in this slice.
+**Impact:** Spec `.specs/features/structured-aware-chunking/spec.md` (executed 2026-09-03). Design and tasks T1–T19 executed 2026-09-03. Supersedes retrieve-side ARX-01/ARX-03 PDF load, RETR-02 `k=3`, RETR-03 PDF walk. Search/admission/T1–T3 routing unchanged.
+
 ### AD-015: Admission/retrieve design locks (2026-08-29)
 
 **Decision:** Approve `.specs/features/admission-retrieve-per-topic/design.md` as written. `SearchStepVerdict.ranked_keys` is `list[PaperKey]`; clip + U1 are runtime (`eval/admission.py`). `papers` are written only after retrieve ingest. Hybrid is N calls of the existing adapter with `retrieve_k_per_paper=3`. Search API pool is `search_max_results=8` (not `max_papers`). Search attempt 1 always retries (`plan_inadequate` ignored for the edge). T1/T2a skip the retrieve mini-judge. T3 query miss always retries once. S8a stays on `plan_inadequate` per leftover search. WRITE-02 is prompt + writer judge. No new graph nodes.
@@ -167,7 +174,9 @@
 - [ ] Writer `answer_delta` after eval pass — Captured during: grill-me
 - [ ] Auth, multi-user, billing — Captured during: project init
 - [ ] Thread TTL/delete and history UI across browser sessions — Captured during: grill-me
-- [ ] arXiv TeX/HTML instead of PDF extract — Captured during: grill-me
+- [x] arXiv TeX/HTML instead of PDF extract — Promoted to feature `structured-aware-chunking` (spec draft 2026-09-02)
+- [ ] Image/figure units + vision — Captured during: structured-aware-chunking grill-me
+- [ ] LLM summaries of tables/equations — Captured during: structured-aware-chunking grill-me
 - [ ] Dockerize API and Chainlit — Captured during: grill-me
 - [ ] Global semantic search over full ingested corpus — Captured during: grill-me
 - [ ] HITL plan approval — Captured during: grill-me
@@ -200,6 +209,11 @@
 - [x] Execute T1–T15 for `admission-retrieve-per-topic`
 - [x] Fix: replan prefix packing remaps `search_artifacts` / `eval_by_step` to new indices (mixed-wave S8a)
 - [x] Fix: Writer living/missing must survive replan (store hole **tasks**, exclude gaps from living)
+- [x] User requested Design for `structured-aware-chunking` (2026-09-03; spec still formally Draft)
+- [x] User requested Tasks for `structured-aware-chunking` (2026-09-03; spec/design still formally Draft)
+- [x] User asked to Execute `.specs/features/structured-aware-chunking/tasks.md` (2026-09-03)
+- [x] Execute T1–T19 for `structured-aware-chunking`; update PROJECT.md (HTML ingest, `retrieve_k_per_paper=5`) and parent spec superseded banners
+- [ ] Manual UAT: structured-aware HTML chunking Independent Tests (`1706.03762` v7 ingest/retrieve; needs free Postgres port)
 
 ---
 
