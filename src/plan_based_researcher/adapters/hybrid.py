@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Protocol
+from dataclasses import dataclass
+from typing import Any, Literal, Protocol, cast
 
 from langchain_classic.retrievers import EnsembleRetriever
 from langchain_community.retrievers import BM25Retriever
@@ -10,8 +11,14 @@ from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 
 from plan_based_researcher.policy import Policy
-from plan_based_researcher.ports.chunks import ChunkRepository, EvidenceChunk
+from plan_based_researcher.ports.chunks import ChunkRecord, ChunkRepository
 from plan_based_researcher.ports.embeddings import EmbeddingPort
+
+
+@dataclass(frozen=True, slots=True)
+class HybridResult:
+    ranked: list[ChunkRecord]
+    corpus: list[ChunkRecord]
 
 
 class HybridRetrievePort(Protocol):
@@ -20,14 +27,17 @@ class HybridRetrievePort(Protocol):
         query: str,
         paper_keys: list[tuple[str, str]],
         k: int,
-    ) -> list[EvidenceChunk]: ...
+    ) -> HybridResult: ...
 
 
-def _to_document(chunk: EvidenceChunk) -> Document:
+def _to_document(chunk: ChunkRecord) -> Document:
     return Document(
-        page_content=chunk.excerpt,
+        page_content=chunk.content,
         metadata={
             "chunk_id": chunk.chunk_id,
+            "kind": chunk.kind,
+            "unit_id": chunk.unit_id,
+            "metadata": chunk.metadata,
             "arxiv_id": chunk.arxiv_id,
             "version": chunk.version,
             "title": chunk.title,
@@ -37,17 +47,20 @@ def _to_document(chunk: EvidenceChunk) -> Document:
     )
 
 
-def _from_document(doc: Document) -> EvidenceChunk:
+def _from_document(doc: Document) -> ChunkRecord:
     metadata = doc.metadata
-    return EvidenceChunk(
+    unit_id = metadata["unit_id"]
+    return ChunkRecord(
         chunk_id=str(metadata["chunk_id"]),
         arxiv_id=str(metadata["arxiv_id"]),
         version=str(metadata["version"]),
         title=str(metadata["title"]),
         year=int(metadata["year"]),
         url=str(metadata["url"]),
-        excerpt=doc.page_content,
-        n=0,
+        kind=cast(Literal["prose", "table", "equation"], str(metadata["kind"])),
+        unit_id=None if unit_id is None else str(unit_id),
+        content=doc.page_content,
+        metadata=dict(metadata["metadata"]),
     )
 
 
@@ -82,12 +95,12 @@ class HybridRetrieveAdapter:
         query: str,
         paper_keys: list[tuple[str, str]],
         k: int,
-    ) -> list[EvidenceChunk]:
+    ) -> HybridResult:
         if not paper_keys:
-            return []
+            return HybridResult([], [])
         corpus = await self._chunks.list_chunks(paper_keys)
         if not corpus:
-            return []
+            return HybridResult([], [])
         vector = _VectorRetriever(
             chunks=self._chunks,
             embeddings=self._embeddings,
@@ -104,4 +117,7 @@ class HybridRetrieveAdapter:
             id_key="chunk_id",
         )
         ranked = await ensemble.ainvoke(query)
-        return [_from_document(doc) for doc in ranked]
+        return HybridResult(
+            ranked=[_from_document(doc) for doc in ranked],
+            corpus=corpus,
+        )
