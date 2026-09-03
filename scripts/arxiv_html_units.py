@@ -1,12 +1,7 @@
-"""Extract figures, tables, and display equations from one arXiv HTML paper
-(spike, not wired in).
+"""Debug CLI over ``parse_arxiv_html`` (not the production parser).
 
-Local extras (not project dependencies):
-
-    pip install beautifulsoup4 lxml markdownify tiktoken
-
-tiktoken is already transitive via the OpenAI stack; still listed so a
-minimal environment can run this script. Fetch uses the project's httpx.
+Fetches arXiv HTML, parses in-memory via the library, and may write
+``_tmp_arxiv_html`` sidecars. Production retrieve must not import this script.
 """
 
 from __future__ import annotations
@@ -16,13 +11,12 @@ import json
 import re
 import shutil
 import sys
-from copy import copy
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urljoin, urlparse
 
 import httpx
 
+from plan_based_researcher.ingest.html_parse import ParsedPaper, parse_arxiv_html
 from plan_based_researcher.policy import Policy
 
 _ROOT = Path(__file__).resolve().parents[1]
@@ -31,16 +25,8 @@ _USER_AGENT = (
     "(local research spike; not a crawler; https://arxiv.org/help/robots)"
 )
 _TIMEOUT = httpx.Timeout(30.0)
-_ARTICLE_ROOT = (
-    "section.ltx_section, div.ltx_page_content, article.ltx_document, "
-    "div.ltx_document, div.ltx_page_main"
-)
-_ASSET_TAGS = ("img", "object", "embed", "source")
 _UNSAFE_ID = re.compile(r"[^\w.\-]+", re.UNICODE)
-_DISPLAYSTYLE = re.compile(r"\\displaystyle\s*")
-_EQUATION_CLASSES = frozenset({"ltx_equation", "ltx_equationgroup"})
-_ZERO_WIDTH_RULE = re.compile(r"width\s*:\s*0(\.0)?pt", re.I)
-_ACK_HEADING = re.compile(r"^(acknowledgements?|acknowledgments?)$", re.I)
+_MD_HEADING = re.compile(r"^(#{1,6})\s+(.*\S)\s*$")
 
 
 def main() -> None:
@@ -49,7 +35,7 @@ def main() -> None:
 
     arxiv_id = args.arxiv_id.strip()
     version = args.version.strip().lstrip("vV")
-    html_url = f"https://arxiv.org/html/{arxiv_id}v{version}"
+    html_url = Policy.html_url(arxiv_id, version)
     out = args.out or (_ROOT / "_tmp_arxiv_html" / f"{arxiv_id}v{version}")
     if not out.is_absolute():
         out = Path.cwd() / out
@@ -58,83 +44,39 @@ def main() -> None:
     out.mkdir(parents=True, exist_ok=True)
     (out / "paper.html").write_bytes(html_bytes)
 
-    soup = _parse_html(html_bytes)
-    if soup.select_one(_ARTICLE_ROOT) is None:
-        print(
-            f"error: no article root (expected {_ARTICLE_ROOT}) at {html_url}",
-            file=sys.stderr,
-        )
+    parsed = parse_arxiv_html(html_bytes)
+    if not parsed.usable:
+        print(f"error: {parsed.reason} at {html_url}", file=sys.stderr)
         sys.exit(1)
+
+    (out / "prose.md").write_text(parsed.prose_markdown, encoding="utf-8")
+    (out / "sections.txt").write_text(
+        _heading_outline(parsed.prose_markdown), encoding="utf-8"
+    )
 
     units_dir = out / "units"
     if units_dir.exists():
         shutil.rmtree(units_dir)
     units_dir.mkdir()
 
-    with httpx.Client(
-        headers={"User-Agent": _USER_AGENT},
-        timeout=_TIMEOUT,
-        follow_redirects=True,
-    ) as client:
-        units = _extract_units(soup, client=client, html_url=html_url, units_dir=units_dir)
-
-    _drop_bibliography(soup)
-    _drop_frontmatter(soup)
-    convert_root = (
-        soup.select_one("article.ltx_document")
-        or soup.select_one("div.ltx_page_content")
-        or soup.body
-        or soup
-    )
-    _rewrite_inline_math(convert_root)
-    prose = _html_to_markdown(convert_root)
-    (out / "prose.md").write_text(prose, encoding="utf-8")
-    (out / "sections.txt").write_text(_heading_outline(soup), encoding="utf-8")
-
     encoder = _token_encoder()
     chunk_size = Policy.chunk_size
-    manifest: list[dict[str, Any]] = []
-    for unit in units:
-        if unit["kind"] == "equation":
-            token_src = unit["tex"]
-        elif unit["kind"] == "table":
-            token_src = unit["markdown"]
-        else:
-            token_src = unit["html"]
-        tokens = _count_tokens(encoder, token_src)
-        row: dict[str, Any] = {
-            "kind": unit["kind"],
-            "html_id": unit["html_id"],
-            "caption": unit["caption"],
-        }
-        if unit["kind"] == "table":
-            row["md_path"] = unit["md_path"]
-        elif unit["kind"] == "equation":
-            row["tex_path"] = unit["tex_path"]
-            row["tex"] = unit["tex"]
-        else:
-            row["html_path"] = unit["html_path"]
-        row["assets"] = unit["assets"]
-        row["tokens"] = tokens
-        row["fits_512"] = tokens <= chunk_size
-        manifest.append(row)
-        unit.pop("html", None)
-        unit.pop("markdown", None)
+    manifest = _write_units(parsed, units_dir=units_dir, encoder=encoder, chunk_size=chunk_size)
 
     (units_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
 
-    _print_report(soup, manifest, encoder, chunk_size)
+    _print_report(parsed, manifest, encoder, chunk_size)
     print(f"Wrote {out}")
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Fetch arXiv HTML and split out innermost figures, tables, "
-            "and display equations."
+            "Fetch arXiv HTML and dump parse_arxiv_html sidecars "
+            "(debug CLI, not the production parser)."
         )
     )
     parser.add_argument("arxiv_id", help="arXiv id (never infers latest by itself)")
@@ -149,28 +91,11 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _require_extras() -> None:
-    missing: list[str] = []
-    try:
-        import bs4  # noqa: F401
-    except ImportError:
-        missing.append("beautifulsoup4")
-    try:
-        import lxml  # noqa: F401
-    except ImportError:
-        missing.append("lxml")
-    try:
-        import markdownify  # noqa: F401
-    except ImportError:
-        missing.append("markdownify")
     try:
         import tiktoken  # noqa: F401
     except ImportError:
-        missing.append("tiktoken")
-    if missing:
         print(
-            "Missing local extras: "
-            + ", ".join(missing)
-            + "\nInstall with: pip install beautifulsoup4 lxml markdownify tiktoken",
+            "Missing local extra: tiktoken\nInstall with: pip install tiktoken",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -196,275 +121,61 @@ def _fetch(url: str) -> bytes:
     return response.content
 
 
-def _parse_html(html_bytes: bytes) -> Any:
-    from bs4 import BeautifulSoup, FeatureNotFound
-
-    try:
-        return BeautifulSoup(html_bytes, "lxml")
-    except FeatureNotFound:
-        print(
-            "error: lxml parser is not available. Install with: pip install lxml",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-
-def _extract_units(
-    soup: Any,
+def _write_units(
+    parsed: ParsedPaper,
     *,
-    client: httpx.Client,
-    html_url: str,
     units_dir: Path,
+    encoder: Any,
+    chunk_size: int,
 ) -> list[dict[str, Any]]:
-    from bs4 import Tag
-
-    nodes = [
-        node
-        for node in soup.find_all(["table", "figure"])
-        if isinstance(node, Tag)
-    ]
-    ranked = sorted(
-        enumerate(nodes),
-        key=lambda item: (-_dom_depth(item[1]), item[0]),
-    )
-
     used_stems: set[str] = set()
-    generated = 0
-    units: list[dict[str, Any]] = []
-    for _, node in ranked:
-        if _is_layout_only_table(node):
-            node.decompose()
-            continue
-        kind = _unit_kind(node)
-        raw_id = (node.get("id") or "").strip()
-        if raw_id:
-            html_id = raw_id
-        else:
-            generated += 1
-            html_id = f"unit-{generated:04d}"
-        stem = _unique_stem(f"{kind}-{_safe_id(html_id)}", used_stems)
-        caption = _unit_caption(node, kind)
-        unit: dict[str, Any] = {
-            "kind": kind,
-            "html_id": html_id,
-            "caption": caption,
-            "assets": [],
+    manifest: list[dict[str, Any]] = []
+    for unit in parsed.units:
+        stem = _unique_stem(f"{unit.kind}-{_safe_id(unit.html_id)}", used_stems)
+        body = unit.body if unit.body.endswith("\n") else unit.body + "\n"
+        tokens = _count_tokens(encoder, unit.body)
+        row: dict[str, Any] = {
+            "kind": unit.kind,
+            "html_id": unit.html_id,
+            "caption": unit.caption,
+            "table_number": unit.table_number,
+            "tokens": tokens,
+            "fits_512": tokens <= chunk_size,
         }
-        if kind == "equation":
-            tex = _equation_tex(node)
-            rel_tex = f"units/{stem}.tex"
-            tex_body = tex if tex.endswith("\n") else tex + "\n"
-            (units_dir / f"{stem}.tex").write_text(tex_body, encoding="utf-8")
-            unit["tex_path"] = rel_tex
-            unit["tex"] = tex
-        elif kind == "table":
-            markdown = _table_to_markdown(node)
+        if unit.kind == "table":
             rel_md = f"units/{stem}.md"
-            (units_dir / f"{stem}.md").write_text(markdown, encoding="utf-8")
-            unit["md_path"] = rel_md
-            unit["markdown"] = markdown
+            (units_dir / f"{stem}.md").write_text(body, encoding="utf-8")
+            row["md_path"] = rel_md
         else:
-            assets = _download_assets(
-                node,
-                client=client,
-                html_url=html_url,
-                units_dir=units_dir,
-                stem=stem,
-            )
-            snapshot = str(node)
-            rel_html = f"units/{stem}.html"
-            (units_dir / f"{stem}.html").write_text(snapshot, encoding="utf-8")
-            unit["html_path"] = rel_html
-            unit["html"] = snapshot
-            unit["assets"] = assets
-        placeholder = soup.new_tag("p")
-        placeholder.string = f"[{kind.upper()}:{html_id}]"
-        node.replace_with(placeholder)
-        units.append(unit)
-    return units
+            rel_tex = f"units/{stem}.tex"
+            (units_dir / f"{stem}.tex").write_text(body, encoding="utf-8")
+            row["tex_path"] = rel_tex
+            row["tex"] = unit.body
+        manifest.append(row)
+    return manifest
 
 
-def _drop_bibliography(root: Any) -> None:
-    """Remove the paper bibliography so it is not converted to markdown.
-
-    In-text cites such as [5, 2] stay in the body. The References list itself
-    is not useful for retrieve: it duplicates metadata and pollutes chunks.
-    """
-    if not hasattr(root, "select"):
-        return
-    for node in list(root.select("section.ltx_bibliography, ul.ltx_biblist")):
-        node.decompose()
+def _heading_outline(prose: str) -> str:
+    lines = [line for line in prose.splitlines() if _MD_HEADING.match(line)]
+    return "\n".join(lines) + ("\n" if lines else "")
 
 
-def _drop_frontmatter(root: Any) -> None:
-    """Remove author/thanks/email blocks and acknowledgement sections.
-
-    Author names already live on the arXiv metadata. Body footnotes outside
-    ``div.ltx_authors`` are kept.
-    """
-    if not hasattr(root, "select"):
-        return
-    for node in list(root.select("div.ltx_authors, section.ltx_acknowledgements")):
-        node.decompose()
-    _drop_acknowledgement_sections(root)
-
-
-def _drop_acknowledgement_sections(root: Any) -> None:
-    from bs4 import Tag
-
-    if not hasattr(root, "find_all"):
-        return
-    heading_names = ["h1", "h2", "h3", "h4", "h5", "h6"]
-    for heading in list(root.find_all(heading_names)):
-        if not isinstance(heading, Tag):
-            continue
-        if not _ACK_HEADING.fullmatch(heading.get_text(" ", strip=True)):
-            continue
-        section = heading.find_parent("section")
-        if (
-            isinstance(section, Tag)
-            and heading is section.find(heading_names)
-        ):
-            section.decompose()
+def _prose_sections(prose: str) -> list[tuple[str, str]]:
+    chunks: list[tuple[str, str]] = []
+    current_label = Policy.PREAMBLE_SECTION
+    current_parts: list[str] = []
+    for line in prose.splitlines():
+        match = _MD_HEADING.match(line)
+        if match:
+            if current_parts:
+                chunks.append((current_label, "\n".join(current_parts)))
+            current_label = match.group(2)
+            current_parts = [line]
         else:
-            heading.decompose()
-
-
-def _is_layout_only_table(table: Any) -> bool:
-    """True if this is a LaTeXML spacer tabular, not a real table.
-
-    LaTeX vertical space often becomes a one-cell ``ltx_tabular`` whose only
-    child is a ``span.ltx_rule`` with ``width: 0pt``. Those must not be
-    extracted as table units.
-    """
-    if getattr(table, "name", None) != "table":
-        return False
-    classes = table.get("class") or []
-    if "ltx_tabular" not in classes:
-        return False
-
-    clone = copy(table)
-    for rule in clone.select("span.ltx_rule"):
-        rule.decompose()
-    if clone.get_text(strip=True):
-        return False
-
-    rules = table.select("span.ltx_rule")
-    if not rules:
-        return False
-    return all(_ZERO_WIDTH_RULE.search(rule.get("style") or "") for rule in rules)
-
-
-def _unit_kind(node: Any) -> str:
-    if node.name != "table":
-        return "figure"
-    classes = set(node.get("class") or [])
-    if classes & _EQUATION_CLASSES:
-        return "equation"
-    if "ltx_eqn_table" in classes and "ltx_tabular" not in classes:
-        return "equation"
-    return "table"
-
-
-def _unit_caption(node: Any, kind: str) -> str:
-    if kind == "equation":
-        tag = node.find(class_="ltx_tag_equation") if hasattr(node, "find") else None
-        if tag is None:
-            return ""
-        return tag.get_text(" ", strip=True)
-    return _caption_text(node)
-
-
-def _caption_text(root: Any) -> str:
-    from bs4 import Tag
-
-    node = root.find("figcaption") if hasattr(root, "find") else None
-    if node is None and hasattr(root, "find"):
-        node = root.find(class_="ltx_caption")
-    if not isinstance(node, Tag):
-        return ""
-    return node.get_text(" ", strip=True)
-
-
-def _math_tex(node: Any) -> str:
-    from bs4 import Tag
-
-    if not isinstance(node, Tag):
-        return ""
-    annotation = node.find("annotation", attrs={"encoding": "application/x-tex"})
-    raw = annotation.get_text() if annotation is not None else ""
-    if not raw.strip() and node.name == "math":
-        raw = node.get("alttext") or ""
-    return _DISPLAYSTYLE.sub("", raw).strip()
-
-
-def _equation_tex(node: Any) -> str:
-    parts: list[str] = []
-    maths = node.find_all("math") if hasattr(node, "find_all") else []
-    for math in maths:
-        tex = _math_tex(math)
-        if tex:
-            parts.append(tex)
-    if not parts:
-        tex = _math_tex(node)
-        if tex:
-            parts.append(tex)
-    if not parts:
-        return ""
-    return "$$\n" + "\n".join(parts) + "\n$$"
-
-
-def _rewrite_inline_math(root: Any) -> None:
-    from bs4 import NavigableString, Tag
-
-    if not hasattr(root, "find_all"):
-        return
-    for math in list(root.find_all("math", class_="ltx_Math")):
-        if not isinstance(math, Tag):
-            continue
-        tex = _math_tex(math)
-        math.replace_with(NavigableString(f"${tex}$" if tex else ""))
-
-
-def _table_to_markdown(node: Any) -> str:
-    for rule in node.select("span.ltx_rule"):
-        rule.decompose()
-    _rewrite_inline_math(node)
-    markdown = _html_to_markdown(node).strip()
-    return markdown + "\n" if markdown else ""
-
-
-def _html_to_markdown(root: Any) -> str:
-    from markdownify import MarkdownConverter
-
-    class ArxivHtmlConverter(MarkdownConverter):
-        def convert_cite(self, el, text, parent_tags):
-            labels = [
-                a.get_text(" ", strip=True)
-                for a in el.find_all("a")
-                if a.get_text(" ", strip=True)
-            ]
-            if labels:
-                return "[" + ", ".join(labels) + "]"
-            return (text or "").strip()
-
-    return ArxivHtmlConverter(
-        heading_style="ATX",
-        wrap=False,
-        bs4_options="lxml",
-        strip=["script", "style", "nav"],
-        escape_underscores=False,
-        table_infer_header=True,
-    ).convert_soup(root)
-
-
-def _dom_depth(tag: Any) -> int:
-    depth = 0
-    current = getattr(tag, "parent", None)
-    while current is not None:
-        depth += 1
-        current = getattr(current, "parent", None)
-    return depth
+            current_parts.append(line)
+    if current_parts:
+        chunks.append((current_label, "\n".join(current_parts)))
+    return chunks
 
 
 def _safe_id(html_id: str) -> str:
@@ -482,83 +193,6 @@ def _unique_stem(stem: str, used: set[str]) -> str:
     return candidate
 
 
-def _download_assets(
-    node: Any,
-    *,
-    client: httpx.Client,
-    html_url: str,
-    units_dir: Path,
-    stem: str,
-) -> list[str]:
-    from bs4 import Tag
-
-    # Resolve against the document URL (no extra slash). arXiv HTML uses
-    # paths like "2310.17513v1/figure1.svg" which only work if the last
-    # path segment is the paper id, not a directory.
-    base = html_url
-    saved: list[str] = []
-    url_to_file: dict[str, str] = {}
-    n = 0
-    for el in node.find_all(_ASSET_TAGS):
-        if not isinstance(el, Tag):
-            continue
-        for attr in ("src", "data"):
-            raw = (el.get(attr) or "").strip()
-            if not raw:
-                continue
-            if urlparse(raw).scheme in {"data", "javascript", "about"}:
-                continue
-            abs_url = urljoin(base, raw)
-            if abs_url in url_to_file:
-                el[attr] = url_to_file[abs_url]
-                continue
-            n += 1
-            filename = _asset_filename(abs_url, stem, n)
-            dest = units_dir / filename
-            if dest.exists():
-                filename = f"{stem}__{n}_{filename}"
-                dest = units_dir / filename
-            if not _get_asset(client, abs_url, dest):
-                continue
-            url_to_file[abs_url] = filename
-            el[attr] = filename
-            saved.append(f"units/{filename}")
-    return saved
-
-
-def _asset_filename(abs_url: str, stem: str, index: int) -> str:
-    path = unquote(urlparse(abs_url).path)
-    name = Path(path).name or f"asset-{index}"
-    name = _UNSAFE_ID.sub("_", name).strip("._") or f"asset-{index}"
-    return f"{stem}__{name}"
-
-
-def _get_asset(client: httpx.Client, url: str, dest: Path) -> bool:
-    try:
-        response = client.get(url)
-    except httpx.HTTPError as exc:
-        print(f"warning: asset download failed {url}: {exc}", file=sys.stderr)
-        return False
-    if response.status_code != 200 or not response.content:
-        print(
-            f"warning: asset {url} returned {response.status_code}, skipping",
-            file=sys.stderr,
-        )
-        return False
-    dest.write_bytes(response.content)
-    return True
-
-
-def _heading_outline(soup: Any) -> str:
-    lines: list[str] = []
-    for heading in soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"]):
-        level = int(heading.name[1])
-        text = heading.get_text(" ", strip=True)
-        if text:
-            lines.append(f"{'#' * level} {text}")
-    return "\n".join(lines) + ("\n" if lines else "")
-
-
 def _token_encoder() -> Any:
     import tiktoken
 
@@ -569,50 +203,14 @@ def _count_tokens(encoder: Any, text: str) -> int:
     return len(encoder.encode(text, disallowed_special=()))
 
 
-def _section_chunks(soup: Any) -> list[tuple[str, str]]:
-    from bs4 import Tag
-
-    chunks: list[tuple[str, str]] = []
-    seen: set[int] = set()
-    for heading in soup.find_all(["h1", "h2", "h3", "h4", "h5", "h6"]):
-        if not isinstance(heading, Tag):
-            continue
-        title = heading.get_text(" ", strip=True)
-        if not title:
-            continue
-        section = heading.find_parent("section")
-        if (
-            isinstance(section, Tag)
-            and id(section) not in seen
-            and heading is section.find(["h1", "h2", "h3", "h4", "h5", "h6"])
-        ):
-            seen.add(id(section))
-            parts: list[str] = []
-            for child in section.children:
-                if isinstance(child, Tag) and child.name == "section":
-                    continue
-                if isinstance(child, Tag):
-                    text = child.get_text(" ", strip=True)
-                else:
-                    text = str(child).strip()
-                if text:
-                    parts.append(text)
-            body = "\n".join(parts)
-            label = section.get("id") or title
-            chunks.append((str(label), body))
-        else:
-            chunks.append((title, title))
-    return chunks
-
-
 def _print_report(
-    soup: Any,
+    parsed: ParsedPaper,
     manifest: list[dict[str, Any]],
     encoder: Any,
     chunk_size: int,
 ) -> None:
     rows: list[tuple[str, str, int, bool]] = []
-    for label, body in _section_chunks(soup):
+    for label, body in _prose_sections(parsed.prose_markdown):
         tokens = _count_tokens(encoder, body)
         rows.append(("section", label, tokens, tokens <= chunk_size))
     for unit in manifest:
