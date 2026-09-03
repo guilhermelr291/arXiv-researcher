@@ -1,4 +1,4 @@
-"""Outbound port for arXiv paper search and HTML/PDF load (ARX-01)."""
+"""Outbound port for arXiv paper search and HTML load (ARX-01)."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -30,5 +30,3 @@ class PaperPort(Protocol):
     async def search(self, query: str, *, max_results: int) -> list[PaperHit]: ...
 
     async def load_html(self, arxiv_id: str, version: str) -> HtmlLoadResult: ...
-
-    async def load_pdf_text(self, arxiv_id: str, version: str) -> str: ...
