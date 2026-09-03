@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, replace
+import asyncio
 
 from langchain_openai import ChatOpenAI
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from plan_based_researcher.adapters.hybrid import HybridRetrievePort
 from plan_based_researcher.agents.query_schema import (
@@ -15,8 +14,12 @@ from plan_based_researcher.agents.query_schema import (
 )
 from plan_based_researcher.agents.registry import REGISTRY
 from plan_based_researcher.graph.state import merge_hole_tasks, merge_papers
+from plan_based_researcher.ingest.chunk_build import build_chunk_drafts
+from plan_based_researcher.ingest.expand import expand_hits
+from plan_based_researcher.ingest.html_parse import ParsedPaper, parse_arxiv_html
+from plan_based_researcher.ingest.pack import pack_hits
 from plan_based_researcher.policy import Policy
-from plan_based_researcher.ports.chunks import ChunkRepository, PaperRecord
+from plan_based_researcher.ports.chunks import ChunkDraft, ChunkRepository, PaperRecord
 from plan_based_researcher.ports.embeddings import EmbeddingPort
 from plan_based_researcher.ports.papers import PaperPort
 
@@ -157,6 +160,11 @@ def _artifact_for_step(artifacts: dict, index: int) -> dict:
     return art if isinstance(art, dict) else {}
 
 
+def _parse_and_build(html_bytes: bytes) -> tuple[ParsedPaper, list[ChunkDraft]]:
+    parsed = parse_arxiv_html(html_bytes)
+    return parsed, build_chunk_drafts(parsed)
+
+
 class RetrieveRunner:
     def __init__(
         self,
@@ -213,11 +221,6 @@ class RetrieveRunner:
             artifacts = state.get("search_artifacts") or {}
             if not isinstance(artifacts, dict):
                 artifacts = {}
-            splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-                encoding_name=Policy.chunk_encoding,
-                chunk_size=Policy.chunk_size,
-                chunk_overlap=Policy.chunk_overlap,
-            )
             for i in passed_search_indices:
                 art = _artifact_for_step(artifacts, i)
                 ranked = art.get("ranked_keys") or []
@@ -236,22 +239,30 @@ class RetrieveRunner:
                     ver = str(key.get("version") or "")
                     if (aid, ver) in usable_keys:
                         continue
-                    record = await self._chunks.get_paper(aid, ver)
-                    if record is None:
-                        any_miss = True
-                        text = await self._papers.load_pdf_text(aid, ver)
-                        if not text.strip():
-                            continue
-                        parts = splitter.split_text(text)
-                        if not parts:
-                            continue
-                        vectors = await self._embeddings.embed_documents(parts)
-                        ref = _paper_ref_from_hit(key, hits)
-                        await self._chunks.upsert_paper_with_chunks(
-                            _paper_record_from_ref(ref), parts, vectors
+                    if await self._chunks.paper_has_chunks(aid, ver):
+                        record = await self._chunks.get_paper(aid, ver)
+                        ref = (
+                            _paper_ref_from_record(record)
+                            if record is not None
+                            else _paper_ref_from_hit(key, hits)
                         )
                     else:
-                        ref = _paper_ref_from_record(record)
+                        any_miss = True
+                        html = await self._papers.load_html(aid, ver)
+                        if html.status != "ok" or not html.body:
+                            continue
+                        parsed, drafts = await asyncio.to_thread(
+                            _parse_and_build, html.body
+                        )
+                        if not parsed.usable or not drafts:
+                            continue
+                        vectors = await self._embeddings.embed_documents(
+                            [draft.embedding_text for draft in drafts]
+                        )
+                        ref = _paper_ref_from_hit(key, hits)
+                        await self._chunks.upsert_paper_with_chunks(
+                            _paper_record_from_ref(ref), drafts, vectors
+                        )
                     usable.append(ref)
                     usable_keys.add((aid, ver))
                     newly_admitted.append(ref)
@@ -290,20 +301,34 @@ class RetrieveRunner:
         query = await self._formulate_query(
             task, feedback=feedback, previous_query=previous_query
         )
-        k = Policy.retrieve_k_per_paper
+        overfetch = Policy.retrieve_overfetch_factor * Policy.retrieve_k_per_paper
         numbered: list[dict] = []
         n = 1
         for paper in merged:
             if not isinstance(paper, dict):
                 continue
-            chunks_i = await self._hybrid.retrieve(
+            result_i = await self._hybrid.retrieve(
                 query,
                 [(paper["arxiv_id"], paper["version"])],
-                k=k,
+                k=overfetch,
             )
-            chunks_i = chunks_i[:k]
-            for chunk in chunks_i:
-                numbered.append(asdict(replace(chunk, n=n)))
+            packed = pack_hits(result_i.ranked, k=Policy.retrieve_k_per_paper)
+            if not packed:
+                continue
+            excerpts = expand_hits(packed, result_i.corpus)
+            for chunk, excerpt in zip(packed, excerpts):
+                numbered.append(
+                    {
+                        "chunk_id": chunk.chunk_id,
+                        "n": n,
+                        "arxiv_id": chunk.arxiv_id,
+                        "version": chunk.version,
+                        "title": chunk.title,
+                        "year": chunk.year,
+                        "url": chunk.url,
+                        "excerpt": excerpt,
+                    }
+                )
                 n += 1
 
         if walked and gap_step_indices:
