@@ -150,13 +150,13 @@ def _replan_constraints(state: dict) -> str:
         lines.append(
             "Retrieve T2a: prefer writer-only suffix when evidence_chunks is "
             "non-empty. Writer task: living topics with [n]; state that no usable "
-            "arXiv paper/PDF was found for each gapped search task; forbid filling "
+            "paper HTML was found for each gapped search task; forbid filling "
             "from memory. Dead search stays in prefix passed_steps."
         )
     elif case == "t1":
         lines.append(
             "Retrieve T1: MUST NOT emit a new search (searches already passed; "
-            "failure is PDF). Suffix still needs a writer."
+            "failure is HTML ingest). Suffix still needs a writer."
         )
     elif case == "t3":
         try:
