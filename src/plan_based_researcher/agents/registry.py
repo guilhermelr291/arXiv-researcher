@@ -52,7 +52,7 @@ REGISTRY: dict[str, AgentSpec] = {
             "runner; the runner does not pick a paper. "
             "Write the task as a natural-language goal, not an arXiv query; "
             "the search agent formulates the query. "
-            "Apply allowlist and recency (or historical). Do not download PDFs."
+            "Apply allowlist and recency (or historical). Do not fetch HTML."
         ),
         model=_MINI_MODEL,
         tools=("arxiv_search",),
@@ -61,8 +61,8 @@ REGISTRY: dict[str, AgentSpec] = {
     "retrieve": AgentSpec(
         name="retrieve",
         abilities=(
-            "Walk ranked_keys and ingest one usable PDF per ranking on cache miss; "
-            "hybrid-retrieve numbered [n] chunks with k=3 per paper for this "
+            "Walk ranked_keys and ingest one usable HTML paper per ranking on cache miss; "
+            "hybrid-retrieve numbered [n] chunks with k=5 per paper for this "
             "evidence goal. Write the task as what to evidence, not the retrieval "
             "query; the retrieve agent formulates an English query. Do not search "
             "arXiv."
