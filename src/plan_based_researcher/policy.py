@@ -32,6 +32,10 @@ class Policy:
     search_max_results: int = 8
     retrieve_k_per_paper: int = 5
     retrieve_overfetch_factor: int = 3
+    retrieve_first_stage_k: int = 40
+    retrieve_rerank_top_n: int = 12
+    retrieve_rerank_margin: float = 0.20
+    retrieve_rerank_floor: float | None = 0.30
     GROUNDING_RULE: str = (
         "every technical claim has a real [n] citation from the provided chunk list"
     )

@@ -23,6 +23,7 @@ dependencies = [
     "pydantic-settings>=2.10.0",
     "python-dotenv>=1.2.3",
     "rank-bm25>=0.2.2",
+    "voyageai",
 ]
 
 [build-system]

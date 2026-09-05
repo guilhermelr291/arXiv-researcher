@@ -13,6 +13,8 @@ This spec defines **only** how papers are chosen, admitted, retrieved, and how s
 
 **Chunking amendment (executed 2026-09-03):** `.specs/features/structured-aware-chunking/spec.md` supersedes **RETR-02** (`k=3` + post-ensemble slice) and **RETR-03** (PDF walk). Unchanged: 1/topic admission, U1, T1/T2a/T3 routing, hybrid weights. Retrieve ingest is HTML; packed `k=5`.
 
+**Rerank amendment (executed 2026-09-03):** `.specs/features/retrieve-cross-encoder-rerank/` supersedes packed `k=5` from ensemble order (**RETR-05**) and RRF pack-to-5 / overfetch `3×k` (**RETR-08**). First-stage hybrid `k=40`; adaptive cut `top_n=12`. Unchanged: HTML ingest, placeholder expand, T1/T2a/T3 routing. UAT of this amendment is not complete.
+
 ## Problem Statement
 
 A compare plan (`search LoRA`, `search QLoRA`, `search DoRA`, `retrieve`, `writer`) can still starve later topics: each search fetches up to 8 hits, eval pass admits the **whole** lot, and `merge_papers` FIFO-trims to 8, so the first search can fill the cap. Retrieve then runs one hybrid over the union with a single `k`, so one PDF can take almost all chunks. Students get a “comparison” evidenced by one method, or a Writer that fills missing methods from model weights. This product’s contract is **one named topic per search step, one usable PDF per topic, a chunk floor per paper, and grounded prose only** — not academic IR recall.

@@ -8,7 +8,9 @@
 
 **Loop amendment (approved 2026-08-27):** `.specs/features/orchestrator-eval-replan/spec.md` supersedes **ORCH-01**, **ORCH-02**, **CAP-01 retry count**, **PLAN-01 agent set** (combined `researcher`), and **THR-02 mechanism** (`reuse_existing_papers`). Unchanged here: Gate, ORCH-03, GROUND-*, SSE event names, UI-*, `max_steps=8`, `max_papers=8`, timeout.
 
-**Chunking amendment (executed 2026-09-03):** `.specs/features/structured-aware-chunking/spec.md` supersedes retrieve-side **ARX-01** / **ARX-03** PDF load (`ArxivLoader`) and the out-of-scope row “Full-text from arXiv TeX/HTML”. Search still titles+abstracts. Retrieve ingest is arXiv HTML; `retrieve_k_per_paper=5`; 512/50 applies inside a heading section.
+**Chunking amendment (executed 2026-09-03):** `.specs/features/structured-aware-chunking/spec.md` supersedes retrieve-side **ARX-01** / **ARX-03** PDF load (`ArxivLoader`) and the out-of-scope row “Full-text from arXiv TeX/HTML”. Search still titles+abstracts. Retrieve ingest is arXiv HTML; 512/50 applies inside a heading section. Packed `retrieve_k_per_paper=5` from that amendment is superseded by the rerank amendment below.
+
+**Rerank amendment (executed 2026-09-03):** `.specs/features/retrieve-cross-encoder-rerank/` supersedes packed `k=5` from ensemble order (**RETR-05**) and RRF pack-to-5 / overfetch `3×k` (**RETR-08**). First-stage hybrid `k=40`; adaptive cut `top_n=12`. Unchanged: HTML ingest, placeholder expand, T1/T2a/T3 routing. UAT of this amendment is not complete.
 
 ## Problem Statement
 

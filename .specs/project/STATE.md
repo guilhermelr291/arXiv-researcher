@@ -1,7 +1,7 @@
 # State
 
-**Last Updated:** 2026-09-03
-**Current Work:** Feature `structured-aware-chunking` — Execute T1–T19 done. Manual UAT still pending (B-001).
+**Last Updated:** 2026-09-04
+**Current Work:** Voyage rerank T1–T7 code-validated (uncommitted). Next: live UAT (`2609.01617` v1, `1706.03762` v7); may be blocked by B-001. Set `VOYAGE_API_KEY` in local `.env` before API boot.
 
 ---
 
@@ -112,6 +112,20 @@
 **Trade-off:** `plan_inadequate` stays overloaded; T1 may spend the only replan then `insufficient`.
 **Impact:** Tasks and implementation must follow that design. Do not reintroduce lot admission at search eval or union `retrieve_k`.
 
+### AD-017: Retrieve CrossEncoder rerank (2026-09-03) — SUPERSEDED by AD-018
+
+**Decision:** After per-paper hybrid overfetch, score candidates once with `tomaarsen/Qwen3-Reranker-0.6B-seq-cls` via `langchain_community.cross_encoders.HuggingFaceCrossEncoder.score` (raw logits; no sigmoid). Rerank query is the retrieve `task` (plus step eval feedback on retry), not `FormulatedQuery`. `RetrieveRunner.run` (`agents/retrieve.py`) calls `cut_reranked` (`ingest/rerank.py`): sort by logit desc, optional `floor` empties the paper if best < floor, else walk and `break` when `(best - current) > margin`, also cap `top_n`. Defaults `top_n=12`, `margin=4.0`, `floor=None` are function parameters. Then `pack_hits` / `expand_hits`. First-stage `k=40` per leg. No LangGraph rerank node. Load/score failure falls back to ensemble-order `pack_hits(k=top_n)`.
+**Reason:** LangSmith trace `01a06938-a33c-7bd0-aaaa-de2129d4d34e` — useful methodology chunks were already in ensemble ranks 7–27. Seq-cls logits are not probabilities and are not calibrated across queries, so the keep-set is relative to that query’s best hit. User specified adaptive `margin` + `top_n` + optional `floor` instead of a fixed `top_n` or a sigmoid threshold.
+**Trade-off:** Local `torch` + ~0.6B download; CPU cold start; `margin=4.0` is un-calibrated; `floor=None` by default so retrieve will not empty on a weak best hit until UAT sets a floor.
+**Impact:** Spec `.specs/features/retrieve-cross-encoder-rerank/spec.md` (Execute T1–T7 2026-09-03, uncommitted; UAT pending). Design and tasks executed 2026-09-03. Supersedes RETR-05 packed k=5 and RETR-08 RRF-order pack-to-5. Reopens admission’s “global rerank” out-of-scope row for this slice only (no MMR, no Citation score). **Superseded 2026-09-04:** local Qwen scorer is not the live path (AD-018).
+
+### AD-018: Voyage rerank-3 retrieve scorer (2026-09-04)
+
+**Decision:** Approve `.specs/features/retrieve-cross-encoder-rerank/spec.md` and `design.md` as written (Voyage amendment). Replace the local Qwen CrossEncoder with `voyageai.Client.rerank` (`rerank-3`, `truncation=True`, no `top_k`), map `index` back to input order, then per-paper `cut_reranked` (`top_n=12`, `margin=0.20`, `floor=0.30`). Rerank query stays retrieve `task` (+ step feedback). Missing `VOYAGE_API_KEY` fails `Settings()` at boot. Runtime Voyage errors pack ensemble `k=top_n`. Drop `torch` / `sentence-transformers` / `transformers`. No new graph node, no Citation score, no silent model fallback.
+**Reason:** User approved spec + design 2026-09-04. Local 0.6B Hub download + CPU score made retrieve unusable vs the ~2 min timeout.
+**Trade-off:** Extra vendor (Voyage) besides OpenAI; Preview `rerank-3`; `margin`/`floor` un-calibrated until UAT; API key required to start the process.
+**Impact:** Qwen Execute T1–T7 SHALL NOT ship. Tasks rewritten 2026-09-04. UAT still pending (`2609.01617` v1, `1706.03762` v7).
+
 ### AD-012: Eval-replan design locks (2026-08-27)
 
 **Decision:** Approve `.specs/features/orchestrator-eval-replan/design.md`. Search waves use LangGraph `Send` and admit papers only after eval pass. Hybrid retrieve is `EnsembleRetriever` RRF weights 0.7/0.3 (`langchain-classic` + BM25), not linear score fusion. Follow-up omits `search` (drop `reuse_existing_papers`). `Policy.max_retries_per_step=1`, `max_replans=1`. Mixed-wave remaining head is the earliest unpassed step; later passed searches are not rerun.
@@ -145,7 +159,10 @@
 - Remaining-only replan compacting prefix to `passed_steps=range(len(prefix))` is safe only if every index-keyed map (`search_artifacts`, `eval_by_step`, `retrieve_ingest.gap_step_indices`) is remapped or stored by task identity. This feature made retrieve depend on `search_artifacts[str(plan_index)]`; mixed-wave S8a then walks the wrong ranking.
 - Chainlit loads `.env` and, if `DATABASE_URL` is set, instantiates `ChainlitDataLayer` (`asyncpg`). This project's `DATABASE_URL` is the API's psycopg/pgvector URL. The Chainlit process must drop that env var after import; do not add `asyncpg` or share the researcher schema with Chainlit persistence.
 - `langchain-community` 0.4.2 `ArxivAPIWrapper` still calls `Search.results()` and `Result.download_pdf()`. `arxiv` 4.x removed both. Keep `arxiv>=2.2.0,<4` until the wrapper (or a successor package) uses `Client.results`.
-- Search-wave judge `ranked_keys` are clipped to artifact hits. If the prompt omits `arxiv_id`/`version`, the model invents ids (`QLoRA-2023`) and a passing step becomes a retry. Trace `01a058c6-e1a8-71a0-b9e1-44ed67f3f1a6` then exhausted the 120s cap on the second eval. Quick 010: judge emits per-step `ranked_hit_indices` instead; clip still gates the artifact.
+- Search formulate that forbids `id:` and ANDs body terms (equation names, Transformer-big) into `abs:` misses a named historical paper on attempt 1. Trace `01a06917-e169-73f1-992c-ef624783dee9` retried after zero hits; the student query already had `1706.03762`. Quick 012: `id:{NNNN.NNNNN}` when present; body facts stay on retrieve.
+- Writer LLM judge can `retry` a grounded answer to demand extra caveats (EN-FR 41.8 vs 41.0 already cited). Quick 013: pass when requested facts are cited; do not retry to rephrase a stated contradiction.
+- `sentence_transformers.CrossEncoder.predict` applies `nn.Sigmoid` when `num_labels=1`. The Qwen3 seq-cls model card’s `predict` example prints probabilities; transformers `.logits` are the raw values `margin=4.0` needs. `HuggingFaceCrossEncoder.score` is `predict` — pass `activation_fn=Identity()` in `model_kwargs` or the adaptive cut never fires.
+- Installing `sentence-transformers` / `transformers` makes FastAPI lifespan import `torch` even when `ingest/rerank.py` lazy-imports. `chunk_build` does `from langchain_text_splitters import …`, and that package `__init__` eagerly imports `SentenceTransformersTokenTextSplitter`. `hybrid` does `from langchain_classic.retrievers import EnsembleRetriever`, whose package `__init__` pulls `ParentDocumentRetriever` → the same splitters. Lazy `get_cross_encoder()` is not enough; defer those two imports until first retrieve/ingest.
 - PyMuPDF `get_text()` (LangChain `ArxivLoader`) can emit U+0000. Postgres TEXT / psycopg reject it. Strip NUL in the arXiv adapter after load. Trace `01a058da-c1b4-7633-befb-39b6249739c7`.
 
 ---
@@ -165,6 +182,9 @@
 | 009 | Strip NUL bytes from arXiv PDF text before pgvector upsert | 2026-08-31 | — | ✅ Done |
 | 010 | Search-wave judge ranks via per-step hit indexes, not invented arXiv ids | 2026-08-31 | — | ✅ Done |
 | 011 | PDF chunking uses tiktoken 512/50 (`cl100k_base`), not characters | 2026-08-31 | — | ✅ Done |
+| 012 | Search `id:` when arXiv id is present; do not AND body terms into abs | 2026-09-03 | — | ✅ Done |
+| 013 | Writer judge passes cited fidelity; no retry for extra caveats | 2026-09-03 | — | ✅ Done |
+| 014 | HTML Independent Tests UAT on canonical `1706.03762` v7 | 2026-09-03 | — | ✅ Done |
 
 ---
 
@@ -175,6 +195,8 @@
 - [ ] Auth, multi-user, billing — Captured during: project init
 - [ ] Thread TTL/delete and history UI across browser sessions — Captured during: grill-me
 - [x] arXiv TeX/HTML instead of PDF extract — Promoted to feature `structured-aware-chunking` (spec draft 2026-09-02)
+- [ ] Qwen3-Reranker-4B if 0.6B still ranks isolated equations above V-C prose — Captured during: retrieve-cross-encoder-rerank specify; 0.6B path to be removed by Voyage amendment
+- [ ] `rerank-3-lite` if Preview `rerank-3` latency or cost hurts UAT — Captured during: Voyage discuss 2026-09-04
 - [ ] Image/figure units + vision — Captured during: structured-aware-chunking grill-me
 - [ ] LLM summaries of tables/equations — Captured during: structured-aware-chunking grill-me
 - [ ] Dockerize API and Chainlit — Captured during: grill-me
@@ -213,7 +235,25 @@
 - [x] User requested Tasks for `structured-aware-chunking` (2026-09-03; spec/design still formally Draft)
 - [x] User asked to Execute `.specs/features/structured-aware-chunking/tasks.md` (2026-09-03)
 - [x] Execute T1–T19 for `structured-aware-chunking`; update PROJECT.md (HTML ingest, `retrieve_k_per_paper=5`) and parent spec superseded banners
-- [ ] Manual UAT: structured-aware HTML chunking Independent Tests (`1706.03762` v7 ingest/retrieve; needs free Postgres port)
+- [x] Code validation: structured-aware HTML chunking (T1–T19 Done-when + live `1706.03762` v7 parse/chunk/pack/expand; 2026-09-03)
+- [x] Manual UAT: structured-aware HTML chunking Independent Tests (`1706.03762` v7 retrieve/cache/Writer; 2026-09-03 quick 014; missing-HTML hole not re-run)
+- [ ] Commit quick 012–014 when asked
+- [x] User requested Design for `retrieve-cross-encoder-rerank` (2026-09-03; spec still formally Draft)
+- [x] User requested Tasks for `retrieve-cross-encoder-rerank` (2026-09-03; spec/design still formally Draft)
+- [x] User asked to Execute `.specs/features/retrieve-cross-encoder-rerank/tasks.md` (2026-09-03; no commits)
+- [x] Execute T1–T7 for `retrieve-cross-encoder-rerank`; update PROJECT.md (first-stage k=40, adaptive `top_n=12`) and parent spec superseded banners
+- [x] Code validation: retrieve CrossEncoder rerank (T1–T7 Done-when + `cut_reranked` unittest; 2026-09-04). Major: torch at FastAPI lifespan (DEP-01)
+- [x] Torch-at-lifespan import: superseded by Voyage design (remove `torch` / `sentence-transformers` / `transformers`; do not defer splitter/Ensemble imports)
+- [x] User approve `.specs/features/retrieve-cross-encoder-rerank/context.md` (Voyage amendment) before Specify
+- [x] User requested Design for Voyage `retrieve-cross-encoder-rerank` (2026-09-04; spec still formally Draft)
+- [x] User approve Voyage spec + design (`.specs/features/retrieve-cross-encoder-rerank/spec.md` + `design.md`) 2026-09-04
+- [x] Rewrite Voyage tasks.md (Qwen T1–T7 superseded)
+- [x] User asked to Execute Voyage `.specs/features/retrieve-cross-encoder-rerank/tasks.md` (2026-09-04; no commits)
+- [x] Execute Voyage T1–T7 (do not Execute from the Qwen task list)
+- [x] Code validation: Voyage retrieve-cross-encoder-rerank T1–T7 (2026-09-04). Gate: 14/14 `tests.test_cut_reranked`. Live Independent Tests still UAT.
+- [ ] Add `VOYAGE_API_KEY` to `.env.example` (boot now requires it; example file still OpenAI-only)
+- [ ] Manual UAT: retrieve rerank Independent Tests after Voyage swap (`2609.01617` v1; `1706.03762` v7; may be blocked by B-001)
+- [ ] Atomic commits when the user asks to commit (Voyage T1–T7 uncommitted; Qwen path superseded)
 
 ---
 

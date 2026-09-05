@@ -8,6 +8,8 @@
 **Design:** `.specs/features/orchestrator-eval-replan/design.md` (approved 2026-08-27)  
 **Amended:** `.specs/features/admission-retrieve-per-topic/` (spec + design approved 2026-08-29) replaces SEARCH-01 **admission**, SEARCH-02 **verdict shape**, RETR-01 **global `k`**, and LOOP-03 on **search attempt 1**. Unnamed IDs in this file stay in force.
 
+**Rerank amendment (executed 2026-09-03):** `.specs/features/retrieve-cross-encoder-rerank/` supersedes packed `k=5` from ensemble order (**RETR-05**) and RRF pack-to-5 / overfetch `3×k` (**RETR-08**). First-stage hybrid `k=40`; adaptive cut `top_n=12`. Unchanged: HTML ingest, placeholder expand, T1/T2a/T3 routing. UAT of this amendment is not complete.
+
 This spec defines **only** the new orchestrator loop, plan shape, per-artifact eval, retry, and replan. Gate, arXiv allowlist, grounding format, SSE event **names**, Chainlit, checkpointer, models, splitter sizes, `max_papers`, and timeout stay as in the parent spec unless an ID below explicitly supersedes them.
 
 ## Problem Statement
@@ -211,7 +213,7 @@ Each requirement gets a unique ID for tracking across design, tasks, and validat
 | LOOP-03        | P1: Replan remaining      | Execute | ⚠ Superseded on search attempt 1 (`admission-retrieve-per-topic` LOOP-04) |
 | SEARCH-01      | P1: Variable plan         | Execute | ⚠ Admission superseded (`admission-retrieve-per-topic` ADM-*) |
 | SEARCH-02      | P1: Semantic eval + retry | Execute | ⚠ Verdict shape superseded (`ranked_keys`; ADM-03) |
-| RETR-01        | P1: Variable plan         | Execute | ⚠ Global `k` then PDF ingest superseded (`retrieve_k_per_paper=5`; HTML-01) |
+| RETR-01        | P1: Variable plan         | Execute | ⚠ Global `k` then PDF ingest superseded (HTML-01); packed-to-5 superseded (retrieve-cross-encoder-rerank; first-stage 40, adaptive `top_n=12`) |
 | WRITE-01       | P1: Semantic eval + retry | Execute | ✅ Verified (code) |
 | REPLAN-01      | P1: Replan remaining      | Execute | ✅ Verified (code) |
 | REPLAN-02      | P1: Replan remaining      | Execute | ✅ Verified (code) |
@@ -226,7 +228,7 @@ Each requirement gets a unique ID for tracking across design, tasks, and validat
 - **LOOP-03** — Fail + retry exhausted **or** eval = plan inadequate → if replan remaining, else `insufficient`. Plan-inadequate skips any unused retry on that step.
 - **SEARCH-01** — Search artifact is titles + abstracts for **this** task, allowlist/recency (or historical). No PDF. The search agent **always** formulates the arXiv query from the task via structured output (not the raw `task` or student `query`). Retry = new arXiv query from task + that step’s feedback. Only passing searches admit papers. Consecutive independent searches may fan out (`Send`) and join before eval.
 - **SEARCH-02** — Semantic search eval is **one** LLM structured-output call per wave, input = all title+abstract returns in that wave, output = one verdict + feedback **per search step**. Not one LLM call per return. Not one verdict for the whole wave. Retry wave: one call over the subset still retrying.
-- **RETR-01** — Retrieve artifact is `[n]` chunks only from admitted papers. Under the hood (not a plan step): miss → HTML → heading split + 512/50 inside a section → hybrid 0.7 vector / 0.3 lexical, packed to `retrieve_k_per_paper=5`. The retrieve agent **always** formulates an English hybrid query from the task via structured output. Retry = new English query from task + that step’s feedback.
+- **RETR-01** — Retrieve artifact is `[n]` chunks only from admitted papers. Under the hood (not a plan step): miss → HTML → heading split + 512/50 inside a section → hybrid 0.7 vector / 0.3 lexical. Packed to `retrieve_k_per_paper=5` is **superseded** by `.specs/features/retrieve-cross-encoder-rerank/` (first-stage `k=40`, adaptive cut `top_n=12`). The retrieve agent **always** formulates an English hybrid query from the task via structured output. Retry = new English query from task + that step’s feedback.
 - **WRITE-01** — Writer eval remains ORCH-03. Retry = rewrite on the **same** evidence. Pass → `answer_complete` only; no student-visible answer before that.
 - **REPLAN-01** — At most **one** replan per run. Planner rewrites **only** the remaining suffix. Passed steps and admitted papers stay. Emit existing `plan` event. Zero retry on the new current step. Checklists unchanged.
 - **REPLAN-02** — Example: `search DoRA` retries exhausted → remaining `retrieve` + `writer` “compare LoRA vs QLoRA; DoRA without evidence.” Do not continue a Writer still asked to compare three as evidenced.

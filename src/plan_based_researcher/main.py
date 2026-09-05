@@ -41,7 +41,12 @@ async def lifespan(app: FastAPI):
     papers = ArxivPaperAdapter()
     hybrid = HybridRetrieveAdapter(repo, embeddings)
     factory = AgentFactory(
-        papers, repo, embeddings, hybrid, api_key=settings.openai_api_key
+        papers,
+        repo,
+        embeddings,
+        hybrid,
+        api_key=settings.openai_api_key,
+        voyage_api_key=settings.voyage_api_key,
     )
     deps = GraphDeps(
         factory=factory,

@@ -1,7 +1,7 @@
 # Structured-Aware Chunking Specification
 
 **Feature:** `structured-aware-chunking`  
-**Spec status:** Implemented (Execute T1–T19 2026-09-03). Manual UAT still pending (B-001).  
+**Spec status:** Implemented (Execute T1–T19 2026-09-03). Independent Tests for ingest, retrieve, cache, and Writer passed 2026-09-03 on canonical paper `1706.03762` v7 (DB cache + hybrid pack/expand; Writer via LangSmith `01a06917-e169-73f1-992c-ef624783dee9`).  
 **Date:** 2026-09-02  
 **Gray areas:** Resolved in grill-me 2026-09-02; `discuss.md` skipped  
 **Parent admission:** `.specs/features/admission-retrieve-per-topic/spec.md` (approved)  
@@ -12,6 +12,8 @@
 **Design:** `.specs/features/structured-aware-chunking/design.md` (executed)  
 **Tasks:** `.specs/features/structured-aware-chunking/tasks.md` (T1–T19 executed 2026-09-03)
 
+**Rerank amendment (executed 2026-09-03):** `.specs/features/retrieve-cross-encoder-rerank/` supersedes packed `k=5` from ensemble order (**RETR-05**) and RRF pack-to-5 / overfetch `3×k` (**RETR-08**). First-stage hybrid `k=40`; adaptive cut `top_n=12`. Unchanged: HTML ingest, placeholder expand, T1/T2a/T3 routing. UAT of this amendment is not complete.
+
 This spec defines **only** how retrieve **ingests** arXiv HTML, how prose and atomic units are stored, and how hybrid retrieve **expands** placeholders into Writer/UI excerpts. Gate, search (titles+abstracts, no full text), admission 1/topic, U1, T1/T2a/T3 routing, hybrid **weights** 0.7/0.3, `FormulatedQuery`, SSE event **names**, Chainlit, checkpointer, models, `max_steps=8`, `max_papers=8`, `max_retries_per_step=1`, `max_replans=1`, timeout, Writer `[n]` **format**, and `Citation` **fields** stay as in the parent specs unless an ID below explicitly supersedes them.
 
 ## Problem Statement
@@ -20,9 +22,9 @@ Retrieve today loads arXiv **PDFs** with `ArxivLoader` and splits the dumped tex
 
 ## Goals
 
-- [ ] Retrieve ingest uses arXiv HTML only. Cache miss fetches HTML, not PDF. Existing local PDF chunks are wiped.
-- [ ] Prose chunks keep section identity; tables and display equations are atomic rows that are never split.
-- [ ] Hybrid retrieve still runs **per admitted paper**, returns **at most 5** packed hits, and inlines full tables/equations into those excerpts without spending extra `[n]` slots.
+- [x] Retrieve ingest uses arXiv HTML only. Cache miss fetches HTML, not PDF. Existing local PDF chunks are wiped.
+- [x] Prose chunks keep section identity; tables and display equations are atomic rows that are never split.
+- [x] Hybrid retrieve still runs **per admitted paper** and inlines full tables/equations into those excerpts without spending extra `[n]` slots. Packed count/order (**at most 5** from ensemble/RRF) is **superseded** by `.specs/features/retrieve-cross-encoder-rerank/` (first-stage `k=40`, adaptive cut `top_n=12`); expand behavior stays.
 
 ## Out of Scope
 
@@ -61,7 +63,7 @@ Upon approval, these IDs are **replaced** by this feature (do not implement both
 - No LLM at ingest for unit descriptions.
 - Equation `embedding_text` is extractive: section path + window `min(containing subsection, 200 tiktoken tokens)` around the placeholder + tag + TeX.
 - Table `embedding_text` is caption + header row + first two data rows.
-- Ensemble **overfetch** at least `3 × retrieve_k_per_paper` candidates per paper, then pack to 5 unique.
+- Ensemble **overfetch** at least `3 × retrieve_k_per_paper` candidates per paper, then pack to 5 unique. **Superseded** by `.specs/features/retrieve-cross-encoder-rerank/` (first-stage `k=40`, adaptive cut `top_n=12`); mixed index + `unit_id` dedup/expand stay.
 - Parser runs **in memory** in the retrieve path; MUST NOT write `_tmp_arxiv_html` (CLI spike MAY remain as a debug wrapper).
 
 ---
@@ -89,7 +91,7 @@ Upon approval, these IDs are **replaced** by this feature (do not implement both
 11. WHEN `(arxiv_id, version)` already has HTML-derived chunks THEN retrieve SHALL skip the fetch and SHALL use stored rows (amended ARX-03).
 12. WHEN this feature is deployed locally THEN existing PDF `chunks` (and papers that only exist for that corpus, as needed) SHALL be wiped and `chunks` recreated for the new columns. The PDF ingest code path in retrieve SHALL be removed, not left as dead fallback.
 
-**Independent Test**: Ingest `1706.03762` v7 from HTML (fixture or live). Assert: prose contains `[EQUATION:S3.E1]`; inner result tables are `kind=table` with caption from the wrapping `ltx_table`; no `figure` rows; no PNG files written; `S6.T3` (or equivalent) body stored whole even if `>512` tokens; layout spacers absent; `embedding_text` of a prose chunk containing E1 uses a human label, not `[EQUATION:S3.E1]`; cache hit does not refetch HTML.
+**Independent Test**: Ingest `1706.03762` v7 from HTML (fixture or live). Assert: prose contains `[EQUATION:S3.E1]`; inner result tables are `kind=table` with caption from the wrapping `ltx_table`; no `figure` rows; no PNG files written; `S6.T3` (or equivalent) body stored whole even if `>512` tokens; layout spacers absent; `embedding_text` of a prose chunk containing E1 uses a human label, not `[EQUATION:S3.E1]`; cache hit does not refetch HTML. **Passed 2026-09-03** on cached v7 rows (38 chunks: prose/table/equation; `S6.T3` 902 tokens; `paper_has_chunks` true).
 
 ---
 
@@ -109,7 +111,7 @@ Upon approval, these IDs are **replaced** by this feature (do not implement both
 6. WHEN the Writer and `Citation.excerpt` / Chainlit side panel are built THEN they SHALL use the **same** expanded excerpt string. `Citation` fields SHALL NOT gain `kind` or `section` in this feature.
 7. WHEN a paper contributes fewer than 5 unique hits THEN the system SHALL return that many (parent tiny-document rule). WHEN a paper has zero chunks THEN it SHALL be omitted from concat (not usable).
 
-**Independent Test**: After ingesting `1706.03762` v7: (a) formulated query about scaled dot-product attention returns a prose `[n]` whose excerpt contains the E1 TeX, not `[EQUATION:S3.E1]`; (b) query that ranks the same unit twice (prose + atomic, or two overlapping prose chunks) shows the full body once and a label the second time; (c) query about a BLEU / variation table inlines the **full** markdown table in some `[n]` even if the table is `>512` tokens; (d) each usable paper contributes at most 5 `[n]` blocks after concat.
+**Independent Test**: After ingesting `1706.03762` v7: (a) formulated query about scaled dot-product attention returns a prose `[n]` whose excerpt contains the E1 TeX, not `[EQUATION:S3.E1]`; (b) query that ranks the same unit twice (prose + atomic, or two overlapping prose chunks) shows the full body once and a label the second time; (c) query about a BLEU / variation table inlines the **full** markdown table in some `[n]` even if the table is `>512` tokens; (d) each usable paper contributes at most 5 `[n]` blocks after concat. **Passed 2026-09-03** via `.specs/quick/014-html-uat-1706/verify.py` (hybrid overfetch → pack 5; E1 TeX in excerpt; Table 2 markdown with 28.4; expand first body / second label). Writer UAT: trace `01a06917-e169-73f1-992c-ef624783dee9` quotes E1 and reports Transformer-big BLEU from expanded `[1]`/`[4]`/`[5]`.
 
 ---
 
@@ -132,20 +134,20 @@ Each requirement gets a unique ID for tracking across design, tasks, and validat
 
 | Requirement ID | Story | Phase | Status |
 | -------------- | ----- | ----- | ------ |
-| HTML-01 | P1: Structured HTML ingest | Execute | ✅ Verified (code); ⏳ UAT |
-| HTML-02 | P1: Structured HTML ingest | Execute | ✅ Verified (code); ⏳ UAT |
-| PARSE-01 | P1: Structured HTML ingest | Execute | ✅ Verified (code); ⏳ UAT |
-| PARSE-02 | P1: Structured HTML ingest | Execute | ✅ Verified (code); ⏳ UAT |
-| PARSE-03 | P1: Structured HTML ingest | Execute | ✅ Verified (code); ⏳ UAT |
-| SPLIT-01 | P1: Structured HTML ingest | Execute | ✅ Verified (code); ⏳ UAT |
-| STORE-01 | P1: Structured HTML ingest | Execute | ✅ Verified (code); ⏳ UAT |
-| EMB-02 | P1: Structured HTML ingest | Execute | ✅ Verified (code); ⏳ UAT |
-| RETR-05 | P1: Placeholder-aware retrieve | Execute | ✅ Verified (code); ⏳ UAT |
-| RETR-06 | P1: Structured HTML ingest | Execute | ✅ Verified (code); ⏳ UAT |
-| RETR-07 | P1: Placeholder-aware retrieve | Execute | ✅ Verified (code); ⏳ UAT |
-| RETR-08 | P1: Placeholder-aware retrieve | Execute | ✅ Verified (code); ⏳ UAT |
-| RETR-09 | P1: Placeholder-aware retrieve | Execute | ✅ Verified (code); ⏳ UAT |
-| MIG-01 | P1: Structured HTML ingest | Execute | ✅ Verified (code); ⏳ UAT |
+| HTML-01 | P1: Structured HTML ingest | Execute | ✅ Verified (code + UAT `1706.03762` v7) |
+| HTML-02 | P1: Structured HTML ingest | Execute | ✅ Verified (code + UAT cache hit) |
+| PARSE-01 | P1: Structured HTML ingest | Execute | ✅ Verified (code + UAT) |
+| PARSE-02 | P1: Structured HTML ingest | Execute | ✅ Verified (code + UAT; no `figure` rows) |
+| PARSE-03 | P1: Structured HTML ingest | Execute | ✅ Verified (code + UAT placeholders) |
+| SPLIT-01 | P1: Structured HTML ingest | Execute | ✅ Verified (code + UAT `S6.T3` 902 tokens) |
+| STORE-01 | P1: Structured HTML ingest | Execute | ✅ Verified (code + UAT) |
+| EMB-02 | P1: Structured HTML ingest | Execute | ✅ Verified (code + UAT label in `embedding_text`) |
+| RETR-05 | P1: Placeholder-aware retrieve | Execute | ⚠ packed k=5 superseded (retrieve-cross-encoder-rerank) |
+| RETR-06 | P1: Structured HTML ingest | Execute | ✅ Verified (code + UAT) |
+| RETR-07 | P1: Placeholder-aware retrieve | Execute | ✅ Verified (code + UAT expand once) |
+| RETR-08 | P1: Placeholder-aware retrieve | Execute | ⚠ RRF pack-to-5 superseded (retrieve-cross-encoder-rerank) |
+| RETR-09 | P1: Placeholder-aware retrieve | Execute | ✅ Verified (code + Writer trace excerpts) |
+| MIG-01 | P1: Structured HTML ingest | Execute | ✅ Verified (code) |
 
 **ID map (normative behavior):**
 
@@ -157,27 +159,27 @@ Each requirement gets a unique ID for tracking across design, tasks, and validat
 - **SPLIT-01** — Heading split, then 512/50 only inside a section; never split atomics.
 - **STORE-01** — `kind`, `unit_id`, `embedding_text`, `content`, `metadata {section, caption, unit_ids}`; atomic identity `(arxiv_id, version, unit_id)`.
 - **EMB-02** — Prose vectors use labels in `embedding_text`; table/equation vectors use locked heuristics/extractive window; no ingest LLM; atomic `content` = caption/tag + full body.
-- **RETR-05** — `retrieve_k_per_paper=5`; per-paper hybrid; concat; continuous `[n]`; no union `k`.
+- **RETR-05** — **Superseded** by retrieve-cross-encoder-rerank for packed `k=5` from ensemble order. Unchanged: one hybrid call per usable paper; concat; continuous `[n]`; no union `k`. Live cut: first-stage hybrid `k=40`; adaptive `top_n=12`.
 - **RETR-06** — Walk `ranked_keys`; first usable **HTML** ingest; empty/missing HTML ≠ arXiv miss; no PDF fallback.
 - **RETR-07** — In-place expansion; first ranked occurrence of a `unit_id` gets full `content`; later prose gets label only; expansion does not consume `k`.
-- **RETR-08** — Mixed index; vector on `embedding_text`, BM25 on `content`; overfetch ≥3×k; dedup `unit_id`; backfill to 5 unique.
+- **RETR-08** — Mixed index; vector on `embedding_text`, BM25 on `content` still apply. **Superseded** by retrieve-cross-encoder-rerank for overfetch ≥3×k and RRF pack-to-5. Unchanged: `unit_id` dedup + backfill; expansion after pack (RETR-07 / RETR-09).
 - **RETR-09** — Atomic hit excerpt = section + `content`; Writer and Citation/UI share the expanded excerpt; no new Citation fields.
 - **MIG-01** — Wipe local PDF chunks; recreate `chunks` schema; delete retrieve PDF path.
 
-**Coverage:** 14 total, 14 mapped to stories, 0 unmapped. Execute T1–T19 2026-09-03. Independent Tests / live UAT still pending (B-001).
+**Coverage:** 14 total, 14 mapped to stories, 0 unmapped. Execute T1–T19 2026-09-03. Independent Tests passed 2026-09-03 on canonical `1706.03762` v7 (cached HTML chunks + hybrid retrieve; Writer via LangSmith `01a06917-e169-73f1-992c-ef624783dee9`). Chainlit side panel was not re-clicked this session; Citation excerpts are the same expanded strings the API already streamed.
 
 ---
 
 ## Success Criteria
 
-- [ ] Cache-miss retrieve of a paper with arXiv HTML stores section-aware prose plus atomic table/equation rows; no PDF download; no image files.
-- [ ] Writer `[n]` list is at most 5 excerpts per usable paper, with placeholders expanded (full table/equation once per `unit_id` in that paper’s packed hits).
-- [ ] A question about a table metric or a named display equation can be evidenced by the **full** element in some citation excerpt.
+- [x] Cache-miss retrieve of a paper with arXiv HTML stores section-aware prose plus atomic table/equation rows; no PDF download; no image files.
+- [x] Writer `[n]` list is at most 5 excerpts per usable paper, with placeholders expanded (full table/equation once per `unit_id` in that paper’s packed hits).
+- [x] A question about a table metric or a named display equation can be evidenced by the **full** element in some citation excerpt.
 - [ ] Paper without HTML is skipped via `ranked_keys` fallback or becomes a WRITE-02 hole; the run does not fetch PDF.
-- [ ] Search, admission 1/topic, T1/T2a/T3 routing, Gate, SSE names, and Writer `[n]` numbering format are unchanged.
+- [x] Search, admission 1/topic, T1/T2a/T3 routing, Gate, SSE names, and Writer `[n]` numbering format are unchanged.
 
 ---
 
 ## Confirm before Execute
 
-Executed 2026-09-03 (`tasks.md` T1–T19). Manual UAT of Independent Tests (`1706.03762` v7) still pending (B-001).
+Executed 2026-09-03 (`tasks.md` T1–T19). Independent Tests for ingest/retrieve/cache/Writer on `1706.03762` v7 passed 2026-09-03 (quick 014). Missing-HTML hole path was not re-run in that UAT.

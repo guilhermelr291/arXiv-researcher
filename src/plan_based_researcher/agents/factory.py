@@ -29,12 +29,21 @@ class AgentFactory:
         embeddings: EmbeddingPort,
         hybrid: HybridRetrievePort,
         api_key: str | None = None,
+        *,
+        voyage_api_key: str,
     ) -> None:
         self._runners: dict[str, AgentRunner] = {
             "gate": GateRunner(api_key=api_key),
             "planner": PlannerRunner(api_key=api_key),
             "search": SearchRunner(papers, api_key=api_key),
-            "retrieve": RetrieveRunner(papers, chunks, embeddings, hybrid, api_key=api_key),
+            "retrieve": RetrieveRunner(
+                papers,
+                chunks,
+                embeddings,
+                hybrid,
+                api_key=api_key,
+                voyage_api_key=voyage_api_key,
+            ),
             "writer": WriterRunner(api_key=api_key),
         }
 

@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 
 from langchain_openai import ChatOpenAI
 
-from plan_based_researcher.adapters.hybrid import HybridRetrievePort
+from plan_based_researcher.adapters.hybrid import HybridResult, HybridRetrievePort
 from plan_based_researcher.agents.query_schema import (
     FormulatedQuery,
     formulate_human,
@@ -18,12 +19,24 @@ from plan_based_researcher.ingest.chunk_build import build_chunk_drafts
 from plan_based_researcher.ingest.expand import expand_hits
 from plan_based_researcher.ingest.html_parse import ParsedPaper, parse_arxiv_html
 from plan_based_researcher.ingest.pack import pack_hits
+from plan_based_researcher.ingest.rerank import (
+    build_rerank_query,
+    cut_reranked,
+    score_chunks,
+)
 from plan_based_researcher.policy import Policy
-from plan_based_researcher.ports.chunks import ChunkDraft, ChunkRepository, PaperRecord
+from plan_based_researcher.ports.chunks import (
+    ChunkDraft,
+    ChunkRecord,
+    ChunkRepository,
+    PaperRecord,
+)
 from plan_based_researcher.ports.embeddings import EmbeddingPort
 from plan_based_researcher.ports.papers import PaperPort
 
 __all__ = ["RetrieveRunner"]
+
+logger = logging.getLogger(__name__)
 
 _FORMULATE_SYSTEM = """\
 You write a English retrieval query for hybrid search (vector + BM25) over \
@@ -165,6 +178,29 @@ def _parse_and_build(html_bytes: bytes) -> tuple[ParsedPaper, list[ChunkDraft]]:
     return parsed, build_chunk_drafts(parsed)
 
 
+def _append_numbered(
+    dest: list[dict],
+    packed: list[ChunkRecord],
+    excerpts: list[str],
+    n: int,
+) -> int:
+    for chunk, excerpt in zip(packed, excerpts):
+        dest.append(
+            {
+                "chunk_id": chunk.chunk_id,
+                "n": n,
+                "arxiv_id": chunk.arxiv_id,
+                "version": chunk.version,
+                "title": chunk.title,
+                "year": chunk.year,
+                "url": chunk.url,
+                "excerpt": excerpt,
+            }
+        )
+        n += 1
+    return n
+
+
 class RetrieveRunner:
     def __init__(
         self,
@@ -173,11 +209,14 @@ class RetrieveRunner:
         embeddings: EmbeddingPort,
         hybrid: HybridRetrievePort,
         api_key: str | None = None,
+        *,
+        voyage_api_key: str,
     ) -> None:
         self._papers = papers
         self._chunks = chunks
         self._embeddings = embeddings
         self._hybrid = hybrid
+        self._voyage_api_key = voyage_api_key
         kwargs: dict = {"model": REGISTRY["retrieve"].model}
         if api_key is not None:
             kwargs["api_key"] = api_key
@@ -301,35 +340,68 @@ class RetrieveRunner:
         query = await self._formulate_query(
             task, feedback=feedback, previous_query=previous_query
         )
-        overfetch = Policy.retrieve_overfetch_factor * Policy.retrieve_k_per_paper
-        numbered: list[dict] = []
-        n = 1
+        rerank_query = build_rerank_query(task, feedback)
+        per_paper: list[HybridResult] = []
         for paper in merged:
             if not isinstance(paper, dict):
                 continue
-            result_i = await self._hybrid.retrieve(
-                query,
-                [(paper["arxiv_id"], paper["version"])],
-                k=overfetch,
-            )
-            packed = pack_hits(result_i.ranked, k=Policy.retrieve_k_per_paper)
-            if not packed:
-                continue
-            excerpts = expand_hits(packed, result_i.corpus)
-            for chunk, excerpt in zip(packed, excerpts):
-                numbered.append(
-                    {
-                        "chunk_id": chunk.chunk_id,
-                        "n": n,
-                        "arxiv_id": chunk.arxiv_id,
-                        "version": chunk.version,
-                        "title": chunk.title,
-                        "year": chunk.year,
-                        "url": chunk.url,
-                        "excerpt": excerpt,
-                    }
+            per_paper.append(
+                await self._hybrid.retrieve(
+                    query,
+                    [(paper["arxiv_id"], paper["version"])],
+                    k=Policy.retrieve_first_stage_k,
                 )
-                n += 1
+            )
+
+        unique: list[ChunkRecord] = []
+        seen_ids: set[str] = set()
+        for result_i in per_paper:
+            for chunk in result_i.ranked:
+                if chunk.chunk_id in seen_ids:
+                    continue
+                seen_ids.add(chunk.chunk_id)
+                unique.append(chunk)
+
+        numbered: list[dict] = []
+        if unique:
+            try:
+                scores = await asyncio.to_thread(
+                    score_chunks, unique, rerank_query, api_key=self._voyage_api_key
+                )
+                chunk_ids = [chunk.chunk_id for chunk in unique]
+                by_id = dict(zip(chunk_ids, scores))
+            except Exception:
+                logger.exception(
+                    "voyage rerank failed; packing ensemble order"
+                )
+                n = 1
+                for result_i in per_paper:
+                    packed = pack_hits(
+                        result_i.ranked, k=Policy.retrieve_rerank_top_n
+                    )
+                    if not packed:
+                        continue
+                    excerpts = expand_hits(packed, result_i.corpus)
+                    n = _append_numbered(numbered, packed, excerpts, n)
+            else:
+                n = 1
+                for result_i in per_paper:
+                    pairs = [
+                        (chunk, by_id[chunk.chunk_id])
+                        for chunk in result_i.ranked
+                    ]
+                    pairs.sort(key=lambda item: item[1], reverse=True)
+                    cut = cut_reranked(
+                        pairs,
+                        top_n=Policy.retrieve_rerank_top_n,
+                        margin=Policy.retrieve_rerank_margin,
+                        floor=Policy.retrieve_rerank_floor,
+                    )
+                    packed = pack_hits(cut, k=len(cut))
+                    if not packed:
+                        continue
+                    excerpts = expand_hits(packed, result_i.corpus)
+                    n = _append_numbered(numbered, packed, excerpts, n)
 
         if walked and gap_step_indices:
             case = "t2a"

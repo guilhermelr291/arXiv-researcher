@@ -109,7 +109,15 @@ def _writer_checklist() -> str:
         "Fail if living [n] citations are used as if they were the missing topic.\n"
         "A sentence that no usable paper was found for a named topic is not a technical "
         "claim and does not need [n].\n"
-        "Living topics still need real [n] (ORCH-03 is enforced deterministically)."
+        "Living topics still need real [n] (ORCH-03 is enforced deterministically).\n"
+        "Pass when the student-requested facts are present and cited with living [n].\n"
+        "Do not retry to rephrase, add headings, or demand extra caveats when those "
+        "facts are already cited. If the evidence contains two conflicting values for "
+        "the same fact and the markdown states both with citations, that is a pass; "
+        "do not retry to pick one canonical number or to expand the caveat.\n"
+        "Retry only when a requested fact is missing, a technical claim lacks [n], "
+        "a missing topic is filled from memory, or living [n] are used as the missing "
+        "topic."
     )
 
 

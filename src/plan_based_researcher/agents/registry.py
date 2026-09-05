@@ -62,10 +62,10 @@ REGISTRY: dict[str, AgentSpec] = {
         name="retrieve",
         abilities=(
             "Walk ranked_keys and ingest one usable HTML paper per ranking on cache miss; "
-            "hybrid-retrieve numbered [n] chunks with k=5 per paper for this "
-            "evidence goal. Write the task as what to evidence, not the retrieval "
-            "query; the retrieve agent formulates an English query. Do not search "
-            "arXiv."
+            "hybrid first-stage overfetch per paper, rerank against the "
+            "evidence task, adaptive packed [n] cut, then expand. Write the task as "
+            "what to evidence, not the retrieval query; the retrieve agent formulates "
+            "the hybrid query. Do not search arXiv."
         ),
         model=_MINI_MODEL,
         tools=("arxiv_load",),

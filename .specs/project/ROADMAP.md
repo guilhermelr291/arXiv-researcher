@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** Structured-aware HTML chunking  
-**Status:** Execute T1–T19 done 2026-09-03. Manual UAT still pending (B-001).
+**Current Milestone:** Retrieve Voyage rerank amendment  
+**Status:** Voyage T1–T7 executed 2026-09-04 (uncommitted). UAT pending (`2609.01617` v1, `1706.03762` v7; may be blocked by B-001). Qwen T1–T7 superseded as the live path.
 
 ---
 
@@ -79,19 +79,38 @@
 ## Structured-aware HTML chunking
 
 **Goal:** Retrieve ingest uses arXiv HTML; tables and display equations stay atomic; prose keeps section identity; hybrid still per-paper with expanded excerpts.
-**Target:** Manual UAT of `.specs/features/structured-aware-chunking/spec.md` Independent Tests (`1706.03762` v7; blocked by B-001).
-**Spec:** Implemented 2026-09-03 (grill-me 2026-09-02).
+**Target:** Independent Tests of `.specs/features/structured-aware-chunking/spec.md` on `1706.03762` v7 passed 2026-09-03 (quick 014). Missing-HTML hole path not re-run.
+**Spec:** Implemented 2026-09-03 (grill-me 2026-09-02). Code validation 2026-09-03 passed. Retrieve/cache/Writer UAT 2026-09-03.
 **Design:** Executed 2026-09-03.
 **Tasks:** T1–T19 executed 2026-09-03.
 
 ### Features
 
-**Structured-aware chunking** - IMPLEMENTED (UAT pending)
+**Structured-aware chunking** - IMPLEMENTED (UAT on `1706.03762` v7 passed 2026-09-03)
 
 - HTML-only retrieve ingest; wipe local PDF chunks; no PDF fallback
 - Heading split + 512/50 inside a section; tables/equations never split
 - Dual text: embed `embedding_text`, BM25/expand `content`; JSONB `section` / `caption` / `unit_ids`
-- Per-paper hybrid `k=5`, overfetch/dedup/backfill, in-place placeholder expansion
+- Per-paper hybrid `k=5`, overfetch/dedup/backfill, in-place placeholder expansion — **packed k and RRF-order pack superseded** by `retrieve-cross-encoder-rerank` (Voyage Execute 2026-09-04; UAT pending)
+
+---
+
+## Retrieve cross-encoder rerank
+
+**Goal:** Hybrid overfetches more candidates; one Voyage `rerank-3` API call reorders them against the retrieve task; `cut_reranked` keeps the prefix within `margin=0.20` of that query’s best `relevance_score`, with `floor=0.30` and `top_n=12`, then `pack_hits` / expand.
+**Target:** UAT: methodology query on `2609.01617` v1 plus regression on `1706.03762` v7. Do not treat UAT as complete.
+**Spec:** `.specs/features/retrieve-cross-encoder-rerank/` — approved 2026-09-04 (Voyage). Prior Qwen Execute T1–T7 superseded as the live scorer.  
+**Design:** Approved 2026-09-04 (Voyage). Qwen/HF design superseded.  
+**Tasks:** Voyage T1–T7 executed 2026-09-04 (uncommitted). Qwen T1–T7 executed 2026-09-03 (superseded path).
+
+### Features
+
+**Task-conditioned retrieve rerank** - IMPLEMENTED (UAT pending)
+
+- First-stage hybrid `k=40` per leg per paper (not pack-on-RRF@5)
+- Voyage `rerank-3` scored once per execute on the retrieve **task** (no torch)
+- Adaptive cut: `cut_reranked` (`top_n=12`, `margin=0.20`, `floor=0.30`) then `pack_hits` / expand
+- No new graph node; no Citation score field; runtime Voyage fail → RRF pack; missing API key → boot fail
 
 ---
 

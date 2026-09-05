@@ -2,9 +2,9 @@
 
 **Design**: `.specs/features/structured-aware-chunking/design.md`  
 **Spec**: `.specs/features/structured-aware-chunking/spec.md`  
-**Status**: Execute complete (T1–T19, 2026-09-03). Manual UAT still pending.
+**Status**: Execute complete (T1–T19, 2026-09-03). Independent Tests on `1706.03762` v7 passed 2026-09-03 (quick 014).
 
-Automated tests (pytest, Testcontainers, e2e) are **out of scope**, same as v1, `orchestrator-eval-replan`, and `admission-retrieve-per-topic`. There is no `.specs/codebase/TESTING.md`. Done-when is implementation complete vs the approved design. Spec “Independent Test” lines (`1706.03762` v7 ingest/retrieve) stay as later manual UAT, not Execute work.
+Automated tests (pytest, Testcontainers, e2e) are **out of scope**, same as v1, `orchestrator-eval-replan`, and `admission-retrieve-per-topic`. There is no `.specs/codebase/TESTING.md`. Done-when is implementation complete vs the approved design. Spec “Independent Test” lines (`1706.03762` v7 ingest/retrieve) passed 2026-09-03 (quick 014).
 
 No new graph nodes, no new SSE event names, no `units` table, no ingest LLM, no figure assets, no PDF fallback. `EvidenceChunk` TypedDict / `Citation` stay excerpt-only.
 
@@ -762,10 +762,10 @@ Phase-1 `[P]` tasks T1–T5 have no inter-deps. Phase-2a `[P]` tasks T6, T8, T9,
 | ---- | ---------- | --------------- | --------- | ------ |
 | T1–T19 | policy / ports / ingest / repo / adapters / agents / eval / scripts | none (no matrix; deferred) | none | ✅ OK |
 
-No task uses “tested in another task” as a deferral of a required type. Spec independent tests (`1706.03762` v7) remain manual UAT after Execute.
+No task uses “tested in another task” as a deferral of a required type. Spec independent tests (`1706.03762` v7) passed 2026-09-03 (quick 014).
 
 ---
 
 ## Confirm before Execute
 
-Executed 2026-09-03. Spec + design + this task list were treated as approved when Execute was requested. Manual UAT of Independent Tests remains.
+Executed 2026-09-03. Spec + design + this task list were treated as approved when Execute was requested. Independent Tests on `1706.03762` v7 passed 2026-09-03 (quick 014).

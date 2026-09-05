@@ -12,3 +12,4 @@ build/
 /graph.png
 /graph.mmd
 _tmp_*
+.files/
