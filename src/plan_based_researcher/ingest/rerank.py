@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 import voyageai
+from langsmith import traceable
 
 from plan_based_researcher.ports.chunks import ChunkRecord
 
@@ -16,6 +17,7 @@ __all__ = [
     "RERANK_MODEL_ID",
     "RERANK_TIMEOUT_SECONDS",
     "build_rerank_query",
+    "chunks_for_trace",
     "cut_reranked",
     "document_text",
     "score_chunks",
@@ -24,7 +26,11 @@ __all__ = [
 
 
 def build_rerank_query(task: str, feedback: str) -> str:
-    """Task, plus this step's eval feedback on retry. Not FormulatedQuery."""
+    """English retrieve task, plus this step's English eval feedback on retry.
+
+    Not FormulatedQuery. Planner/eval emit English even when the student query
+    is another language (LANG-05).
+    """
     task = task.strip()
     feedback = feedback.strip()
     if feedback:
@@ -85,6 +91,68 @@ def scores_from_rerank_results(n_docs: int, results: Sequence[Any]) -> list[floa
     return mapped
 
 
+_TRACE_PREVIEW_CHARS = 240
+
+
+def chunks_for_trace(
+    chunks: Sequence[Any],
+    *,
+    scores: Mapping[str, float] | None = None,
+    preview_chars: int = _TRACE_PREVIEW_CHARS,
+) -> list[dict]:
+    """Serialize chunks for a LangSmith span: rank, ids, section, preview, optional score."""
+    rows: list[dict] = []
+    for i, chunk in enumerate(chunks):
+        chunk_id = getattr(chunk, "chunk_id", None)
+        metadata = getattr(chunk, "metadata", None)
+        section = ""
+        if isinstance(metadata, dict):
+            section = (metadata.get("section") or "").strip()
+        content = str(getattr(chunk, "content", "") or "").replace("\n", " ")
+        if preview_chars >= 0 and len(content) > preview_chars:
+            content = content[:preview_chars]
+        row: dict[str, Any] = {
+            "rank": i + 1,
+            "chunk_id": chunk_id,
+            "kind": getattr(chunk, "kind", None),
+            "unit_id": getattr(chunk, "unit_id", None),
+            "section": section,
+            "arxiv_id": getattr(chunk, "arxiv_id", None),
+            "version": getattr(chunk, "version", None),
+            "content_preview": content,
+        }
+        if scores is not None and chunk_id is not None and chunk_id in scores:
+            row["score"] = scores[chunk_id]
+        rows.append(row)
+    return rows
+
+
+def _voyage_rerank_inputs(inputs: dict) -> dict:
+    """Log query + chunks. Never send the Voyage API key to LangSmith."""
+    raw = inputs.get("chunks") or []
+    chunks = raw if isinstance(raw, list) else []
+    return {
+        "query": inputs.get("query"),
+        "n_docs": len(chunks),
+        "chunks": chunks_for_trace(chunks),
+        "model": RERANK_MODEL_ID,
+    }
+
+
+def _voyage_rerank_outputs(outputs: object) -> dict:
+    if not isinstance(outputs, list):
+        return {"output": outputs}
+    return {"n_scores": len(outputs), "scores": outputs}
+
+
+@traceable(
+    name="voyage_rerank",
+    run_type="chain",
+    process_inputs=_voyage_rerank_inputs,
+    process_outputs=_voyage_rerank_outputs,
+    metadata={"model": RERANK_MODEL_ID},
+    tags=["rerank"],
+)
 def score_chunks(chunks: list[ChunkRecord], query: str, *, api_key: str) -> list[float]:
     """One Client.rerank call. Returns one relevance_score per chunk, same order.
 

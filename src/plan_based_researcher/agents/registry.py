@@ -35,10 +35,11 @@ REGISTRY: dict[str, AgentSpec] = {
     "planner": AgentSpec(
         name="planner",
         abilities=(
-            "Produce an ordered plan of {agent, task, reasoning}. "
+            "Produce an ordered plan of {agent, task, reasoning} in English. "
             "Each search is one named topic; on compare use distinct task texts. "
             "May mark historical steps. For same-thread follow-ups that already "
-            "have papers, omit search (retrieve then writer)."
+            "have papers, omit search (retrieve then writer). The writer matches "
+            "the student query language; plan tasks stay English."
         ),
         model=_PLANNER_WRITER_MODEL,
         tools=(),
@@ -74,10 +75,10 @@ REGISTRY: dict[str, AgentSpec] = {
     "writer": AgentSpec(
         name="writer",
         abilities=(
-            "Write a didactic student answer citing only provided [n] chunks. "
-            "State contradictions. No extra sources. Hole rule: no parametric "
-            "fill; announce missing topics; do not teach missing methods from "
-            "model weights."
+            "Write a didactic student answer in the student query language, "
+            "citing only provided [n] chunks. State contradictions. No extra "
+            "sources. Hole rule: no parametric fill; announce missing topics; "
+            "do not teach missing methods from model weights."
         ),
         model=_PLANNER_WRITER_MODEL,
         tools=(),

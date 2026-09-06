@@ -12,7 +12,7 @@ _SYSTEM_PROMPT = (
     "Allow only AI/ML questions that could be answered from arXiv CS/stat.ML papers "
     "(cs.AI, cs.LG, cs.CL, cs.CV, cs.NE, cs.RO, stat.ML). "
     "Infer query language (BCP-47). Never search papers. "
-    "Student-facing reason may match query language."
+    "Student-facing reason MUST match the query language."
 )
 
 

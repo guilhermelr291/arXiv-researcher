@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** Retrieve Voyage rerank amendment  
-**Status:** Voyage T1–T7 executed 2026-09-04 (uncommitted). UAT pending (`2609.01617` v1, `1706.03762` v7; may be blocked by B-001). Qwen T1–T7 superseded as the live path.
+**Current Milestone:** English internals (plan/eval/rerank); writer follows query language  
+**Status:** `english-internal-language` prompt/schema locks 2026-09-06. Voyage rerank UAT still pending (`2609.01617` v1, `1706.03762` v7).
 
 ---
 

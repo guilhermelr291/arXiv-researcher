@@ -6,6 +6,7 @@ import asyncio
 import logging
 
 from langchain_openai import ChatOpenAI
+from langsmith import trace
 
 from plan_based_researcher.adapters.hybrid import HybridResult, HybridRetrievePort
 from plan_based_researcher.agents.query_schema import (
@@ -20,7 +21,9 @@ from plan_based_researcher.ingest.expand import expand_hits
 from plan_based_researcher.ingest.html_parse import ParsedPaper, parse_arxiv_html
 from plan_based_researcher.ingest.pack import pack_hits
 from plan_based_researcher.ingest.rerank import (
+    RERANK_MODEL_ID,
     build_rerank_query,
+    chunks_for_trace,
     cut_reranked,
     score_chunks,
 )
@@ -364,44 +367,87 @@ class RetrieveRunner:
 
         numbered: list[dict] = []
         if unique:
-            try:
-                scores = await asyncio.to_thread(
-                    score_chunks, unique, rerank_query, api_key=self._voyage_api_key
-                )
-                chunk_ids = [chunk.chunk_id for chunk in unique]
-                by_id = dict(zip(chunk_ids, scores))
-            except Exception:
-                logger.exception(
-                    "voyage rerank failed; packing ensemble order"
-                )
+            async with trace(
+                "rerank",
+                run_type="chain",
+                inputs={
+                    "query": rerank_query,
+                    "n_docs": len(unique),
+                    "model": RERANK_MODEL_ID,
+                    "chunks": chunks_for_trace(unique),
+                },
+                tags=["rerank"],
+                metadata={"model": RERANK_MODEL_ID},
+            ) as rerank_run:
+                strategy = "voyage"
+                error_type: str | None = None
+                error_msg: str | None = None
+                by_id: dict[str, float] = {}
+                packed_chunks: list[ChunkRecord] = []
                 n = 1
-                for result_i in per_paper:
-                    packed = pack_hits(
-                        result_i.ranked, k=Policy.retrieve_rerank_top_n
+                try:
+                    scores = await asyncio.to_thread(
+                        score_chunks,
+                        unique,
+                        rerank_query,
+                        api_key=self._voyage_api_key,
                     )
-                    if not packed:
-                        continue
-                    excerpts = expand_hits(packed, result_i.corpus)
-                    n = _append_numbered(numbered, packed, excerpts, n)
-            else:
-                n = 1
-                for result_i in per_paper:
-                    pairs = [
-                        (chunk, by_id[chunk.chunk_id])
-                        for chunk in result_i.ranked
-                    ]
-                    pairs.sort(key=lambda item: item[1], reverse=True)
-                    cut = cut_reranked(
-                        pairs,
-                        top_n=Policy.retrieve_rerank_top_n,
-                        margin=Policy.retrieve_rerank_margin,
-                        floor=Policy.retrieve_rerank_floor,
+                    chunk_ids = [chunk.chunk_id for chunk in unique]
+                    by_id = dict(zip(chunk_ids, scores))
+                except Exception as exc:
+                    logger.exception(
+                        "voyage rerank failed; packing ensemble order"
                     )
-                    packed = pack_hits(cut, k=len(cut))
-                    if not packed:
-                        continue
-                    excerpts = expand_hits(packed, result_i.corpus)
-                    n = _append_numbered(numbered, packed, excerpts, n)
+                    strategy = "ensemble_order"
+                    error_type = type(exc).__name__
+                    error_msg = str(exc)
+                    for result_i in per_paper:
+                        packed = pack_hits(
+                            result_i.ranked, k=Policy.retrieve_rerank_top_n
+                        )
+                        if not packed:
+                            continue
+                        packed_chunks.extend(packed)
+                        excerpts = expand_hits(packed, result_i.corpus)
+                        n = _append_numbered(numbered, packed, excerpts, n)
+                else:
+                    for result_i in per_paper:
+                        pairs = [
+                            (chunk, by_id[chunk.chunk_id])
+                            for chunk in result_i.ranked
+                        ]
+                        pairs.sort(key=lambda item: item[1], reverse=True)
+                        cut = cut_reranked(
+                            pairs,
+                            top_n=Policy.retrieve_rerank_top_n,
+                            margin=Policy.retrieve_rerank_margin,
+                            floor=Policy.retrieve_rerank_floor,
+                        )
+                        packed = pack_hits(cut, k=len(cut))
+                        if not packed:
+                            continue
+                        packed_chunks.extend(packed)
+                        excerpts = expand_hits(packed, result_i.corpus)
+                        n = _append_numbered(numbered, packed, excerpts, n)
+                score_map = by_id or None
+                outputs: dict = {
+                    "strategy": strategy,
+                    "n_packed": n - 1,
+                    "chunks": chunks_for_trace(packed_chunks, scores=score_map),
+                }
+                if by_id:
+                    scored = sorted(
+                        unique,
+                        key=lambda chunk: by_id[chunk.chunk_id],
+                        reverse=True,
+                    )
+                    outputs["chunks_scored"] = chunks_for_trace(
+                        scored, scores=by_id
+                    )
+                if error_type is not None:
+                    outputs["error_type"] = error_type
+                    outputs["error"] = error_msg
+                rerank_run.end(outputs=outputs)
 
         if walked and gap_step_indices:
             case = "t2a"

@@ -43,7 +43,7 @@
 
 ## Constraints
 
-- All project artifacts (code, docs, comments, API contracts, prompts) must be in **English**. Student-facing answer language follows the query language.
+- All project artifacts (code, docs, comments, API contracts, prompts) must be in **English**. Runtime plan/eval/rerank text is English. Student-facing writer answers and gate refusal reasons follow the query language.
 - LLM and embeddings: OpenAI only.
 - Evidence: arXiv only; category allowlist `cs.AI`, `cs.LG`, `cs.CL`, `cs.CV`, `cs.NE`, `cs.RO`, `stat.ML`.
 - Caps: `max_steps=8`, **1 retry per step (2 attempts)**, `max_replans=1`, `max_papers=8`, timeout ~2 minutes. Retrieve: first-stage hybrid `retrieve_first_stage_k=40` per leg per paper, then adaptive cut `top_n=12` (not packed `retrieve_k_per_paper=5` from ensemble order).

@@ -1,7 +1,7 @@
 # State
 
-**Last Updated:** 2026-09-04
-**Current Work:** Voyage rerank T1–T7 code-validated (uncommitted). Next: live UAT (`2609.01617` v1, `1706.03762` v7); may be blocked by B-001. Set `VOYAGE_API_KEY` in local `.env` before API boot.
+**Last Updated:** 2026-09-06
+**Current Work:** English internals and LangSmith rerank traces committed. Voyage UAT still pending (`2609.01617` v1, `1706.03762` v7).
 
 ---
 
@@ -28,12 +28,19 @@
 **Trade-off:** Tied to those vendors.
 **Impact:** Superseded: Tavily removed; evidence is arXiv only; Postgres/pgvector added.
 
+### AD-019: Runtime internals English; only answers follow query language (2026-09-06)
+
+**Decision:** Planner `task`/`reasoning`, eval `feedback`/`reasoning`, formulated search/retrieve queries, and the Voyage rerank query are always English. Writer `markdown` and gate student-facing `reason` match the student query language (`gate.language`). SSE plan/eval stay English.
+**Reason:** Trace `01a0786a-ba4b-74f0-8a12-685eccf10738`: Portuguese student query made Portuguese plan tasks and a Portuguese Voyage query, which reranked overview prose over methodology equations. AD-004 already required English artifacts; the runtime had drifted.
+**Trade-off:** Chainlit plan/eval steps are English even when the student asked in another language.
+**Impact:** Spec `.specs/features/english-internal-language/spec.md`. Prompt + structured-output field locks. Tightens AD-004 for graph outputs.
+
 ### AD-004: Project language is English (2026-08-25)
 
 **Decision:** All project artifacts (code, docs, comments, API, prompts) are in English.
 **Reason:** User requirement.
 **Trade-off:** None material.
-**Impact:** Specs, identifiers, and prompts stay in English. Student-facing answers follow the query language.
+**Impact:** Specs, identifiers, and prompts stay in English. Student-facing answers follow the query language. **Tightened by AD-019:** plan/eval/rerank strings are English at runtime, not only prompt source.
 
 ### AD-005: ArXiv-only AI/ML student researcher (2026-08-25)
 
@@ -164,6 +171,7 @@
 - `sentence_transformers.CrossEncoder.predict` applies `nn.Sigmoid` when `num_labels=1`. The Qwen3 seq-cls model card’s `predict` example prints probabilities; transformers `.logits` are the raw values `margin=4.0` needs. `HuggingFaceCrossEncoder.score` is `predict` — pass `activation_fn=Identity()` in `model_kwargs` or the adaptive cut never fires.
 - Installing `sentence-transformers` / `transformers` makes FastAPI lifespan import `torch` even when `ingest/rerank.py` lazy-imports. `chunk_build` does `from langchain_text_splitters import …`, and that package `__init__` eagerly imports `SentenceTransformersTokenTextSplitter`. `hybrid` does `from langchain_classic.retrievers import EnsembleRetriever`, whose package `__init__` pulls `ParentDocumentRetriever` → the same splitters. Lazy `get_cross_encoder()` is not enough; defer those two imports until first retrieve/ingest.
 - PyMuPDF `get_text()` (LangChain `ArxivLoader`) can emit U+0000. Postgres TEXT / psycopg reject it. Strip NUL in the arXiv adapter after load. Trace `01a058da-c1b4-7633-befb-39b6249739c7`.
+- Voyage `rerank-3` without a payment method is 3 RPM / 10K TPM and raises `RateLimitError`. Retrieve falls back to ensemble pack (`k=top_n`); that used to be uvicorn-only (`voyage rerank failed`). Trace `01a0782d-8975-72a3-a44e-93e0c72f001a`. Quick 016: LangSmith child `voyage_rerank` + parent `rerank` with `strategy=ensemble_order`.
 
 ---
 
@@ -185,6 +193,8 @@
 | 012 | Search `id:` when arXiv id is present; do not AND body terms into abs | 2026-09-03 | — | ✅ Done |
 | 013 | Writer judge passes cited fidelity; no retry for extra caveats | 2026-09-03 | — | ✅ Done |
 | 014 | HTML Independent Tests UAT on canonical `1706.03762` v7 | 2026-09-03 | — | ✅ Done |
+| 016 | LangSmith span on Voyage rerank fallback | 2026-09-06 | — | ✅ Done |
+| 017 | LangSmith chunk lists before and after rerank | 2026-09-06 | — | ✅ Done |
 
 ---
 
@@ -253,6 +263,7 @@
 - [x] Code validation: Voyage retrieve-cross-encoder-rerank T1–T7 (2026-09-04). Gate: 14/14 `tests.test_cut_reranked`. Live Independent Tests still UAT.
 - [ ] Add `VOYAGE_API_KEY` to `.env.example` (boot now requires it; example file still OpenAI-only)
 - [ ] Manual UAT: retrieve rerank Independent Tests after Voyage swap (`2609.01617` v1; `1706.03762` v7; may be blocked by B-001)
+- [ ] Manual UAT: `english-internal-language` — Portuguese query → English plan/eval/rerank query; writer markdown in Portuguese
 - [ ] Atomic commits when the user asks to commit (Voyage T1–T7 uncommitted; Qwen path superseded)
 
 ---
