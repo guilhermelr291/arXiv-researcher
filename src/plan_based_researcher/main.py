@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI):
     repo = PgChunkRepository(pool)
     await repo.ensure_schema()
     embeddings = OpenAIEmbeddingAdapter(api_key=settings.openai_api_key)
-    papers = ArxivPaperAdapter()
+    papers = ArxivPaperAdapter(mock_arxiv_id=settings.mock_arxiv_id or None)
     hybrid = HybridRetrieveAdapter(repo, embeddings)
     factory = AgentFactory(
         papers,

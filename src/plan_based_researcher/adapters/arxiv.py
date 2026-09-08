@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from datetime import date, datetime, timezone
 from urllib.parse import urlparse
@@ -22,6 +23,32 @@ _CLIENT = arxiv.Client(page_size=8, delay_seconds=3.0)
 _REQUEST_LOCK = asyncio.Lock()
 _HTML_USER_AGENT = "plan-based-researcher/0.1 (research tool; not a crawler)"
 _HTML_TIMEOUT = httpx.Timeout(30.0)
+logger = logging.getLogger(__name__)
+
+_MOCK_PUBLISHED = datetime(2026, 9, 1, tzinfo=timezone.utc)
+_MOCK_HITS: dict[tuple[str, str], PaperHit] = {
+    ("2609.01617", "1"): PaperHit(
+        arxiv_id="2609.01617",
+        version="1",
+        title=(
+            "Hybrid Retrieval-Augmented Generation with Knowledge Graph "
+            "Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for "
+            "Enterprise Document Search"
+        ),
+        year=2026,
+        url="https://arxiv.org/abs/2609.01617v1",
+        categories=["cs.AI", "cs.LG"],
+        published_at=_MOCK_PUBLISHED,
+        abstract=(
+            "Getting accurate, grounded answers out of large enterprise "
+            "document repositories is a difficult problem. Dense vector "
+            "retrieval alone frequently performs poorly on queries that mix "
+            "lexical identifiers with conceptual intent. DocuSearch is a "
+            "hybrid multi-agent RAG system using knowledge-graph expansion, "
+            "Reciprocal Rank Fusion, and per-chunk grounded evaluation."
+        ),
+    ),
+}
 
 
 def _parse_arxiv_id_and_version(entry_id: str) -> tuple[str, str] | None:
@@ -114,13 +141,54 @@ def _load_html_sync(arxiv_id: str, version: str) -> HtmlLoadResult:
     return HtmlLoadResult(status="ok", body=body, content_type=content_type)
 
 
+def _parse_mock_arxiv_id(value: str) -> tuple[str, str] | None:
+    match = _ABS_ID_RE.search(value.strip())
+    if match is None:
+        return None
+    return match.group("arxiv_id"), match.group("version") or "1"
+
+
+def _mock_hit(arxiv_id: str, version: str) -> PaperHit:
+    pinned = _MOCK_HITS.get((arxiv_id, version))
+    if pinned is not None:
+        return pinned
+    return PaperHit(
+        arxiv_id=arxiv_id,
+        version=version,
+        title=arxiv_id,
+        year=_MOCK_PUBLISHED.year,
+        url=f"https://arxiv.org/abs/{arxiv_id}v{version}",
+        categories=["cs.AI"],
+        published_at=_MOCK_PUBLISHED,
+        abstract=f"Pinned mock hit for {arxiv_id}v{version}.",
+    )
+
+
 class ArxivPaperAdapter:
     """PaperPort backed by a shared arXiv Client and HTML GET."""
 
+    def __init__(self, mock_arxiv_id: str | None = None) -> None:
+        self._mock = _parse_mock_arxiv_id(mock_arxiv_id or "")
+
     async def search(self, query: str, *, max_results: int) -> list[PaperHit]:
+        if self._mock is not None:
+            arxiv_id, version = self._mock
+            logger.warning(
+                "MOCK_ARXIV_ID=%sv%s; skipping live arXiv search",
+                arxiv_id,
+                version,
+            )
+            return [_mock_hit(arxiv_id, version)]
         async with _REQUEST_LOCK:
             return await asyncio.to_thread(_search_sync, query, max_results)
 
     async def load_html(self, arxiv_id: str, version: str) -> HtmlLoadResult:
+        if self._mock is not None:
+            logger.warning(
+                "MOCK_ARXIV_ID set; skipping live HTML fetch for %sv%s",
+                arxiv_id,
+                version,
+            )
+            return HtmlLoadResult(status="missing")
         async with _REQUEST_LOCK:
             return await asyncio.to_thread(_load_html_sync, arxiv_id, version)

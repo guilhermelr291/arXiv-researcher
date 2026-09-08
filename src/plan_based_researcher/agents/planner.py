@@ -11,6 +11,17 @@ from plan_based_researcher.api.schemas import ResearchPlan
 
 __all__ = ["PlannerRunner"]
 
+_ENGLISH_PLAN_LOCK = (
+    "Write every task and reasoning in English, even when the student "
+    "query is not English. Do not copy the student query language. "
+    "The writer, not the planner, matches the student's language. "
+    "Example: student 'Me explique a metodologia usada nesse artigo 2609.01617v1: …' "
+    "→ retrieve task 'Gather evidence from the paper on the full methodological "
+    "pipeline: hybrid retrieval, knowledge-graph expansion, RRF fusion, RAG, and "
+    "per-chunk grounded evaluation, including inputs, steps, metrics, and execution flow.' "
+    "Never emit a Portuguese task such as 'Examinar o artigo localizado…'."
+)
+
 
 def _papers_blob(papers: object) -> str:
     if not papers:
@@ -211,9 +222,7 @@ class PlannerRunner:
         prompt = (
             "Produce an ordered executable plan. Each step is "
             "{agent, task, reasoning, historical}.\n"
-            "Write every task and reasoning in English, even when the student "
-            "query is not English. The writer, not the planner, matches the "
-            "student's language.\n"
+            f"{_ENGLISH_PLAN_LOCK}\n"
             "Write each task as a natural-language research or writing goal. "
             "Do not put arXiv search syntax in task; search and retrieve agents "
             "formulate their own queries.\n"
@@ -234,6 +243,7 @@ class PlannerRunner:
             "Available agents:\n"
             f"{planner_prompt_abilities()}\n\n"
             f"Query:\n{query}\n\n"
+            f"{_ENGLISH_PLAN_LOCK}\n\n"
             f"Papers already on this thread:\n{_papers_blob(papers)}"
         )
         return await self._complete(prompt)
@@ -249,13 +259,13 @@ class PlannerRunner:
             "searches passed, remaining should be retrieve + writer tasked to compare topics "
             "that HAVE evidence and state the missing topic WITHOUT evidence. "
             "Do not keep a Writer still asked to compare three topics as evidenced.\n"
-            "Write every remaining task and reasoning in English, even when the "
-            "student query is not English.\n"
+            f"{_ENGLISH_PLAN_LOCK}\n"
             "Write each remaining task as a natural-language goal, not arXiv syntax.\n"
             "Set historical=True on a step when older papers are needed.\n\n"
             "Available agents:\n"
             f"{planner_prompt_abilities()}\n\n"
             f"Student query:\n{query}\n\n"
+            f"{_ENGLISH_PLAN_LOCK}\n\n"
             f"Committed prefix (passed steps):\n{_prefix_summary(state)}\n\n"
             f"Admitted papers:\n{_papers_blob(papers)}\n\n"
             f"Failed step(s) + feedback:\n{_failed_blob(state)}\n\n"

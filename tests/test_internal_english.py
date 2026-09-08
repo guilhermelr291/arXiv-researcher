@@ -6,7 +6,7 @@ import inspect
 import unittest
 
 from plan_based_researcher.agents.gate import _SYSTEM_PROMPT as GATE_SYSTEM
-from plan_based_researcher.agents.planner import PlannerRunner
+from plan_based_researcher.agents import planner as planner_mod
 from plan_based_researcher.agents.registry import REGISTRY
 from plan_based_researcher.agents.writer import _system_prompt as writer_system
 from plan_based_researcher.api.schemas import GateDecision, PlanStep
@@ -36,8 +36,10 @@ class InternalEnglishLocksTest(unittest.TestCase):
         self.assertIn("MUST match the query language", GATE_SYSTEM)
 
     def test_planner_and_writer_prompts(self) -> None:
-        source = inspect.getsource(PlannerRunner)
+        source = inspect.getsource(planner_mod)
         self.assertIn("Write every task and reasoning in English", source)
+        self.assertIn("Do not copy the student query language", source)
+        self.assertIn("Never emit a Portuguese task", source)
         self.assertIn("in English", REGISTRY["planner"].abilities)
         system = writer_system()
         self.assertIn("student query language", system)
@@ -46,6 +48,9 @@ class InternalEnglishLocksTest(unittest.TestCase):
     def test_eval_checklists_english_feedback(self) -> None:
         self.assertIn("in English", _search_checklist())
         self.assertIn("in English", _retrieve_checklist())
+        self.assertIn("student query first", _retrieve_checklist())
+        self.assertIn("Do not retry the retrieve query", _retrieve_checklist())
+        self.assertIn("plan_inadequate=true", _retrieve_checklist())
         self.assertIn("feedback field must be English", _writer_checklist())
         self.assertIn("same language as the student query", _writer_checklist())
 
