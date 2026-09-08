@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-08-31
-**Current Work:** Feature `admission-retrieve-per-topic` T1–T15 plus validation fixes (replan remap + hole_tasks). Manual UAT still pending (B-001). Quick task 011 (token chunk splitter 512/50) done.
+**Last Updated:** 2026-09-07
+**Current Work:** Feature `sse-agent-dispatcher` — T1–T7 validated (uncommitted). Unit gate 34/34. Live headers + incremental `gate`/`plan`/`step_*` on `:8001`. Full until `done`/`insufficient`, Chainlit, follow-up `thread_id` still UAT. Quick 019 / 018 and `MOCK_ARXIV_ID` still uncommitted.
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-020: SSE consume path is astream_events v2 + StreamDispatcher (2026-09-07)
+
+**Decision:** Execute `.specs/features/sse-agent-dispatcher/` as designed: `SseFrame` + `SSE_HEADERS`, `StreamDispatcher` (`include_types=("chain",)`, `stream_mode="custom"` string), `ResearchGraph` wrapper, `ResearchExecutor.execute` as the only production iterator, lifespan compile-once, `POST /research` returns `StreamingResponse(executor.execute(...))`.
+**Reason:** User asked to Execute T1–T7. Parent PAT-11 consume wording (`graph.astream` updates+custom) is replaced for the HTTP generator; FastAPI `StreamingResponse` and SSE-01 names stay.
+**Trade-off:** Unit tests cover unwrap/timeout/headers; live in-domain stream and Chainlit are still UAT.
+**Impact:** Route module has no `astream(`; nodes and Chainlit unchanged. Commits deferred until asked.
 
 ### AD-001: Plan-based multi-agent researcher (2026-08-25)
 
@@ -28,12 +35,19 @@
 **Trade-off:** Tied to those vendors.
 **Impact:** Superseded: Tavily removed; evidence is arXiv only; Postgres/pgvector added.
 
+### AD-019: Runtime internals English; only answers follow query language (2026-09-06)
+
+**Decision:** Planner `task`/`reasoning`, eval `feedback`/`reasoning`, formulated search/retrieve queries, and the Voyage rerank query are always English. Writer `markdown` and gate student-facing `reason` match the student query language (`gate.language`). SSE plan/eval stay English.
+**Reason:** Trace `01a0786a-ba4b-74f0-8a12-685eccf10738`: Portuguese student query made Portuguese plan tasks and a Portuguese Voyage query, which reranked overview prose over methodology equations. AD-004 already required English artifacts; the runtime had drifted.
+**Trade-off:** Chainlit plan/eval steps are English even when the student asked in another language.
+**Impact:** Spec `.specs/features/english-internal-language/spec.md`. Prompt + structured-output field locks. Tightens AD-004 for graph outputs.
+
 ### AD-004: Project language is English (2026-08-25)
 
 **Decision:** All project artifacts (code, docs, comments, API, prompts) are in English.
 **Reason:** User requirement.
 **Trade-off:** None material.
-**Impact:** Specs, identifiers, and prompts stay in English. Student-facing answers follow the query language.
+**Impact:** Specs, identifiers, and prompts stay in English. Student-facing answers follow the query language. **Tightened by AD-019:** plan/eval/rerank strings are English at runtime, not only prompt source.
 
 ### AD-005: ArXiv-only AI/ML student researcher (2026-08-25)
 
@@ -98,12 +112,33 @@
 **Trade-off:** One angle per topic; T1 may spend the only replan then `insufficient`; `plan_inadequate` is overloaded on search attempt 2.
 **Impact:** Spec `.specs/features/admission-retrieve-per-topic/spec.md` (approved 2026-08-29). Design `.specs/features/admission-retrieve-per-topic/design.md` (approved 2026-08-29). Supersedes SEARCH-01 admission, SEARCH-02 verdict shape, RETR-01 global `k`, LOOP-03 on search attempt 1. Routing atlas in `graph-flow.md`.
 
+### AD-016: Structured-aware HTML chunking (2026-09-02)
+
+**Decision:** Replace retrieve PDF ingest with arXiv HTML. Tables and display equations are atomic (`content` = caption/tag + full body, never truncated). Prose is heading-split then 512/50 inside a section, with canonical placeholders in `content` and human labels in `embedding_text`. `figure.ltx_table` collapses to one table unit; image figures become caption text (no units, no assets, no LLM summaries). Schema: `kind`, `unit_id`, `embedding_text`, `content`, JSONB `{section, caption, unit_ids}`. Hybrid per paper `k=5`; vector on `embedding_text`, BM25 on `content`; overfetch ≥3×k; dedup `unit_id` + backfill to 5 unique; in-place expansion (first occurrence full body, later label only). Direct atomic hit excerpt = section + `content`. Writer and Citation share that excerpt. Local wipe of PDF chunks; no PDF fallback; missing HTML omits/walks `ranked_keys`. Graph execute unchanged.
+**Reason:** Grill-me 2026-09-02; RecursiveCharacterTextSplitter on PDF text drops section, table, and equation identity. Spike `scripts/arxiv_html_units.py` validated the parse.
+**Trade-off:** Papers without HTML contribute no chunks; large tables can inflate Writer context; no figure retrieval in this slice.
+**Impact:** Spec `.specs/features/structured-aware-chunking/spec.md` (executed 2026-09-03). Design and tasks T1–T19 executed 2026-09-03. Supersedes retrieve-side ARX-01/ARX-03 PDF load, RETR-02 `k=3`, RETR-03 PDF walk. Search/admission/T1–T3 routing unchanged.
+
 ### AD-015: Admission/retrieve design locks (2026-08-29)
 
 **Decision:** Approve `.specs/features/admission-retrieve-per-topic/design.md` as written. `SearchStepVerdict.ranked_keys` is `list[PaperKey]`; clip + U1 are runtime (`eval/admission.py`). `papers` are written only after retrieve ingest. Hybrid is N calls of the existing adapter with `retrieve_k_per_paper=3`. Search API pool is `search_max_results=8` (not `max_papers`). Search attempt 1 always retries (`plan_inadequate` ignored for the edge). T1/T2a skip the retrieve mini-judge. T3 query miss always retries once. S8a stays on `plan_inadequate` per leftover search. WRITE-02 is prompt + writer judge. No new graph nodes.
 **Reason:** User approved spec + design 2026-08-29.
 **Trade-off:** `plan_inadequate` stays overloaded; T1 may spend the only replan then `insufficient`.
 **Impact:** Tasks and implementation must follow that design. Do not reintroduce lot admission at search eval or union `retrieve_k`.
+
+### AD-017: Retrieve CrossEncoder rerank (2026-09-03) — SUPERSEDED by AD-018
+
+**Decision:** After per-paper hybrid overfetch, score candidates once with `tomaarsen/Qwen3-Reranker-0.6B-seq-cls` via `langchain_community.cross_encoders.HuggingFaceCrossEncoder.score` (raw logits; no sigmoid). Rerank query is the retrieve `task` (plus step eval feedback on retry), not `FormulatedQuery`. `RetrieveRunner.run` (`agents/retrieve.py`) calls `cut_reranked` (`ingest/rerank.py`): sort by logit desc, optional `floor` empties the paper if best < floor, else walk and `break` when `(best - current) > margin`, also cap `top_n`. Defaults `top_n=12`, `margin=4.0`, `floor=None` are function parameters. Then `pack_hits` / `expand_hits`. First-stage `k=40` per leg. No LangGraph rerank node. Load/score failure falls back to ensemble-order `pack_hits(k=top_n)`.
+**Reason:** LangSmith trace `01a06938-a33c-7bd0-aaaa-de2129d4d34e` — useful methodology chunks were already in ensemble ranks 7–27. Seq-cls logits are not probabilities and are not calibrated across queries, so the keep-set is relative to that query’s best hit. User specified adaptive `margin` + `top_n` + optional `floor` instead of a fixed `top_n` or a sigmoid threshold.
+**Trade-off:** Local `torch` + ~0.6B download; CPU cold start; `margin=4.0` is un-calibrated; `floor=None` by default so retrieve will not empty on a weak best hit until UAT sets a floor.
+**Impact:** Spec `.specs/features/retrieve-cross-encoder-rerank/spec.md` (Execute T1–T7 2026-09-03, uncommitted; UAT pending). Design and tasks executed 2026-09-03. Supersedes RETR-05 packed k=5 and RETR-08 RRF-order pack-to-5. Reopens admission’s “global rerank” out-of-scope row for this slice only (no MMR, no Citation score). **Superseded 2026-09-04:** local Qwen scorer is not the live path (AD-018).
+
+### AD-018: Voyage rerank-3 retrieve scorer (2026-09-04)
+
+**Decision:** Approve `.specs/features/retrieve-cross-encoder-rerank/spec.md` and `design.md` as written (Voyage amendment). Replace the local Qwen CrossEncoder with `voyageai.Client.rerank` (`rerank-3`, `truncation=True`, no `top_k`), map `index` back to input order, then per-paper `cut_reranked` (`top_n=12`, `margin=0.20`, `floor=0.30`). Rerank query stays retrieve `task` (+ step feedback). Missing `VOYAGE_API_KEY` fails `Settings()` at boot. Runtime Voyage errors pack ensemble `k=top_n`. Drop `torch` / `sentence-transformers` / `transformers`. No new graph node, no Citation score, no silent model fallback.
+**Reason:** User approved spec + design 2026-09-04. Local 0.6B Hub download + CPU score made retrieve unusable vs the ~2 min timeout.
+**Trade-off:** Extra vendor (Voyage) besides OpenAI; Preview `rerank-3`; `margin`/`floor` un-calibrated until UAT; API key required to start the process.
+**Impact:** Qwen Execute T1–T7 SHALL NOT ship. Tasks rewritten 2026-09-04. UAT still pending (`2609.01617` v1, `1706.03762` v7).
 
 ### AD-012: Eval-replan design locks (2026-08-27)
 
@@ -138,8 +173,14 @@
 - Remaining-only replan compacting prefix to `passed_steps=range(len(prefix))` is safe only if every index-keyed map (`search_artifacts`, `eval_by_step`, `retrieve_ingest.gap_step_indices`) is remapped or stored by task identity. This feature made retrieve depend on `search_artifacts[str(plan_index)]`; mixed-wave S8a then walks the wrong ranking.
 - Chainlit loads `.env` and, if `DATABASE_URL` is set, instantiates `ChainlitDataLayer` (`asyncpg`). This project's `DATABASE_URL` is the API's psycopg/pgvector URL. The Chainlit process must drop that env var after import; do not add `asyncpg` or share the researcher schema with Chainlit persistence.
 - `langchain-community` 0.4.2 `ArxivAPIWrapper` still calls `Search.results()` and `Result.download_pdf()`. `arxiv` 4.x removed both. Keep `arxiv>=2.2.0,<4` until the wrapper (or a successor package) uses `Client.results`.
-- Search-wave judge `ranked_keys` are clipped to artifact hits. If the prompt omits `arxiv_id`/`version`, the model invents ids (`QLoRA-2023`) and a passing step becomes a retry. Trace `01a058c6-e1a8-71a0-b9e1-44ed67f3f1a6` then exhausted the 120s cap on the second eval. Quick 010: judge emits per-step `ranked_hit_indices` instead; clip still gates the artifact.
+- Search formulate that forbids `id:` and ANDs body terms (equation names, Transformer-big) into `abs:` misses a named historical paper on attempt 1. Trace `01a06917-e169-73f1-992c-ef624783dee9` retried after zero hits; the student query already had `1706.03762`. Quick 012: `id:{NNNN.NNNNN}` when present; body facts stay on retrieve.
+- Writer LLM judge can `retry` a grounded answer to demand extra caveats (EN-FR 41.8 vs 41.0 already cited). Quick 013: pass when requested facts are cited; do not retry to rephrase a stated contradiction.
+- `sentence_transformers.CrossEncoder.predict` applies `nn.Sigmoid` when `num_labels=1`. The Qwen3 seq-cls model card’s `predict` example prints probabilities; transformers `.logits` are the raw values `margin=4.0` needs. `HuggingFaceCrossEncoder.score` is `predict` — pass `activation_fn=Identity()` in `model_kwargs` or the adaptive cut never fires.
+- Installing `sentence-transformers` / `transformers` makes FastAPI lifespan import `torch` even when `ingest/rerank.py` lazy-imports. `chunk_build` does `from langchain_text_splitters import …`, and that package `__init__` eagerly imports `SentenceTransformersTokenTextSplitter`. `hybrid` does `from langchain_classic.retrievers import EnsembleRetriever`, whose package `__init__` pulls `ParentDocumentRetriever` → the same splitters. Lazy `get_cross_encoder()` is not enough; defer those two imports until first retrieve/ingest.
 - PyMuPDF `get_text()` (LangChain `ArxivLoader`) can emit U+0000. Postgres TEXT / psycopg reject it. Strip NUL in the arXiv adapter after load. Trace `01a058da-c1b4-7633-befb-39b6249739c7`.
+- Voyage `rerank-3` without a payment method is 3 RPM / 10K TPM and raises `RateLimitError`. Retrieve falls back to ensemble pack (`k=top_n`); that used to be uvicorn-only (`voyage rerank failed`). Trace `01a0782d-8975-72a3-a44e-93e0c72f001a`. Quick 016: LangSmith child `voyage_rerank` + parent `rerank` with `strategy=ensemble_order`.
+- Prompt-only LANG-01 at the top of the planner prompt is not enough: the model still copied a Portuguese student query into `task` (trace `01a0786a-ba4b-74f0-8a12-685eccf10738`). Quick 019: repeat the English lock after the query, with a Portuguese→English few-shot. Do not sniff language in retrieve.
+- Feature unittest modules can vanish from disk while `__pycache__/*.pyc` remains. `unittest discover` then silently runs only committed tests (here 5 instead of 34). During `sse-agent-dispatcher` verify, restore the `.py` files before treating the gate as green.
 
 ---
 
@@ -158,16 +199,28 @@
 | 009 | Strip NUL bytes from arXiv PDF text before pgvector upsert | 2026-08-31 | — | ✅ Done |
 | 010 | Search-wave judge ranks via per-step hit indexes, not invented arXiv ids | 2026-08-31 | — | ✅ Done |
 | 011 | PDF chunking uses tiktoken 512/50 (`cl100k_base`), not characters | 2026-08-31 | — | ✅ Done |
+| 012 | Search `id:` when arXiv id is present; do not AND body terms into abs | 2026-09-03 | — | ✅ Done |
+| 013 | Writer judge passes cited fidelity; no retry for extra caveats | 2026-09-03 | — | ✅ Done |
+| 014 | HTML Independent Tests UAT on canonical `1706.03762` v7 | 2026-09-03 | — | ✅ Done |
+| 015 | Mock arXiv search for cached UAT (`MOCK_ARXIV_ID`) | 2026-09-05 | — | ✅ Done |
+| 016 | LangSmith span on Voyage rerank fallback | 2026-09-06 | — | ✅ Done |
+| 018 | Retrieve judge passes core student request; no T3 retry for extra facets | 2026-09-06 | — | ✅ Done |
+| 019 | Planner English lock after student query so Voyage task is not Portuguese | 2026-09-06 | — | ✅ Done |
 
 ---
 
 ## Deferred Ideas
 
 - [ ] Automated test suite (pytest / Testcontainers) — Captured during: tasks phase (explicitly deferred)
+- [ ] Remove unused `encode_payload` from `api/sse.py` (orphaned after T7 deleted `iter_sse`) — Captured during: sse-agent-dispatcher Execute
 - [ ] Writer `answer_delta` after eval pass — Captured during: grill-me
 - [ ] Auth, multi-user, billing — Captured during: project init
 - [ ] Thread TTL/delete and history UI across browser sessions — Captured during: grill-me
-- [ ] arXiv TeX/HTML instead of PDF extract — Captured during: grill-me
+- [x] arXiv TeX/HTML instead of PDF extract — Promoted to feature `structured-aware-chunking` (spec draft 2026-09-02)
+- [ ] Qwen3-Reranker-4B if 0.6B still ranks isolated equations above V-C prose — Captured during: retrieve-cross-encoder-rerank specify; 0.6B path to be removed by Voyage amendment
+- [ ] `rerank-3-lite` if Preview `rerank-3` latency or cost hurts UAT — Captured during: Voyage discuss 2026-09-04
+- [ ] Image/figure units + vision — Captured during: structured-aware-chunking grill-me
+- [ ] LLM summaries of tables/equations — Captured during: structured-aware-chunking grill-me
 - [ ] Dockerize API and Chainlit — Captured during: grill-me
 - [ ] Global semantic search over full ingested corpus — Captured during: grill-me
 - [ ] HITL plan approval — Captured during: grill-me
@@ -200,6 +253,39 @@
 - [x] Execute T1–T15 for `admission-retrieve-per-topic`
 - [x] Fix: replan prefix packing remaps `search_artifacts` / `eval_by_step` to new indices (mixed-wave S8a)
 - [x] Fix: Writer living/missing must survive replan (store hole **tasks**, exclude gaps from living)
+- [x] User requested Design for `structured-aware-chunking` (2026-09-03; spec still formally Draft)
+- [x] User requested Tasks for `structured-aware-chunking` (2026-09-03; spec/design still formally Draft)
+- [x] User asked to Execute `.specs/features/structured-aware-chunking/tasks.md` (2026-09-03)
+- [x] Execute T1–T19 for `structured-aware-chunking`; update PROJECT.md (HTML ingest, `retrieve_k_per_paper=5`) and parent spec superseded banners
+- [x] Code validation: structured-aware HTML chunking (T1–T19 Done-when + live `1706.03762` v7 parse/chunk/pack/expand; 2026-09-03)
+- [x] Manual UAT: structured-aware HTML chunking Independent Tests (`1706.03762` v7 retrieve/cache/Writer; 2026-09-03 quick 014; missing-HTML hole not re-run)
+- [ ] Commit quick 012–014 when asked
+- [x] User requested Design for `retrieve-cross-encoder-rerank` (2026-09-03; spec still formally Draft)
+- [x] User requested Tasks for `retrieve-cross-encoder-rerank` (2026-09-03; spec/design still formally Draft)
+- [x] User asked to Execute `.specs/features/retrieve-cross-encoder-rerank/tasks.md` (2026-09-03; no commits)
+- [x] Execute T1–T7 for `retrieve-cross-encoder-rerank`; update PROJECT.md (first-stage k=40, adaptive `top_n=12`) and parent spec superseded banners
+- [x] Code validation: retrieve CrossEncoder rerank (T1–T7 Done-when + `cut_reranked` unittest; 2026-09-04). Major: torch at FastAPI lifespan (DEP-01)
+- [x] Torch-at-lifespan import: superseded by Voyage design (remove `torch` / `sentence-transformers` / `transformers`; do not defer splitter/Ensemble imports)
+- [x] User approve `.specs/features/retrieve-cross-encoder-rerank/context.md` (Voyage amendment) before Specify
+- [x] User requested Design for Voyage `retrieve-cross-encoder-rerank` (2026-09-04; spec still formally Draft)
+- [x] User approve Voyage spec + design (`.specs/features/retrieve-cross-encoder-rerank/spec.md` + `design.md`) 2026-09-04
+- [x] Rewrite Voyage tasks.md (Qwen T1–T7 superseded)
+- [x] User asked to Execute Voyage `.specs/features/retrieve-cross-encoder-rerank/tasks.md` (2026-09-04; no commits)
+- [x] Execute Voyage T1–T7 (do not Execute from the Qwen task list)
+- [x] Code validation: Voyage retrieve-cross-encoder-rerank T1–T7 (2026-09-04). Gate: 14/14 `tests.test_cut_reranked`. Live Independent Tests still UAT.
+- [ ] Add `VOYAGE_API_KEY` to `.env.example` (boot now requires it; example file still OpenAI-only)
+- [x] Quick 015: `MOCK_ARXIV_ID` pins search to `2609.01617` v1 (2026-09-05; uncommitted)
+- [ ] Manual UAT: retrieve rerank Independent Tests after Voyage swap (`2609.01617` v1; `1706.03762` v7; may be blocked by B-001)
+- [ ] Manual UAT: quick 018 — Portuguese methodology query on `2609.01617` should be **one** retrieve (eval pass or `plan_inadequate` → writer), not a second hybrid
+- [ ] Manual UAT: `english-internal-language` — Portuguese query → English plan/eval/rerank query; writer markdown in Portuguese
+- [ ] Atomic commits when the user asks to commit (Voyage T1–T7 uncommitted; Qwen path superseded)
+- [x] User requested Design for `sse-agent-dispatcher` (2026-09-07; spec still formally Draft)
+- [x] User requested Tasks for `sse-agent-dispatcher` (2026-09-07; spec/design still formally Draft)
+- [x] User asked to Execute `.specs/features/sse-agent-dispatcher/tasks.md` (2026-09-07; no commits)
+- [x] Execute T1–T7 for `sse-agent-dispatcher`; full unittest discover 34/34
+- [x] Code validation: `sse-agent-dispatcher` T1–T7 (2026-09-07). Restored missing `tests/test_sse_frame.py` (and T2–T7 modules). Live sample: SSE headers + incremental `gate`/`plan`/`step_start`/`step_end` on `:8001`.
+- [ ] Manual UAT: SSE dispatcher Independent Tests (in-domain until `done`/`insufficient`; only SSE-01 names; Chainlit unchanged; follow-up `thread_id`)
+- [ ] Atomic commits per task T1–T7 when the user asks to commit (`sse-agent-dispatcher`)
 
 ---
 

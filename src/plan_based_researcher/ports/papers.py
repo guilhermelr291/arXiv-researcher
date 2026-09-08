@@ -1,10 +1,10 @@
-"""Outbound port for arXiv paper search and PDF text loading (ARX-01)."""
+"""Outbound port for arXiv paper search and HTML load (ARX-01)."""
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
+from typing import Literal, Protocol
 
-__all__ = ["PaperHit", "PaperPort"]
+__all__ = ["HtmlLoadResult", "PaperHit", "PaperPort"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,7 +19,14 @@ class PaperHit:
     abstract: str
 
 
+@dataclass(frozen=True, slots=True)
+class HtmlLoadResult:
+    status: Literal["ok", "missing", "empty", "not_html"]
+    body: bytes = b""
+    content_type: str = ""
+
+
 class PaperPort(Protocol):
     async def search(self, query: str, *, max_results: int) -> list[PaperHit]: ...
 
-    async def load_pdf_text(self, arxiv_id: str, version: str) -> str: ...
+    async def load_html(self, arxiv_id: str, version: str) -> HtmlLoadResult: ...

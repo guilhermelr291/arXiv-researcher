@@ -101,7 +101,9 @@ def _writer_checklist() -> str:
     return (
         f"Allowed evidence domain: arXiv categories only ({categories}).\n"
         f"Grounding: {Policy.GROUNDING_RULE}.\n"
-        "Answer in the same language as the student query.\n"
+        "Your feedback field must be English.\n"
+        "The student markdown must be in the same language as the student query; "
+        "do not fail it for being a different language from the English plan task.\n"
         "Use a didactic, student-friendly tone.\n"
         "Do not introduce sources outside the provided evidence chunks or arxiv.org URLs.\n"
         "Fail if the answer teaches a definition, mechanism, or comparison of a missing "
@@ -109,7 +111,15 @@ def _writer_checklist() -> str:
         "Fail if living [n] citations are used as if they were the missing topic.\n"
         "A sentence that no usable paper was found for a named topic is not a technical "
         "claim and does not need [n].\n"
-        "Living topics still need real [n] (ORCH-03 is enforced deterministically)."
+        "Living topics still need real [n] (ORCH-03 is enforced deterministically).\n"
+        "Pass when the student-requested facts are present and cited with living [n].\n"
+        "Do not retry to rephrase, add headings, or demand extra caveats when those "
+        "facts are already cited. If the evidence contains two conflicting values for "
+        "the same fact and the markdown states both with citations, that is a pass; "
+        "do not retry to pick one canonical number or to expand the caveat.\n"
+        "Retry only when a requested fact is missing, a technical claim lacks [n], "
+        "a missing topic is filled from memory, or living [n] are used as the missing "
+        "topic."
     )
 
 
@@ -141,6 +151,8 @@ def _search_checklist() -> str:
     categories = ", ".join(sorted(Policy.arxiv_categories))
     return (
         "Return one independent verdict per search step, plus overall reasoning.\n"
+        "Write feedback and reasoning in English, even when the student query "
+        "is not English.\n"
         "Titles and abstracts must match THIS step's task.\n"
         "For each step, output ranked_hit_indices: an ordered list of 0-based "
         "indexes into THAT step's hits only (the [n] labels in that step). "
@@ -156,10 +168,11 @@ def _search_checklist() -> str:
 def _retrieve_checklist() -> str:
     return (
         "Evaluate retrieve evidence against THIS retrieve step task.\n"
+        "Write feedback in English, even when the student query is not English.\n"
         "Chunks must be numbered [n] and come only from already-admitted papers.\n"
         "Chunks must match the retrieve task.\n"
         "A T3 query miss is a retrieve query rewrite on the same papers, "
-        "not a new PDF walk.\n"
+        "not a new HTML walk.\n"
         "Return status pass, retry, or fail with feedback. "
         "Set plan_inadequate if the admitted paper set cannot satisfy this task."
     )
@@ -410,7 +423,8 @@ class SearchEvalStrategy:
                         "system",
                         "You evaluate arXiv search results for a wave of search steps. "
                         "Return one verdict per step (passed, feedback, plan_inadequate, "
-                        "ranked_hit_indices) and reasoning.\n"
+                        "ranked_hit_indices) and reasoning. Write feedback and reasoning "
+                        "in English.\n"
                         f"{_search_checklist()}",
                     ),
                     (
@@ -457,7 +471,7 @@ class RetrieveEvalStrategy:
                 status="fail",
                 plan_inadequate=True,
                 feedback=(
-                    "T2a: at least one passed ranking ingested no usable PDF; "
+                    "T2a: at least one passed ranking ingested no usable HTML; "
                     "hybrid ran on living papers. Do not retry the retrieve query."
                 ),
             )
@@ -520,7 +534,7 @@ class RetrieveEvalStrategy:
                     (
                         "system",
                         "You evaluate retrieved evidence chunks. "
-                        "Return status pass, retry, or fail with feedback.\n"
+                        "Return status pass, retry, or fail with English feedback.\n"
                         f"{_retrieve_checklist()}",
                     ),
                     (
@@ -633,7 +647,7 @@ class WriterEvalStrategy:
                     (
                         "system",
                         "You evaluate a student research answer. "
-                        "Return status pass, retry, or fail with feedback.\n"
+                        "Return status pass, retry, or fail with English feedback.\n"
                         f"{_writer_checklist()}",
                     ),
                     (

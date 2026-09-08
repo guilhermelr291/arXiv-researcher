@@ -41,8 +41,11 @@ def formulate_human(
     feedback: str = "",
     previous_query: str = "",
     historical: bool | None = None,
+    student_query: str = "",
 ) -> str:
     parts = [f"Task:\n{task}"]
+    if student_query.strip():
+        parts.append(f"Student query:\n{student_query.strip()}")
     if historical is True:
         parts.append("Constraint: historical=true (do not bias toward recent papers).")
     if previous_query:

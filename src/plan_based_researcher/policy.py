@@ -30,7 +30,12 @@ class Policy:
     hybrid_vector_weight: float = 0.7
     hybrid_lexical_weight: float = 0.3
     search_max_results: int = 8
-    retrieve_k_per_paper: int = 3
+    retrieve_k_per_paper: int = 5
+    retrieve_overfetch_factor: int = 3
+    retrieve_first_stage_k: int = 40
+    retrieve_rerank_top_n: int = 15
+    retrieve_rerank_margin: float = 0.20
+    retrieve_rerank_floor: float | None = 0.30
     GROUNDING_RULE: str = (
         "every technical claim has a real [n] citation from the provided chunk list"
     )
@@ -40,6 +45,11 @@ class Policy:
         "do not fill missing topics from parametric knowledge; "
         "do not cite another method's chunks as the missing topic"
     )
+    PREAMBLE_SECTION: str = "Preamble"
+
+    @classmethod
+    def html_url(cls, arxiv_id: str, version: str) -> str:
+        return f"https://arxiv.org/html/{arxiv_id}v{version}"
 
     @classmethod
     def is_allowlisted(cls, categories: list[str]) -> bool:

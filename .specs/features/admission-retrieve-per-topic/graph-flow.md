@@ -1,16 +1,16 @@
 # Graph execution flow — admission 1/topic + retrieve per paper
 
-**Status:** Grilled 2026-08-29. Spec + design approved 2026-08-29. Tasks draft: `tasks.md`. Not implemented yet.  
+**Status:** Grilled 2026-08-29. Spec + design approved 2026-08-29. Tasks T1–T15 executed.  
 **Parent loop:** `.specs/features/orchestrator-eval-replan/` (nodes and SSE **names** unchanged).  
-**This document:** routing atlas for Design — every edge case from that grill, drawn on the **real** LangGraph topology (`gate → planner → dispatch → search|execute → evaluate → replan|finalize`).
+**Chunking amendment:** `.specs/features/structured-aware-chunking/` (executed 2026-09-03) — retrieve ingest is HTML; packed `k=5`; this atlas still describes T1/T2a/T3 **routing**.
 
-Caps (unchanged unless named): `max_steps=8`, `max_retries_per_step=1` (2 attempts), `max_replans=1`, `max_papers=8`, timeout ~2 min (API, not a graph node). New: `retrieve_k_per_paper=3`. API search `max_results=8` (never 1).
+Caps (unchanged unless named): `max_steps=8`, `max_retries_per_step=1` (2 attempts), `max_replans=1`, `max_papers=8`, timeout ~2 min (API, not a graph node). Packed retrieve: `retrieve_k_per_paper=5`. API search `max_results=8` (never 1).
 
 Invariants:
 
-- Search never writes `papers`, never loads PDF.
+- Search never writes `papers`, never loads PDF/HTML full text.
 - Evaluate on search **pass** writes `ranked_keys` on the artifact; it does **not** admit papers.
-- Retrieve admits at most **one usable PDF per passed search ranking**, walking the ranking; then hybrid **per paper** (`k=3`, slice after ensemble), concat in admission order, continuous `[n]`.
+- Retrieve admits at most **one usable HTML paper per passed search ranking**, walking the ranking; then hybrid **per paper** (`k=5`, overfetch then pack), concat in admission order, continuous `[n]`.
 - Passed steps are never re-executed. Gate, Writer grounding `[n]`, SSE event names, splitter 500/100 stay as today.
 - **No parametric fill.** If a named topic has no ingested PDF / no chunks, the Writer states that **no usable arXiv paper was found for that topic** and answers **only** what the remaining chunks support, each technical claim with a real `[n]`. It MUST NOT explain the missing topic from model weights, general knowledge, or by citing LoRA/QLoRA chunks as if they were DoRA.
 

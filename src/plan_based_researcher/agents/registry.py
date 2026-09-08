@@ -35,10 +35,11 @@ REGISTRY: dict[str, AgentSpec] = {
     "planner": AgentSpec(
         name="planner",
         abilities=(
-            "Produce an ordered plan of {agent, task, reasoning}. "
+            "Produce an ordered plan of {agent, task, reasoning} in English. "
             "Each search is one named topic; on compare use distinct task texts. "
             "May mark historical steps. For same-thread follow-ups that already "
-            "have papers, omit search (retrieve then writer)."
+            "have papers, omit search (retrieve then writer). The writer matches "
+            "the student query language; plan tasks stay English."
         ),
         model=_PLANNER_WRITER_MODEL,
         tools=(),
@@ -52,7 +53,7 @@ REGISTRY: dict[str, AgentSpec] = {
             "runner; the runner does not pick a paper. "
             "Write the task as a natural-language goal, not an arXiv query; "
             "the search agent formulates the query. "
-            "Apply allowlist and recency (or historical). Do not download PDFs."
+            "Apply allowlist and recency (or historical). Do not fetch HTML."
         ),
         model=_MINI_MODEL,
         tools=("arxiv_search",),
@@ -61,11 +62,11 @@ REGISTRY: dict[str, AgentSpec] = {
     "retrieve": AgentSpec(
         name="retrieve",
         abilities=(
-            "Walk ranked_keys and ingest one usable PDF per ranking on cache miss; "
-            "hybrid-retrieve numbered [n] chunks with k=3 per paper for this "
-            "evidence goal. Write the task as what to evidence, not the retrieval "
-            "query; the retrieve agent formulates an English query. Do not search "
-            "arXiv."
+            "Walk ranked_keys and ingest one usable HTML paper per ranking on cache miss; "
+            "hybrid first-stage overfetch per paper, rerank against the "
+            "evidence task, adaptive packed [n] cut, then expand. Write the task as "
+            "what to evidence, not the retrieval query; the retrieve agent formulates "
+            "the hybrid query. Do not search arXiv."
         ),
         model=_MINI_MODEL,
         tools=("arxiv_load",),
@@ -74,10 +75,10 @@ REGISTRY: dict[str, AgentSpec] = {
     "writer": AgentSpec(
         name="writer",
         abilities=(
-            "Write a didactic student answer citing only provided [n] chunks. "
-            "State contradictions. No extra sources. Hole rule: no parametric "
-            "fill; announce missing topics; do not teach missing methods from "
-            "model weights."
+            "Write a didactic student answer in the student query language, "
+            "citing only provided [n] chunks. State contradictions. No extra "
+            "sources. Hole rule: no parametric fill; announce missing topics; "
+            "do not teach missing methods from model weights."
         ),
         model=_PLANNER_WRITER_MODEL,
         tools=(),

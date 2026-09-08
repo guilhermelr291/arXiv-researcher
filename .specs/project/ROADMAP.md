@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** Admission 1/topic + per-paper retrieve  
-**Status:** T1–T15 executed; validation fixes (replan remap + hole_tasks) 2026-08-30. Manual UAT still pending (B-001).
+**Current Milestone:** SSE agent dispatcher (validated, uncommitted)  
+**Status:** `.specs/features/sse-agent-dispatcher/` T1–T7 validated 2026-09-07 (34 tests; live headers + first SSE-01 frames). Full Independent Tests / Chainlit / follow-up `thread_id` still UAT. English internals implemented; Voyage rerank UAT still pending.
 
 ---
 
@@ -71,8 +71,65 @@
 **Fair admission and per-paper retrieve** - IMPLEMENTED (UAT pending)
 
 - 1 paper per named `search` step (judge ranking, clip, U1); admit on ingest, not at search eval pass
-- Retrieve `k=3` per paper (no union `LIMIT k`); PDF fallback walks the same ranking
+- Retrieve `k=3` per paper (no union `LIMIT k`); PDF fallback walks the same ranking — **superseded** by `structured-aware-chunking` (`retrieve_k_per_paper=5`, HTML ingest, no PDF fallback)
 - Search attempt 1 always retries; attempt 2 S8a; retrieve T1/T2a/T3 + Writer hole rule (WRITE-02)
+
+---
+
+## Structured-aware HTML chunking
+
+**Goal:** Retrieve ingest uses arXiv HTML; tables and display equations stay atomic; prose keeps section identity; hybrid still per-paper with expanded excerpts.
+**Target:** Independent Tests of `.specs/features/structured-aware-chunking/spec.md` on `1706.03762` v7 passed 2026-09-03 (quick 014). Missing-HTML hole path not re-run.
+**Spec:** Implemented 2026-09-03 (grill-me 2026-09-02). Code validation 2026-09-03 passed. Retrieve/cache/Writer UAT 2026-09-03.
+**Design:** Executed 2026-09-03.
+**Tasks:** T1–T19 executed 2026-09-03.
+
+### Features
+
+**Structured-aware chunking** - IMPLEMENTED (UAT on `1706.03762` v7 passed 2026-09-03)
+
+- HTML-only retrieve ingest; wipe local PDF chunks; no PDF fallback
+- Heading split + 512/50 inside a section; tables/equations never split
+- Dual text: embed `embedding_text`, BM25/expand `content`; JSONB `section` / `caption` / `unit_ids`
+- Per-paper hybrid `k=5`, overfetch/dedup/backfill, in-place placeholder expansion — **packed k and RRF-order pack superseded** by `retrieve-cross-encoder-rerank` (Voyage Execute 2026-09-04; UAT pending)
+
+---
+
+## Retrieve cross-encoder rerank
+
+**Goal:** Hybrid overfetches more candidates; one Voyage `rerank-3` API call reorders them against the retrieve task; `cut_reranked` keeps the prefix within `margin=0.20` of that query’s best `relevance_score`, with `floor=0.30` and `top_n=12`, then `pack_hits` / expand.
+**Target:** UAT: methodology query on `2609.01617` v1 plus regression on `1706.03762` v7. Do not treat UAT as complete.
+**Spec:** `.specs/features/retrieve-cross-encoder-rerank/` — approved 2026-09-04 (Voyage). Prior Qwen Execute T1–T7 superseded as the live scorer.  
+**Design:** Approved 2026-09-04 (Voyage). Qwen/HF design superseded.  
+**Tasks:** Voyage T1–T7 executed 2026-09-04 (uncommitted). Qwen T1–T7 executed 2026-09-03 (superseded path).
+
+### Features
+
+**Task-conditioned retrieve rerank** - IMPLEMENTED (UAT pending)
+
+- First-stage hybrid `k=40` per leg per paper (not pack-on-RRF@5)
+- Voyage `rerank-3` scored once per execute on the retrieve **task** (no torch)
+- Adaptive cut: `cut_reranked` (`top_n=12`, `margin=0.20`, `floor=0.30`) then `pack_hits` / expand
+- No new graph node; no Citation score field; runtime Voyage fail → RRF pack; missing API key → boot fail
+
+---
+
+## SSE agent dispatcher
+
+**Goal:** Refactor `POST /research` streaming: SSE headers, `SseFrame` + domain dispatcher, execute facade, compile-once graph wrapper, consume `astream_events` v2. Client event names and Chainlit stay unchanged.
+**Target:** Live Independent Tests of `POST /research` until `done`/`insufficient`; Chainlit unchanged; follow-up `thread_id`.
+**Spec:** Validated 2026-09-07 (unit + live headers/first frames; full Independent Tests still UAT).
+**Design:** Validated 2026-09-07.
+**Tasks:** T1–T7 executed 2026-09-07 (uncommitted).
+
+### Features
+
+**SSE Agent Dispatcher** - VALIDATED (full Independent Tests still UAT)
+
+- Headers: `Cache-Control`, `Connection: keep-alive`, `X-Accel-Buffering: no`
+- Dispatcher owns `include_types` and kind → handler; unknown kind fails
+- Facade `execute` + graph wrapper compiled once (no ReAct `call_model`)
+- Out: Chainlit Strategy, `/agent/execute`, body `message`, `answer_delta`, LC callback event names on the wire
 
 ---
 
@@ -82,7 +139,8 @@
 - Thread TTL / delete and cross-session history UI
 - Hover/JSX citation tooltips
 - Writer `answer_delta` after eval pass
-- arXiv TeX/HTML parsers
+- Image/figure units and vision embeddings (cut from structured-aware-chunking)
+- LLM unit summaries (cut; extractive/caption heuristics in v1 of that feature)
 - Dockerize API and Chainlit
 - Global semantic search over the full ingested corpus
 - Human-in-the-loop plan approval

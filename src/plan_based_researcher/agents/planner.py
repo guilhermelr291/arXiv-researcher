@@ -150,13 +150,13 @@ def _replan_constraints(state: dict) -> str:
         lines.append(
             "Retrieve T2a: prefer writer-only suffix when evidence_chunks is "
             "non-empty. Writer task: living topics with [n]; state that no usable "
-            "arXiv paper/PDF was found for each gapped search task; forbid filling "
+            "paper HTML was found for each gapped search task; forbid filling "
             "from memory. Dead search stays in prefix passed_steps."
         )
     elif case == "t1":
         lines.append(
             "Retrieve T1: MUST NOT emit a new search (searches already passed; "
-            "failure is PDF). Suffix still needs a writer."
+            "failure is HTML ingest). Suffix still needs a writer."
         )
     elif case == "t3":
         try:
@@ -211,6 +211,9 @@ class PlannerRunner:
         prompt = (
             "Produce an ordered executable plan. Each step is "
             "{agent, task, reasoning, historical}.\n"
+            "Write every task and reasoning in English, even when the student "
+            "query is not English. The writer, not the planner, matches the "
+            "student's language.\n"
             "Write each task as a natural-language research or writing goal. "
             "Do not put arXiv search syntax in task; search and retrieve agents "
             "formulate their own queries.\n"
@@ -246,6 +249,8 @@ class PlannerRunner:
             "searches passed, remaining should be retrieve + writer tasked to compare topics "
             "that HAVE evidence and state the missing topic WITHOUT evidence. "
             "Do not keep a Writer still asked to compare three topics as evidenced.\n"
+            "Write every remaining task and reasoning in English, even when the "
+            "student query is not English.\n"
             "Write each remaining task as a natural-language goal, not arXiv syntax.\n"
             "Set historical=True on a step when older papers are needed.\n\n"
             "Available agents:\n"

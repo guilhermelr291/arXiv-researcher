@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, replace
+import asyncio
+import logging
 
 from langchain_openai import ChatOpenAI
-from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langsmith import trace
 
-from plan_based_researcher.adapters.hybrid import HybridRetrievePort
+from plan_based_researcher.adapters.hybrid import HybridResult, HybridRetrievePort
 from plan_based_researcher.agents.query_schema import (
     FormulatedQuery,
     formulate_human,
@@ -15,12 +16,30 @@ from plan_based_researcher.agents.query_schema import (
 )
 from plan_based_researcher.agents.registry import REGISTRY
 from plan_based_researcher.graph.state import merge_hole_tasks, merge_papers
+from plan_based_researcher.ingest.chunk_build import build_chunk_drafts
+from plan_based_researcher.ingest.expand import expand_hits
+from plan_based_researcher.ingest.html_parse import ParsedPaper, parse_arxiv_html
+from plan_based_researcher.ingest.pack import pack_hits
+from plan_based_researcher.ingest.rerank import (
+    RERANK_MODEL_ID,
+    build_rerank_query,
+    chunks_for_trace,
+    cut_reranked,
+    score_chunks,
+)
 from plan_based_researcher.policy import Policy
-from plan_based_researcher.ports.chunks import ChunkRepository, PaperRecord
+from plan_based_researcher.ports.chunks import (
+    ChunkDraft,
+    ChunkRecord,
+    ChunkRepository,
+    PaperRecord,
+)
 from plan_based_researcher.ports.embeddings import EmbeddingPort
 from plan_based_researcher.ports.papers import PaperPort
 
 __all__ = ["RetrieveRunner"]
+
+logger = logging.getLogger(__name__)
 
 _FORMULATE_SYSTEM = """\
 You write a English retrieval query for hybrid search (vector + BM25) over \
@@ -157,6 +176,34 @@ def _artifact_for_step(artifacts: dict, index: int) -> dict:
     return art if isinstance(art, dict) else {}
 
 
+def _parse_and_build(html_bytes: bytes) -> tuple[ParsedPaper, list[ChunkDraft]]:
+    parsed = parse_arxiv_html(html_bytes)
+    return parsed, build_chunk_drafts(parsed)
+
+
+def _append_numbered(
+    dest: list[dict],
+    packed: list[ChunkRecord],
+    excerpts: list[str],
+    n: int,
+) -> int:
+    for chunk, excerpt in zip(packed, excerpts):
+        dest.append(
+            {
+                "chunk_id": chunk.chunk_id,
+                "n": n,
+                "arxiv_id": chunk.arxiv_id,
+                "version": chunk.version,
+                "title": chunk.title,
+                "year": chunk.year,
+                "url": chunk.url,
+                "excerpt": excerpt,
+            }
+        )
+        n += 1
+    return n
+
+
 class RetrieveRunner:
     def __init__(
         self,
@@ -165,11 +212,14 @@ class RetrieveRunner:
         embeddings: EmbeddingPort,
         hybrid: HybridRetrievePort,
         api_key: str | None = None,
+        *,
+        voyage_api_key: str,
     ) -> None:
         self._papers = papers
         self._chunks = chunks
         self._embeddings = embeddings
         self._hybrid = hybrid
+        self._voyage_api_key = voyage_api_key
         kwargs: dict = {"model": REGISTRY["retrieve"].model}
         if api_key is not None:
             kwargs["api_key"] = api_key
@@ -213,11 +263,6 @@ class RetrieveRunner:
             artifacts = state.get("search_artifacts") or {}
             if not isinstance(artifacts, dict):
                 artifacts = {}
-            splitter = RecursiveCharacterTextSplitter.from_tiktoken_encoder(
-                encoding_name=Policy.chunk_encoding,
-                chunk_size=Policy.chunk_size,
-                chunk_overlap=Policy.chunk_overlap,
-            )
             for i in passed_search_indices:
                 art = _artifact_for_step(artifacts, i)
                 ranked = art.get("ranked_keys") or []
@@ -236,22 +281,30 @@ class RetrieveRunner:
                     ver = str(key.get("version") or "")
                     if (aid, ver) in usable_keys:
                         continue
-                    record = await self._chunks.get_paper(aid, ver)
-                    if record is None:
-                        any_miss = True
-                        text = await self._papers.load_pdf_text(aid, ver)
-                        if not text.strip():
-                            continue
-                        parts = splitter.split_text(text)
-                        if not parts:
-                            continue
-                        vectors = await self._embeddings.embed_documents(parts)
-                        ref = _paper_ref_from_hit(key, hits)
-                        await self._chunks.upsert_paper_with_chunks(
-                            _paper_record_from_ref(ref), parts, vectors
+                    if await self._chunks.paper_has_chunks(aid, ver):
+                        record = await self._chunks.get_paper(aid, ver)
+                        ref = (
+                            _paper_ref_from_record(record)
+                            if record is not None
+                            else _paper_ref_from_hit(key, hits)
                         )
                     else:
-                        ref = _paper_ref_from_record(record)
+                        any_miss = True
+                        html = await self._papers.load_html(aid, ver)
+                        if html.status != "ok" or not html.body:
+                            continue
+                        parsed, drafts = await asyncio.to_thread(
+                            _parse_and_build, html.body
+                        )
+                        if not parsed.usable or not drafts:
+                            continue
+                        vectors = await self._embeddings.embed_documents(
+                            [draft.embedding_text for draft in drafts]
+                        )
+                        ref = _paper_ref_from_hit(key, hits)
+                        await self._chunks.upsert_paper_with_chunks(
+                            _paper_record_from_ref(ref), drafts, vectors
+                        )
                     usable.append(ref)
                     usable_keys.add((aid, ver))
                     newly_admitted.append(ref)
@@ -290,21 +343,111 @@ class RetrieveRunner:
         query = await self._formulate_query(
             task, feedback=feedback, previous_query=previous_query
         )
-        k = Policy.retrieve_k_per_paper
-        numbered: list[dict] = []
-        n = 1
+        rerank_query = build_rerank_query(task, feedback)
+        per_paper: list[HybridResult] = []
         for paper in merged:
             if not isinstance(paper, dict):
                 continue
-            chunks_i = await self._hybrid.retrieve(
-                query,
-                [(paper["arxiv_id"], paper["version"])],
-                k=k,
+            per_paper.append(
+                await self._hybrid.retrieve(
+                    query,
+                    [(paper["arxiv_id"], paper["version"])],
+                    k=Policy.retrieve_first_stage_k,
+                )
             )
-            chunks_i = chunks_i[:k]
-            for chunk in chunks_i:
-                numbered.append(asdict(replace(chunk, n=n)))
-                n += 1
+
+        unique: list[ChunkRecord] = []
+        seen_ids: set[str] = set()
+        for result_i in per_paper:
+            for chunk in result_i.ranked:
+                if chunk.chunk_id in seen_ids:
+                    continue
+                seen_ids.add(chunk.chunk_id)
+                unique.append(chunk)
+
+        numbered: list[dict] = []
+        if unique:
+            async with trace(
+                "rerank",
+                run_type="chain",
+                inputs={
+                    "query": rerank_query,
+                    "n_docs": len(unique),
+                    "model": RERANK_MODEL_ID,
+                    "chunks": chunks_for_trace(unique),
+                },
+                tags=["rerank"],
+                metadata={"model": RERANK_MODEL_ID},
+            ) as rerank_run:
+                strategy = "voyage"
+                error_type: str | None = None
+                error_msg: str | None = None
+                by_id: dict[str, float] = {}
+                packed_chunks: list[ChunkRecord] = []
+                n = 1
+                try:
+                    scores = await asyncio.to_thread(
+                        score_chunks,
+                        unique,
+                        rerank_query,
+                        api_key=self._voyage_api_key,
+                    )
+                    chunk_ids = [chunk.chunk_id for chunk in unique]
+                    by_id = dict(zip(chunk_ids, scores))
+                except Exception as exc:
+                    logger.exception(
+                        "voyage rerank failed; packing ensemble order"
+                    )
+                    strategy = "ensemble_order"
+                    error_type = type(exc).__name__
+                    error_msg = str(exc)
+                    for result_i in per_paper:
+                        packed = pack_hits(
+                            result_i.ranked, k=Policy.retrieve_rerank_top_n
+                        )
+                        if not packed:
+                            continue
+                        packed_chunks.extend(packed)
+                        excerpts = expand_hits(packed, result_i.corpus)
+                        n = _append_numbered(numbered, packed, excerpts, n)
+                else:
+                    for result_i in per_paper:
+                        pairs = [
+                            (chunk, by_id[chunk.chunk_id])
+                            for chunk in result_i.ranked
+                        ]
+                        pairs.sort(key=lambda item: item[1], reverse=True)
+                        cut = cut_reranked(
+                            pairs,
+                            top_n=Policy.retrieve_rerank_top_n,
+                            margin=Policy.retrieve_rerank_margin,
+                            floor=Policy.retrieve_rerank_floor,
+                        )
+                        packed = pack_hits(cut, k=len(cut))
+                        if not packed:
+                            continue
+                        packed_chunks.extend(packed)
+                        excerpts = expand_hits(packed, result_i.corpus)
+                        n = _append_numbered(numbered, packed, excerpts, n)
+                score_map = by_id or None
+                outputs: dict = {
+                    "strategy": strategy,
+                    "n_packed": n - 1,
+                    "chunks": chunks_for_trace(packed_chunks, scores=score_map),
+                }
+                if by_id:
+                    scored = sorted(
+                        unique,
+                        key=lambda chunk: by_id[chunk.chunk_id],
+                        reverse=True,
+                    )
+                    outputs["chunks_scored"] = chunks_for_trace(
+                        scored, scores=by_id
+                    )
+                if error_type is not None:
+                    outputs["error_type"] = error_type
+                    outputs["error"] = error_msg
+                rerank_run.end(outputs=outputs)
 
         if walked and gap_step_indices:
             case = "t2a"

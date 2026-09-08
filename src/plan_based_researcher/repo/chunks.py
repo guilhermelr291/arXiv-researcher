@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal
 from uuid import uuid4
 
 from pgvector import Vector
 from pgvector.psycopg import register_vector_async
+from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
-from plan_based_researcher.ports.chunks import EvidenceChunk, PaperRecord
+from plan_based_researcher.ports.chunks import ChunkDraft, ChunkRecord, PaperRecord
 
-_SCHEMA_SQL = """
+_METADATA_KEYS = frozenset({"section", "caption", "unit_ids"})
+
+_PREAMBLE_SQL = """
 CREATE EXTENSION IF NOT EXISTS vector;
 
 CREATE TABLE IF NOT EXISTS papers (
@@ -25,25 +28,58 @@ CREATE TABLE IF NOT EXISTS papers (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (arxiv_id, version)
 );
+"""
 
+_CHUNKS_SQL = """
 CREATE TABLE IF NOT EXISTS chunks (
   chunk_id UUID PRIMARY KEY,
   arxiv_id TEXT NOT NULL,
   version TEXT NOT NULL,
   chunk_index INT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('prose', 'table', 'equation')),
+  unit_id TEXT,
+  embedding_text TEXT NOT NULL,
   content TEXT NOT NULL,
   embedding vector(1536) NOT NULL,
+  metadata JSONB NOT NULL,
   UNIQUE (arxiv_id, version, chunk_index),
   FOREIGN KEY (arxiv_id, version) REFERENCES papers (arxiv_id, version)
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS chunks_atomic_identity
+  ON chunks (arxiv_id, version, unit_id)
+  WHERE unit_id IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS chunks_papers_idx ON chunks (arxiv_id, version);
+"""
+
+_CHUNKS_KIND_STATE_SQL = """
+SELECT
+  EXISTS (
+    SELECT 1
+    FROM information_schema.tables
+    WHERE table_schema = current_schema()
+      AND table_name = 'chunks'
+  ) AS table_exists,
+  EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_schema = current_schema()
+      AND table_name = 'chunks'
+      AND column_name = 'kind'
+  ) AS kind_exists
 """
 
 _GET_PAPER_SQL = """
 SELECT arxiv_id, version, title, year, url, categories
 FROM papers
 WHERE arxiv_id = %s AND version = %s
+"""
+
+_PAPER_HAS_CHUNKS_SQL = """
+SELECT EXISTS (
+  SELECT 1 FROM chunks WHERE arxiv_id = %s AND version = %s
+) AS has_chunks
 """
 
 _UPSERT_PAPER_SQL = """
@@ -61,19 +97,29 @@ DELETE FROM chunks WHERE arxiv_id = %s AND version = %s
 """
 
 _INSERT_CHUNK_SQL = """
-INSERT INTO chunks (chunk_id, arxiv_id, version, chunk_index, content, embedding)
-VALUES (%s, %s, %s, %s, %s, %s)
+INSERT INTO chunks (
+  chunk_id, arxiv_id, version, chunk_index,
+  kind, unit_id, embedding_text, content, embedding, metadata
+)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 """
 
-_SIMILARITY_SEARCH_SQL = """
-SELECT
+_CHUNK_SELECT = """
   c.chunk_id,
   c.arxiv_id,
   c.version,
   p.title,
   p.year,
   p.url,
-  c.content
+  c.kind,
+  c.unit_id,
+  c.content,
+  c.metadata
+"""
+
+_SIMILARITY_SEARCH_SQL = f"""
+SELECT
+{_CHUNK_SELECT}
 FROM chunks AS c
 JOIN papers AS p
   ON p.arxiv_id = c.arxiv_id AND p.version = c.version
@@ -84,15 +130,9 @@ ORDER BY c.embedding <=> %s
 LIMIT %s
 """
 
-_LIST_CHUNKS_SQL = """
+_LIST_CHUNKS_SQL = f"""
 SELECT
-  c.chunk_id,
-  c.arxiv_id,
-  c.version,
-  p.title,
-  p.year,
-  p.url,
-  c.content
+{_CHUNK_SELECT}
 FROM chunks AS c
 JOIN papers AS p
   ON p.arxiv_id = c.arxiv_id AND p.version = c.version
@@ -118,17 +158,57 @@ def _paper_from_row(row: Mapping[str, Any]) -> PaperRecord:
     )
 
 
-def _chunk_from_row(row: Mapping[str, Any]) -> EvidenceChunk:
-    return EvidenceChunk(
+def _chunk_kind(value: Any) -> Literal["prose", "table", "equation"]:
+    kind = str(value)
+    if kind == "prose":
+        return "prose"
+    if kind == "table":
+        return "table"
+    if kind == "equation":
+        return "equation"
+    raise ValueError(f"invalid chunk kind: {kind}")
+
+
+def _metadata_from_row(value: Any) -> dict:
+    if isinstance(value, dict):
+        return dict(value)
+    raise TypeError(
+        f"chunk metadata must be a dict, got {type(value).__name__}"
+    )
+
+
+def _validated_metadata(metadata: Mapping[str, Any]) -> dict[str, Any]:
+    keys = frozenset(metadata)
+    if keys != _METADATA_KEYS:
+        raise ValueError(
+            "chunk metadata keys must be exactly {section, caption, unit_ids}, "
+            f"got {sorted(keys)}"
+        )
+    return dict(metadata)
+
+
+def _chunk_from_row(row: Mapping[str, Any]) -> ChunkRecord:
+    unit_id = row["unit_id"]
+    return ChunkRecord(
         chunk_id=str(row["chunk_id"]),
         arxiv_id=str(row["arxiv_id"]),
         version=str(row["version"]),
         title=str(row["title"]),
         year=int(row["year"]),
         url=str(row["url"]),
-        excerpt=str(row["content"]),
-        n=0,
+        kind=_chunk_kind(row["kind"]),
+        unit_id=None if unit_id is None else str(unit_id),
+        content=str(row["content"]),
+        metadata=_metadata_from_row(row["metadata"]),
     )
+
+
+async def _legacy_chunks_without_kind(conn: Any) -> bool:
+    cur = await conn.execute(_CHUNKS_KIND_STATE_SQL)
+    row = await cur.fetchone()
+    if row is None:
+        return False
+    return bool(row["table_exists"]) and not bool(row["kind_exists"])
 
 
 class PgChunkRepository:
@@ -137,7 +217,12 @@ class PgChunkRepository:
 
     async def ensure_schema(self) -> None:
         async with self._pool.connection() as conn:
-            for statement in _schema_statements(_SCHEMA_SQL):
+            for statement in _schema_statements(_PREAMBLE_SQL):
+                await conn.execute(statement)
+            if await _legacy_chunks_without_kind(conn):
+                await conn.execute("DROP TABLE chunks")
+                await conn.execute("DELETE FROM papers")
+            for statement in _schema_statements(_CHUNKS_SQL):
                 await conn.execute(statement)
 
     async def get_paper(self, arxiv_id: str, version: str) -> PaperRecord | None:
@@ -149,16 +234,24 @@ class PgChunkRepository:
             return None
         return _paper_from_row(row)
 
+    async def paper_has_chunks(self, arxiv_id: str, version: str) -> bool:
+        async with self._pool.connection() as conn:
+            cur = await conn.execute(_PAPER_HAS_CHUNKS_SQL, (arxiv_id, version))
+            row = await cur.fetchone()
+        if row is None:
+            return False
+        return bool(row["has_chunks"])
+
     async def upsert_paper_with_chunks(
         self,
         paper: PaperRecord,
-        chunks: list[str],
+        drafts: list[ChunkDraft],
         embeddings: list[list[float]],
     ) -> None:
-        if len(chunks) != len(embeddings):
+        if len(drafts) != len(embeddings):
             raise ValueError(
-                "chunks and embeddings must have the same length "
-                f"({len(chunks)} != {len(embeddings)})"
+                "drafts and embeddings must have the same length "
+                f"({len(drafts)} != {len(embeddings)})"
             )
         rows = [
             (
@@ -166,10 +259,14 @@ class PgChunkRepository:
                 paper.arxiv_id,
                 paper.version,
                 index,
-                content,
+                draft.kind,
+                draft.unit_id,
+                draft.embedding_text,
+                draft.content,
                 Vector(embedding),
+                Jsonb(_validated_metadata(draft.metadata)),
             )
-            for index, (content, embedding) in enumerate(zip(chunks, embeddings))
+            for index, (draft, embedding) in enumerate(zip(drafts, embeddings))
         ]
         async with self._pool.connection() as conn:
             await register_vector_async(conn)
@@ -194,7 +291,7 @@ class PgChunkRepository:
         query_embedding: list[float],
         paper_keys: list[tuple[str, str]],
         k: int,
-    ) -> list[EvidenceChunk]:
+    ) -> list[ChunkRecord]:
         if not paper_keys:
             return []
         ids = [key[0] for key in paper_keys]
@@ -211,7 +308,7 @@ class PgChunkRepository:
     async def list_chunks(
         self,
         paper_keys: list[tuple[str, str]],
-    ) -> list[EvidenceChunk]:
+    ) -> list[ChunkRecord]:
         if not paper_keys:
             return []
         ids = [key[0] for key in paper_keys]

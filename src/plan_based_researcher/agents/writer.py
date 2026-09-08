@@ -286,7 +286,9 @@ def _system_prompt() -> str:
         "You are given a numbered list of arXiv evidence chunks formatted as [n] blocks. "
         "Cite only those [n] values; never invent indices or non-arXiv sources. "
         "Every technical claim needs a real [n]. "
-        "Match the student query language and a student didactic register. "
+        "Write the answer markdown in the student query language and a student "
+        "didactic register. Plan tasks and evaluator feedback are English; do "
+        "not switch the answer to English because of them. "
         "If chunks disagree or conflict, include a limitations/contradictions section; "
         "do not pick a silent winner. State both sides with their [n] citations."
     )
@@ -300,9 +302,13 @@ def _user_prompt(state: GraphState, formatted_chunks: str) -> str:
         f"Student query:\n{state.get('query') or ''}",
     ]
     if language:
-        parts.append(f"Answer language: {language}")
+        parts.append(
+            f"Answer language: {language}\n"
+            "Write the markdown in that language. The writing task and evaluator "
+            "feedback may be English; do not follow them for answer language."
+        )
     if task:
-        parts.append(f"Current writing task:\n{task}")
+        parts.append(f"Current writing task (English; execute it in Answer language):\n{task}")
     if feedback:
         parts.append(f"Evaluator feedback (honor this on retry):\n{feedback}")
     living, missing = living_and_missing(state)

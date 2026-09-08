@@ -24,18 +24,26 @@ Rules:
 - Put the query in the structured `query` field. Do not narrate.
 - Use English keywords even when the task is in another language.
 - Do not copy the task prose or a student question as the query.
-- Field prefixes: ti: (title), abs: (abstract), all: (all fields). Use au: only \
-if the task names an author. Do not use id:.
+- Field prefixes: ti: (title), abs: (abstract), all: (all fields), id: (arXiv id). \
+Use au: only if the task names an author.
+- If the task or student query contains an arXiv id (new-style NNNN.NNNNN, \
+optional vN), the query MUST be exactly id: plus that id, with no AND of title \
+or abstract phrases. Strip a trailing vN if present; use the id the student \
+gave, not a different paper.
 - Boolean operators must be uppercase: AND, OR, ANDNOT. Use parentheses for grouping.
 - Quote multi-word phrases: ti:"low-rank adaptation".
-- Prefer (ti:"phrase" OR abs:"phrase") plus related terms.
+- When no arXiv id is given, prefer (ti:"phrase" OR abs:"phrase") plus related terms.
+- Do not AND retrieve-only body terms into ti: or abs:. Equation names, table \
+numbers, BLEU scores, section titles, and architecture nicknames such as \
+Transformer-big are for retrieve, not search. Search matches titles and abstracts.
 - Do not use cat: to enforce the AI/ML allowlist. A later filter keeps only \
 cs.AI, cs.LG, cs.CL, cs.CV, cs.NE, cs.RO, stat.ML. A cat: outside that list \
 yields empty usable hits.
 - Do not use submittedDate. Recency is applied after search unless historical=true.
 - Keep the query under 300 characters.
 - When Previous query or Evaluator feedback is present, honor the feedback and \
-emit a different query from Previous query.
+emit a different query from Previous query. An id: query that returned hits \
+must not be rewritten into a title/abstract AND.
 
 Examples:
 - Task: Find papers on LoRA for adapting LLMs
@@ -111,6 +119,7 @@ class SearchRunner:
             feedback=feedback,
             previous_query=previous_query,
             historical=historical,
+            student_query=str(state.get("query") or ""),
         )
 
         hits = await self._papers.search(query, max_results=Policy.search_max_results)
@@ -145,6 +154,7 @@ class SearchRunner:
         feedback: str,
         previous_query: str,
         historical: bool,
+        student_query: str,
     ) -> str:
         formulated = await self._formulate.ainvoke(
             [
@@ -156,6 +166,7 @@ class SearchRunner:
                         feedback=feedback,
                         previous_query=previous_query,
                         historical=historical,
+                        student_query=student_query,
                     ),
                 ),
             ]

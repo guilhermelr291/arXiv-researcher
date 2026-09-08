@@ -13,14 +13,17 @@ from plan_based_researcher.adapters.arxiv import ArxivPaperAdapter
 from plan_based_researcher.adapters.hybrid import HybridRetrieveAdapter
 from plan_based_researcher.adapters.openai_embeddings import OpenAIEmbeddingAdapter
 from plan_based_researcher.agents.factory import AgentFactory
+from plan_based_researcher.api.executor import ResearchExecutor
 from plan_based_researcher.api.routes import router
+from plan_based_researcher.api.stream_dispatcher import StreamDispatcher
 from plan_based_researcher.config import Settings
 from plan_based_researcher.eval.strategies import (
     RetrieveEvalStrategy,
     SearchEvalStrategy,
     WriterEvalStrategy,
 )
-from plan_based_researcher.graph.build import GraphDeps, build_graph
+from plan_based_researcher.graph.build import GraphDeps
+from plan_based_researcher.graph.research_graph import ResearchGraph
 from plan_based_researcher.repo.chunks import PgChunkRepository
 
 
@@ -41,7 +44,12 @@ async def lifespan(app: FastAPI):
     papers = ArxivPaperAdapter()
     hybrid = HybridRetrieveAdapter(repo, embeddings)
     factory = AgentFactory(
-        papers, repo, embeddings, hybrid, api_key=settings.openai_api_key
+        papers,
+        repo,
+        embeddings,
+        hybrid,
+        api_key=settings.openai_api_key,
+        voyage_api_key=settings.voyage_api_key,
     )
     deps = GraphDeps(
         factory=factory,
@@ -51,7 +59,10 @@ async def lifespan(app: FastAPI):
     )
     app.state.settings = settings
     app.state.pool = pool
-    app.state.graph = build_graph(deps, checkpointer=checkpointer)
+    app.state.executor = ResearchExecutor(
+        ResearchGraph(deps, checkpointer=checkpointer),
+        StreamDispatcher.default(),
+    )
     yield
     await pool.close()
 

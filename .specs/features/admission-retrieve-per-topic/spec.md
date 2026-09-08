@@ -9,7 +9,11 @@
 **Architecture constraints:** `.specs/features/arxiv-grounded-research/context.md` (PAT-01–PAT-12 still apply)  
 **Routing atlas (grilled):** `.specs/features/admission-retrieve-per-topic/graph-flow.md`
 
-This spec defines **only** how papers are chosen, admitted, retrieved, and how search/retrieve misses retry or replan — plus the Writer hole rule (no parametric fill). Gate, allowlist, recency, splitter 500/100, hybrid **weights** 0.7/0.3, SSE event **names**, Chainlit, checkpointer, models, `max_steps=8`, `max_papers=8`, `max_retries_per_step=1`, `max_replans=1`, and timeout stay as in the parent specs unless an ID below explicitly supersedes them.
+This spec defines **only** how papers are chosen, admitted, retrieved, and how search/retrieve misses retry or replan — plus the Writer hole rule (no parametric fill). Gate, allowlist, recency, hybrid **weights** 0.7/0.3, SSE event **names**, Chainlit, checkpointer, models, `max_steps=8`, `max_papers=8`, `max_retries_per_step=1`, `max_replans=1`, and timeout stay as in the parent specs unless an ID below explicitly supersedes them.
+
+**Chunking amendment (executed 2026-09-03):** `.specs/features/structured-aware-chunking/spec.md` supersedes **RETR-02** (`k=3` + post-ensemble slice) and **RETR-03** (PDF walk). Unchanged: 1/topic admission, U1, T1/T2a/T3 routing, hybrid weights. Retrieve ingest is HTML; packed `k=5`.
+
+**Rerank amendment (executed 2026-09-03):** `.specs/features/retrieve-cross-encoder-rerank/` supersedes packed `k=5` from ensemble order (**RETR-05**) and RRF pack-to-5 / overfetch `3×k` (**RETR-08**). First-stage hybrid `k=40`; adaptive cut `top_n=12`. Unchanged: HTML ingest, placeholder expand, T1/T2a/T3 routing. UAT of this amendment is not complete.
 
 ## Problem Statement
 
@@ -193,8 +197,8 @@ Each requirement gets a unique ID for tracking across design, tasks, and validat
 | ADM-02 | P1: One paper per topic | Execute | ✅ Verified |
 | ADM-03 | P1: One paper per topic | Execute | ✅ Verified |
 | ADM-04 | P1: One paper per topic | Execute | ✅ Verified |
-| RETR-02 | P1: Per-paper retrieve | Execute | ✅ Verified |
-| RETR-03 | P1: Per-paper retrieve | Execute | ✅ Verified |
+| RETR-02 | P1: Per-paper retrieve | Execute | ⚠ `k=3` superseded (`structured-aware-chunking` RETR-05) |
+| RETR-03 | P1: Per-paper retrieve | Execute | ⚠ PDF walk superseded (`structured-aware-chunking` RETR-06) |
 | RETR-04 | P1: Retry / hole | Execute | ✅ Verified |
 | LOOP-04 | P1: Retry / hole | Execute | ✅ Verified |
 | LOOP-05 | P1: Retry / hole | Execute | ✅ Verified |
@@ -207,8 +211,8 @@ Each requirement gets a unique ID for tracking across design, tasks, and validat
 - **ADM-02** — Search fetches `max_results=8`, filters as today, writes artifacts only; never API `top_k=1`; never writes `papers`.
 - **ADM-03** — One wave LLM call; per-step ordered acceptable keys; clip to artifact hits; `passed` iff list non-empty after clip + U1; persist `ranked_keys` on the full artifact.
 - **ADM-04** — U1: uniqueness uses champion heads only at eval; retrieve skips keys already in `usable`. Empty after U1 → that search fails.
-- **RETR-02** — `retrieve_k_per_paper=3`; one hybrid call per usable paper; slice after ensemble; concat in admission order; continuous `[n]`. No union `LIMIT k`. Follow-up without current-plan searches: hybrid over thread `papers` only.
-- **RETR-03** — Retrieve walks `ranked_keys` and admits the first usable PDF per ranking in the same execute. Empty PDF ≠ arXiv miss. T3 retry does not re-walk exhausted PDFs.
+- **RETR-02** — **Superseded** by RETR-05: `retrieve_k_per_paper=5`, overfetch/pack, no post-ensemble `[:k]`. Unchanged: one hybrid call per usable paper; concat in admission order; continuous `[n]`; no union `LIMIT k`; follow-up hybrid over thread `papers` only.
+- **RETR-03** — **Superseded** by RETR-06: first usable **HTML** per ranking; empty/missing HTML ≠ arXiv miss. Unchanged: walk `ranked_keys` in the same execute; T3 retry does not re-walk exhausted keys.
 - **RETR-04** — T1 / T2a / T3 as in P1 story 3. T2a: hybrid on living papers; deterministic `plan_inadequate`; do not un-pass search.
 - **LOOP-04** — Search attempt 1 never routes on `plan_inadequate`; always retry the same search when the ranking is empty / off-task.
 - **LOOP-05** — Retrieve R2: T3 attempt 1 always query-retry (ignore judge `plan_inadequate` for routing). T1, T2a, and paper-set inadequate skip retrieve retry.
