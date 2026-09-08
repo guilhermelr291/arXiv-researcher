@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** English internals (plan/eval/rerank); writer follows query language  
-**Status:** `english-internal-language` prompt/schema locks 2026-09-06. Voyage rerank UAT still pending (`2609.01617` v1, `1706.03762` v7).
+**Current Milestone:** SSE agent dispatcher (validated, uncommitted)  
+**Status:** `.specs/features/sse-agent-dispatcher/` T1–T7 validated 2026-09-07 (34 tests; live headers + first SSE-01 frames). Full Independent Tests / Chainlit / follow-up `thread_id` still UAT. English internals implemented; Voyage rerank UAT still pending.
 
 ---
 
@@ -111,6 +111,25 @@
 - Voyage `rerank-3` scored once per execute on the retrieve **task** (no torch)
 - Adaptive cut: `cut_reranked` (`top_n=12`, `margin=0.20`, `floor=0.30`) then `pack_hits` / expand
 - No new graph node; no Citation score field; runtime Voyage fail → RRF pack; missing API key → boot fail
+
+---
+
+## SSE agent dispatcher
+
+**Goal:** Refactor `POST /research` streaming: SSE headers, `SseFrame` + domain dispatcher, execute facade, compile-once graph wrapper, consume `astream_events` v2. Client event names and Chainlit stay unchanged.
+**Target:** Live Independent Tests of `POST /research` until `done`/`insufficient`; Chainlit unchanged; follow-up `thread_id`.
+**Spec:** Validated 2026-09-07 (unit + live headers/first frames; full Independent Tests still UAT).
+**Design:** Validated 2026-09-07.
+**Tasks:** T1–T7 executed 2026-09-07 (uncommitted).
+
+### Features
+
+**SSE Agent Dispatcher** - VALIDATED (full Independent Tests still UAT)
+
+- Headers: `Cache-Control`, `Connection: keep-alive`, `X-Accel-Buffering: no`
+- Dispatcher owns `include_types` and kind → handler; unknown kind fails
+- Facade `execute` + graph wrapper compiled once (no ReAct `call_model`)
+- Out: Chainlit Strategy, `/agent/execute`, body `message`, `answer_delta`, LC callback event names on the wire
 
 ---
 

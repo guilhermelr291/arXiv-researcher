@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-09-06
-**Current Work:** English internals and LangSmith rerank traces committed. Voyage UAT still pending (`2609.01617` v1, `1706.03762` v7).
+**Last Updated:** 2026-09-07
+**Current Work:** Feature `sse-agent-dispatcher` — T1–T7 validated (uncommitted). Unit gate 34/34. Live headers + incremental `gate`/`plan`/`step_*` on `:8001`. Full until `done`/`insufficient`, Chainlit, follow-up `thread_id` still UAT. Quick 019 / 018 and `MOCK_ARXIV_ID` still uncommitted.
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-020: SSE consume path is astream_events v2 + StreamDispatcher (2026-09-07)
+
+**Decision:** Execute `.specs/features/sse-agent-dispatcher/` as designed: `SseFrame` + `SSE_HEADERS`, `StreamDispatcher` (`include_types=("chain",)`, `stream_mode="custom"` string), `ResearchGraph` wrapper, `ResearchExecutor.execute` as the only production iterator, lifespan compile-once, `POST /research` returns `StreamingResponse(executor.execute(...))`.
+**Reason:** User asked to Execute T1–T7. Parent PAT-11 consume wording (`graph.astream` updates+custom) is replaced for the HTTP generator; FastAPI `StreamingResponse` and SSE-01 names stay.
+**Trade-off:** Unit tests cover unwrap/timeout/headers; live in-domain stream and Chainlit are still UAT.
+**Impact:** Route module has no `astream(`; nodes and Chainlit unchanged. Commits deferred until asked.
 
 ### AD-001: Plan-based multi-agent researcher (2026-08-25)
 
@@ -172,6 +179,8 @@
 - Installing `sentence-transformers` / `transformers` makes FastAPI lifespan import `torch` even when `ingest/rerank.py` lazy-imports. `chunk_build` does `from langchain_text_splitters import …`, and that package `__init__` eagerly imports `SentenceTransformersTokenTextSplitter`. `hybrid` does `from langchain_classic.retrievers import EnsembleRetriever`, whose package `__init__` pulls `ParentDocumentRetriever` → the same splitters. Lazy `get_cross_encoder()` is not enough; defer those two imports until first retrieve/ingest.
 - PyMuPDF `get_text()` (LangChain `ArxivLoader`) can emit U+0000. Postgres TEXT / psycopg reject it. Strip NUL in the arXiv adapter after load. Trace `01a058da-c1b4-7633-befb-39b6249739c7`.
 - Voyage `rerank-3` without a payment method is 3 RPM / 10K TPM and raises `RateLimitError`. Retrieve falls back to ensemble pack (`k=top_n`); that used to be uvicorn-only (`voyage rerank failed`). Trace `01a0782d-8975-72a3-a44e-93e0c72f001a`. Quick 016: LangSmith child `voyage_rerank` + parent `rerank` with `strategy=ensemble_order`.
+- Prompt-only LANG-01 at the top of the planner prompt is not enough: the model still copied a Portuguese student query into `task` (trace `01a0786a-ba4b-74f0-8a12-685eccf10738`). Quick 019: repeat the English lock after the query, with a Portuguese→English few-shot. Do not sniff language in retrieve.
+- Feature unittest modules can vanish from disk while `__pycache__/*.pyc` remains. `unittest discover` then silently runs only committed tests (here 5 instead of 34). During `sse-agent-dispatcher` verify, restore the `.py` files before treating the gate as green.
 
 ---
 
@@ -193,14 +202,17 @@
 | 012 | Search `id:` when arXiv id is present; do not AND body terms into abs | 2026-09-03 | — | ✅ Done |
 | 013 | Writer judge passes cited fidelity; no retry for extra caveats | 2026-09-03 | — | ✅ Done |
 | 014 | HTML Independent Tests UAT on canonical `1706.03762` v7 | 2026-09-03 | — | ✅ Done |
+| 015 | Mock arXiv search for cached UAT (`MOCK_ARXIV_ID`) | 2026-09-05 | — | ✅ Done |
 | 016 | LangSmith span on Voyage rerank fallback | 2026-09-06 | — | ✅ Done |
-| 017 | LangSmith chunk lists before and after rerank | 2026-09-06 | — | ✅ Done |
+| 018 | Retrieve judge passes core student request; no T3 retry for extra facets | 2026-09-06 | — | ✅ Done |
+| 019 | Planner English lock after student query so Voyage task is not Portuguese | 2026-09-06 | — | ✅ Done |
 
 ---
 
 ## Deferred Ideas
 
 - [ ] Automated test suite (pytest / Testcontainers) — Captured during: tasks phase (explicitly deferred)
+- [ ] Remove unused `encode_payload` from `api/sse.py` (orphaned after T7 deleted `iter_sse`) — Captured during: sse-agent-dispatcher Execute
 - [ ] Writer `answer_delta` after eval pass — Captured during: grill-me
 - [ ] Auth, multi-user, billing — Captured during: project init
 - [ ] Thread TTL/delete and history UI across browser sessions — Captured during: grill-me
@@ -262,9 +274,18 @@
 - [x] Execute Voyage T1–T7 (do not Execute from the Qwen task list)
 - [x] Code validation: Voyage retrieve-cross-encoder-rerank T1–T7 (2026-09-04). Gate: 14/14 `tests.test_cut_reranked`. Live Independent Tests still UAT.
 - [ ] Add `VOYAGE_API_KEY` to `.env.example` (boot now requires it; example file still OpenAI-only)
+- [x] Quick 015: `MOCK_ARXIV_ID` pins search to `2609.01617` v1 (2026-09-05; uncommitted)
 - [ ] Manual UAT: retrieve rerank Independent Tests after Voyage swap (`2609.01617` v1; `1706.03762` v7; may be blocked by B-001)
+- [ ] Manual UAT: quick 018 — Portuguese methodology query on `2609.01617` should be **one** retrieve (eval pass or `plan_inadequate` → writer), not a second hybrid
 - [ ] Manual UAT: `english-internal-language` — Portuguese query → English plan/eval/rerank query; writer markdown in Portuguese
 - [ ] Atomic commits when the user asks to commit (Voyage T1–T7 uncommitted; Qwen path superseded)
+- [x] User requested Design for `sse-agent-dispatcher` (2026-09-07; spec still formally Draft)
+- [x] User requested Tasks for `sse-agent-dispatcher` (2026-09-07; spec/design still formally Draft)
+- [x] User asked to Execute `.specs/features/sse-agent-dispatcher/tasks.md` (2026-09-07; no commits)
+- [x] Execute T1–T7 for `sse-agent-dispatcher`; full unittest discover 34/34
+- [x] Code validation: `sse-agent-dispatcher` T1–T7 (2026-09-07). Restored missing `tests/test_sse_frame.py` (and T2–T7 modules). Live sample: SSE headers + incremental `gate`/`plan`/`step_start`/`step_end` on `:8001`.
+- [ ] Manual UAT: SSE dispatcher Independent Tests (in-domain until `done`/`insufficient`; only SSE-01 names; Chainlit unchanged; follow-up `thread_id`)
+- [ ] Atomic commits per task T1–T7 when the user asks to commit (`sse-agent-dispatcher`)
 
 ---
 
