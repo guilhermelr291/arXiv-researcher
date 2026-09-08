@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     openai_api_key: str
     voyage_api_key: str = Field(min_length=1)
     database_url: str
+    mock_arxiv_id: str = ""
     api_host: str = "127.0.0.1"
     api_port: int = 8001
     research_timeout_seconds: int = 120

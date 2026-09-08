@@ -167,14 +167,28 @@ def _search_checklist() -> str:
 
 def _retrieve_checklist() -> str:
     return (
-        "Evaluate retrieve evidence against THIS retrieve step task.\n"
-        "Write feedback in English, even when the student query is not English.\n"
+        "Evaluate retrieve evidence against the student query first, then the "
+        "retrieve task. Write feedback in English, even when the student query "
+        "is not English.\n"
         "Chunks must be numbered [n] and come only from already-admitted papers.\n"
-        "Chunks must match the retrieve task.\n"
+        "Pass when the keep-set is enough to answer the student query's core "
+        "request (the method, pipeline, or comparison they asked for), even if a "
+        "long retrieve task lists extra facets (experimental protocol, prompt "
+        "templates, annotation procedure, every baseline, every limitation) that "
+        "are only sketched or missing from [n]. The writer will state holes.\n"
+        "Do not retry the retrieve query to hunt extra subsections, metrics "
+        "tables, or caveats when that core is already evidenced with [n].\n"
+        "Retry only when the keep-set is off-topic for the student query "
+        "(wrong aspect or unrelated sections) or when chunks are empty/foreign "
+        "(deterministic checks).\n"
+        "Set plan_inadequate=true when a listed facet cannot be satisfied "
+        "because it is not in the admitted paper — not because the current [n] "
+        "list omitted a chunk that is likely in the same HTML. If unsure whether "
+        "the paper contains it, pass if the core student request is covered; "
+        "do not retry.\n"
         "A T3 query miss is a retrieve query rewrite on the same papers, "
         "not a new HTML walk.\n"
-        "Return status pass, retry, or fail with feedback. "
-        "Set plan_inadequate if the admitted paper set cannot satisfy this task."
+        "Return status pass, retry, or fail with feedback."
     )
 
 
@@ -539,8 +553,8 @@ class RetrieveEvalStrategy:
                     ),
                     (
                         "human",
-                        f"Student query:\n{query}\n\n"
-                        f"Retrieve task:\n{task}\n\n"
+                        f"Student query (grade sufficiency against this first):\n{query}\n\n"
+                        f"Retrieve task (research goal, not an exhaustive inventory):\n{task}\n\n"
                         f"Admitted papers:\n{_format_admitted(data.get('papers'))}\n\n"
                         f"Evidence chunks:\n{_format_chunks(data.get('evidence_chunks'))}",
                     ),
