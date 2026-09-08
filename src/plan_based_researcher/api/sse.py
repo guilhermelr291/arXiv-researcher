@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 
 SSE_EVENTS: frozenset[str] = frozenset(
     {
@@ -18,13 +19,28 @@ SSE_EVENTS: frozenset[str] = frozenset(
     }
 )
 
+SSE_HEADERS: dict[str, str] = {
+    "Cache-Control": "no-cache",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no",
+}
+
+
+@dataclass(frozen=True, slots=True)
+class SseFrame:
+    event: str
+    data: object
+
+    def encode(self) -> bytes:
+        if self.event not in SSE_EVENTS:
+            raise ValueError(f"unknown SSE event: {self.event!r}")
+        payload = json.dumps(self.data, default=str)
+        return f"event: {self.event}\ndata: {payload}\n\n".encode("utf-8")
+
 
 def encode_sse(event: str, data: object) -> bytes:
     """Encode one SSE frame as UTF-8 ``event:`` / ``data:`` bytes."""
-    if event not in SSE_EVENTS:
-        raise ValueError(f"unknown SSE event: {event!r}")
-    payload = json.dumps(data, default=str)
-    return f"event: {event}\ndata: {payload}\n\n".encode("utf-8")
+    return SseFrame(event, data).encode()
 
 
 def encode_payload(payload: dict) -> bytes:
