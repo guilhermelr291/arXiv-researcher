@@ -3,19 +3,19 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from types import SimpleNamespace
 from typing import Any
 
-import voyageai
+from langchain_core.documents import Document
+from langchain_voyageai import VoyageAIRerank
 from langsmith import traceable
 
 from plan_based_researcher.ports.chunks import ChunkRecord
 
 RERANK_MODEL_ID = "rerank-3"
-RERANK_TIMEOUT_SECONDS = 30.0
 
 __all__ = [
     "RERANK_MODEL_ID",
-    "RERANK_TIMEOUT_SECONDS",
     "build_rerank_query",
     "chunks_for_trace",
     "cut_reranked",
@@ -154,20 +154,28 @@ def _voyage_rerank_outputs(outputs: object) -> dict:
     tags=["rerank"],
 )
 def score_chunks(chunks: list[ChunkRecord], query: str, *, api_key: str) -> list[float]:
-    """One Client.rerank call. Returns one relevance_score per chunk, same order.
+    """One VoyageAIRerank.compress_documents call. Returns one relevance_score per chunk, same order.
 
     Raises on HTTP/SDK failure or incomplete index coverage.
     """
     if not chunks:
         return []
-    ranking = voyageai.Client(
-        api_key=api_key,
-        timeout=RERANK_TIMEOUT_SECONDS,
-        max_retries=0,
-    ).rerank(
-        query,
-        [document_text(c) for c in chunks],
+    docs = [
+        Document(page_content=document_text(c), metadata={"input_index": i})
+        for i, c in enumerate(chunks)
+    ]
+    compressor = VoyageAIRerank(
         model=RERANK_MODEL_ID,
+        api_key=api_key,
+        top_k=len(docs),
         truncation=True,
     )
-    return scores_from_rerank_results(len(chunks), ranking.results)
+    compressed = compressor.compress_documents(docs, query)
+    results = [
+        SimpleNamespace(
+            index=doc.metadata["input_index"],
+            relevance_score=doc.metadata["relevance_score"],
+        )
+        for doc in compressed
+    ]
+    return scores_from_rerank_results(len(chunks), results)
