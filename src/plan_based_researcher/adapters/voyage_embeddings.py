@@ -1,13 +1,15 @@
-from langchain_openai import OpenAIEmbeddings
+from langchain_voyageai import VoyageAIEmbeddings
 from plan_based_researcher.ports.embeddings import EmbeddingPort  # structural only
 
+EMBEDDING_MODEL_ID = "voyage-4-large"
 
-class OpenAIEmbeddingAdapter:
+
+class VoyageEmbeddingAdapter:
     def __init__(self, api_key: str | None = None) -> None:
-        kwargs = {"model": "text-embedding-3-small"}
+        kwargs = {"model": EMBEDDING_MODEL_ID, "truncation": True}
         if api_key is not None:
             kwargs["api_key"] = api_key
-        self._embeddings = OpenAIEmbeddings(**kwargs)
+        self._embeddings = VoyageAIEmbeddings(**kwargs)
 
     async def embed_documents(self, texts: list[str]) -> list[list[float]]:
         return await self._embeddings.aembed_documents(texts)

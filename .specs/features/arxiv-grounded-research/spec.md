@@ -12,6 +12,8 @@
 
 **Rerank amendment (executed 2026-09-03):** `.specs/features/retrieve-cross-encoder-rerank/` supersedes packed `k=5` from ensemble order (**RETR-05**) and RRF pack-to-5 / overfetch `3×k` (**RETR-08**). First-stage hybrid `k=40`; adaptive cut `top_n=12`. Unchanged: HTML ingest, placeholder expand, T1/T2a/T3 routing. UAT of this amendment is not complete.
 
+**Embeddings amendment (Execute 2026-09-08):** `.specs/features/voyage-4-large-embeddings/` supersedes **EMB-01** model + 1536 store (`text-embedding-3-small` into `vector(1536)`). Production embeddings are Voyage `voyage-4-large` at default **1024**-d (`Policy.embedding_dimensions`). Unchanged: pgvector store; RAG scoped to selected papers; HTML ingest + `embedding_text`. Live Independent Tests of this amendment are **not** complete.
+
 ## Problem Statement
 
 Students asking AI/ML questions get fluent answers that mix parametric memory with the open web. That is unreliable for learning: claims are hard to check, sources are not papers, and a single LLM pass does not plan or correct itself. This feature answers only from arXiv papers in a fixed AI/ML category allowlist, with a plan-based multi-agent loop, per-step evaluation, and grounded generation (every technical claim tied to a retrieved chunk).
@@ -163,7 +165,7 @@ Students asking AI/ML questions get fluent answers that mix parametric memory wi
 | Audience         | Student; didactic **structure**, not uncited analogies                              |
 | Agents           | Gate → Planner → Orchestrator/Evaluator loop → Researcher → Writer                  |
 | Models           | Planner + Writer: `gpt-5.1`. Gate, Orchestrator, Researcher: `gpt-5-mini`           |
-| Embeddings       | `text-embedding-3-small`                                                            |
+| Embeddings       | Voyage `voyage-4-large` (1024-d); see embeddings amendment                          |
 | Splitter         | `RecursiveCharacterTextSplitter` 500 / 100                                          |
 | Caps             | `max_steps=8`, `max_retries_per_step=2`, `max_papers=8`, timeout ~2 min             |
 | Checkpointer     | `AsyncPostgresSaver` in the **same** Postgres as pgvector; `setup()` on API startup |
@@ -222,7 +224,7 @@ Students asking AI/ML questions get fluent answers that mix parametric memory wi
 - **ARX-02** — Recency: prefer last 5 years unless historical step.
 - **ARX-03** — Unique `(arxiv_id, version)`; miss fetches HTML, hit skips fetch when chunks exist; RAG not over the full library.
 - **ARX-04** — `max_papers=8` unique papers per run.
-- **EMB-01** — Split 500/100, `text-embedding-3-small`, store in pgvector.
+- **EMB-01** — Split 500/100, store in pgvector. **Superseded** for model + 1536 width (`text-embedding-3-small` into `vector(1536)`): Voyage `voyage-4-large` at 1024-d (embeddings amendment). Unchanged: pgvector store.
 - **GROUND-01** — Chunks formatted with `[n]` before the Writer; citations only from that list.
 - **GROUND-02** — `citations[]` plus markdown; excerpt is the used chunk (or recut of it).
 - **GROUND-03** — Contradictions must be stated; no silent winner.

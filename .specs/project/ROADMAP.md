@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** SSE agent dispatcher (validated, uncommitted)  
-**Status:** `.specs/features/sse-agent-dispatcher/` T1–T7 validated 2026-09-07 (34 tests; live headers + first SSE-01 frames). Full Independent Tests / Chainlit / follow-up `thread_id` still UAT. English internals implemented; Voyage rerank UAT still pending.
+**Current Milestone:** Voyage 4 large embeddings (code executed; live UAT pending)  
+**Status:** `.specs/features/voyage-4-large-embeddings/` T1–T8 executed 2026-09-08 (not committed). Corpus reset is `scripts/wipe_paper_chunks.py --yes`, not boot. Live Independent Tests (1024 ingest after wipe; leftover 1536 INSERT fail; `2609.01617` / `1706.03762` retrieve) remain UAT (may be blocked by B-001). SSE agent dispatcher T1–T7 remain validated/uncommitted.
 
 ---
 
@@ -130,6 +130,24 @@
 - Dispatcher owns `include_types` and kind → handler; unknown kind fails
 - Facade `execute` + graph wrapper compiled once (no ReAct `call_model`)
 - Out: Chainlit Strategy, `/agent/execute`, body `message`, `answer_delta`, LC callback event names on the wire
+
+---
+
+## Voyage 4 large embeddings
+
+**Goal:** First-stage vectors use Voyage `voyage-4-large` (1024-d); operator script wipes 1536 corpus; Voyage embed and rerank HTTP go through `langchain-voyageai` without changing `cut_reranked`.
+**Target:** Approve spec + design + tasks, then Execute T1–T8. Independent Tests: 1024-d ingest, wipe script `--yes`, `VoyageAIRerank` still feeds the current cut.
+**Spec:** Executed 2026-09-08 (grill-me locks; wipe amended to operator script). Discuss skipped. Live Independent Tests UAT pending.  
+**Design:** Executed 2026-09-08.  
+**Tasks:** Executed T1–T8 2026-09-08 (not committed).
+
+### Features
+
+**Voyage 4 large embeddings** - IMPLEMENTED (UAT pending)
+
+- Replace OpenAI `text-embedding-3-small` with `VoyageAIEmbeddings` (`voyage-4-large`, default 1024)
+- `Policy.embedding_dimensions=1024`; `ensure_schema` CREATE-only; `scripts/wipe_paper_chunks.py --yes` drops chunks/papers
+- `score_chunks` uses `VoyageAIRerank` (`rerank-3`); no `ContextualCompressionRetriever`; no app `import voyageai`
 
 ---
 
