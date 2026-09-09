@@ -13,6 +13,8 @@
 
 This spec defines **only** how retrieve **ranks and cuts** hybrid candidates before `pack_hits` / `expand_hits`. HTML ingest, placeholder expansion, hybrid **weights** 0.7/0.3, `FormulatedQuery` for the **first-stage** lexical/vector query, admission 1/topic, U1, T1/T2a/T3 routing, Gate, search, SSE event **names**, Chainlit, checkpointer, Writer `[n]` **format**, and `Citation` **fields** stay as in the parent specs unless an ID below explicitly supersedes them.
 
+**Client amendment (Execute 2026-09-08):** `.specs/features/voyage-4-large-embeddings/` supersedes app `voyageai.Client` as the required HTTP client. `score_chunks` uses `langchain_voyageai.VoyageAIRerank` (`compress_documents`). Unchanged: `rerank-3`, truncation, no Writer `top_k`, index/`relevance_score` mapping, `cut_reranked`, pack/expand, RRF fallback, boot fail without `VOYAGE_API_KEY`. UAT of retrieve Independent Tests is **not** complete.
+
 ## Problem Statement
 
 Packed retrieve used to keep the first `retrieve_k_per_paper=5` unique `unit_id`s of EnsembleRetriever RRF order. On methodology questions the first-stage query is a keyword dump, so isolated equations and results tables occupy `[1]`–`[5]` while section prose sits in overfetch ranks ~7–27. Overfetch already retrieved the useful passages — the leak is **RRF order plus a tight count cut**.
@@ -73,7 +75,7 @@ Upon approval, these IDs / rows are **replaced** by this feature (do not impleme
 **Locked knobs (specify + discuss, not reopened in Design):**
 
 - Model id: Voyage **`rerank-3`** (Preview). SHALL NOT call `rerank-3-lite` or `rerank-2.5` as a silent substitute.
-- Scoring SHALL be Voyage rerank (`voyageai.Client.rerank` or equivalent HTTP). Each document SHALL be scored against the retrieve **task**. Return values SHALL be Voyage **`relevance_score`** (~0–1). SHALL NOT apply sigmoid / min-max. SHALL NOT interpret them as Qwen logits.
+- Scoring SHALL be Voyage rerank (`voyageai.Client.rerank` or equivalent HTTP). **Client class superseded** (embeddings amendment): `langchain_voyageai.VoyageAIRerank` (`compress_documents`); scoring/cut locks stay. Each document SHALL be scored against the retrieve **task**. Return values SHALL be Voyage **`relevance_score`** (~0–1). SHALL NOT apply sigmoid / min-max. SHALL NOT interpret them as Qwen logits.
 - SHALL NOT use Voyage `top_k` (or `CrossEncoderReranker` / `ContextualCompressionRetriever`) as the Writer cut. Score the **full** `chunk_id`-unique first-stage list (or `top_k=len(documents)` so every candidate returns), map scores back to input order, then `cut_reranked`.
 - Rerank **query** = current retrieve `step.task`. On retry, concatenate that task with this step’s evaluator feedback (`eval_by_step`). SHALL NOT use `retrieve_query_used` / `FormulatedQuery`. SHALL NOT prepend the old Qwen Instruct paragraph.
 - Rerank **document** = `metadata.section` + newline + chunk `content` (placeholders still in prose; expansion stays after pack). Empty section → `content` only.
@@ -84,7 +86,7 @@ Upon approval, these IDs / rows are **replaced** by this feature (do not impleme
 - Sync Voyage I/O SHALL run off the event loop (`asyncio.to_thread` or equivalent async client). SHALL NOT import `torch` on the retrieve / FastAPI path.
 - WHEN Voyage **runtime** score fails (timeout, 5xx, network) THEN retrieve SHALL skip `cut_reranked` and `pack_hits` from **ensemble order** with `k=top_n` and SHALL NOT crash the graph. Log the failure. SHALL NOT fall back to Qwen or to another Voyage model.
 - WHEN `VOYAGE_API_KEY` is missing at process start THEN the API SHALL **refuse to start** (boot error). That is not the runtime fallback path.
-- OpenAI remains the LLM and embedding vendor. Voyage is the sole extra rerank vendor. Runtime deps SHALL include a Voyage client; SHALL NOT require `torch` / `sentence-transformers` / `transformers` for retrieve.
+- OpenAI remains the LLM vendor. Embeddings vendor is Voyage per the embeddings amendment (`voyage-4-large`, 1024-d); Voyage remains the sole extra rerank vendor. Runtime deps SHALL include a Voyage client; SHALL NOT require `torch` / `sentence-transformers` / `transformers` for retrieve.
 
 ---
 
