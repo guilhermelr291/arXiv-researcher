@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-09-07
-**Current Work:** Feature `sse-agent-dispatcher` — T1–T7 validated (uncommitted). Unit gate 34/34. Live headers + incremental `gate`/`plan`/`step_*` on `:8001`. Full until `done`/`insufficient`, Chainlit, follow-up `thread_id` still UAT. Quick 019 / 018 and `MOCK_ARXIV_ID` still uncommitted.
+**Last Updated:** 2026-09-08
+**Current Work:** Feature `voyage-4-large-embeddings` T1–T8 validated (code; 57/57). Live Independent Tests remain UAT. Not committed. SSE dispatcher T1–T7 still validated/uncommitted.
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-021: Voyage-4-large embeddings + LangChain Voyage clients (2026-09-08)
+
+**Decision:** Specify `.specs/features/voyage-4-large-embeddings/spec.md`. Production embeddings: `langchain_voyageai.VoyageAIEmbeddings`, model `voyage-4-large`, default 1024-d (no `output_dimension`). `Policy.embedding_dimensions=1024`; pgvector `vector(1024)`. `ensure_schema` is CREATE-only (no boot DROP of chunks/papers, including removal of the `kind` wipe). Operator `scripts/wipe_paper_chunks.py --yes` drops chunks and deletes papers; without `--yes` it no-ops. Rerank stays `rerank-3` + `cut_reranked`; HTTP client becomes `VoyageAIRerank` inside `score_chunks`. No `ContextualCompressionRetriever`, no Voyage `top_k` as Writer cut, no app `import voyageai`. Same `VOYAGE_API_KEY`. OpenAI remains LLM-only.
+**Reason:** Grill-me 2026-09-08 plus specify amendment: automatic wipe on boot is dangerous if the model/width changes again and the operator forgets.
+**Trade-off:** Leftover `vector(1536)` is not auto-migrated; INSERT of 1024-d vectors fails until the script is run. Direct `voyageai` SDK in app code goes away (Execute).
+**Impact:** Execute T1–T8 2026-09-08 (not committed). Partner `VoyageAIRerank.top_k` default in 0.4.1 is `None`; production still passes `top_k=len(documents)`. Supersedes EMB-01 model/1536, AD-006 embeddings line, PROJECT “embeddings: OpenAI only”, STORE-01 width, structured-aware boot `kind` wipe, and AD-018’s required `voyageai.Client` (not the scoring/cut locks). Leftover `vector(1536)` needs `python scripts/wipe_paper_chunks.py --yes` then API restart before 1024 ingest can succeed.
 
 ### AD-020: SSE consume path is astream_events v2 + StreamDispatcher (2026-09-07)
 
@@ -273,7 +280,7 @@
 - [x] User asked to Execute Voyage `.specs/features/retrieve-cross-encoder-rerank/tasks.md` (2026-09-04; no commits)
 - [x] Execute Voyage T1–T7 (do not Execute from the Qwen task list)
 - [x] Code validation: Voyage retrieve-cross-encoder-rerank T1–T7 (2026-09-04). Gate: 14/14 `tests.test_cut_reranked`. Live Independent Tests still UAT.
-- [ ] Add `VOYAGE_API_KEY` to `.env.example` (boot now requires it; example file still OpenAI-only)
+- [x] Add `VOYAGE_API_KEY` to `.env.example` (boot now requires it; T8 2026-09-08)
 - [x] Quick 015: `MOCK_ARXIV_ID` pins search to `2609.01617` v1 (2026-09-05; uncommitted)
 - [ ] Manual UAT: retrieve rerank Independent Tests after Voyage swap (`2609.01617` v1; `1706.03762` v7; may be blocked by B-001)
 - [ ] Manual UAT: quick 018 — Portuguese methodology query on `2609.01617` should be **one** retrieve (eval pass or `plan_inadequate` → writer), not a second hybrid
@@ -286,6 +293,13 @@
 - [x] Code validation: `sse-agent-dispatcher` T1–T7 (2026-09-07). Restored missing `tests/test_sse_frame.py` (and T2–T7 modules). Live sample: SSE headers + incremental `gate`/`plan`/`step_start`/`step_end` on `:8001`.
 - [ ] Manual UAT: SSE dispatcher Independent Tests (in-domain until `done`/`insufficient`; only SSE-01 names; Chainlit unchanged; follow-up `thread_id`)
 - [ ] Atomic commits per task T1–T7 when the user asks to commit (`sse-agent-dispatcher`)
+- [x] User requested Design for `voyage-4-large-embeddings` (2026-09-08; spec still formally Draft)
+- [x] User requested Tasks for `voyage-4-large-embeddings` (2026-09-08; spec/design still formally Draft)
+- [x] User asked to Execute `.specs/features/voyage-4-large-embeddings/tasks.md` (2026-09-08; no commits)
+- [x] Execute T1–T8 for `voyage-4-large-embeddings`; full unittest discover 57/57
+- [x] Code validation: `voyage-4-large-embeddings` T1–T8 (2026-09-08 verify). Gate `unittest discover -s tests` 57/57. Live Independent Tests still UAT.
+- [ ] Manual UAT: after `wipe_paper_chunks.py --yes` + restart, ingest writes 1024-d Voyage vectors; leftover 1536 INSERT fails until wipe; retrieve `2609.01617` / `1706.03762` (may be blocked by B-001)
+- [ ] Atomic commits per task T1–T8 when the user asks to commit (`voyage-4-large-embeddings`)
 
 ---
 
