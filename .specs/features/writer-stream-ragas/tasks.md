@@ -2,7 +2,7 @@
 
 **Design**: `.specs/features/writer-stream-ragas/design.md`  
 **Spec**: `.specs/features/writer-stream-ragas/spec.md`  
-**Status**: Verified T1–T10 2026-09-08 (code; unittest discover 88/88). Live Independent Tests remain UAT. Not committed. Spec/design still formally Draft.
+**Status**: Verified T1–T10 2026-09-08 (code; unittest discover 88/88). Live Independent Tests remain UAT. Spec/design still formally Draft.
 
 `.specs/codebase/TESTING.md` does not exist. Same as v1 / SSE dispatcher / Voyage: graph e2e (pytest, Testcontainers) is **out of scope**. Co-located **stdlib `unittest`** covers the SSE allowlist, Writer stream (tiny in-process `StateGraph` + mocked `astream`), evaluate auto-pass, finalize halt payloads, Chainlit source locks, and the RAGAS mapper. Live Independent Tests (`POST /research` until `done`, Chainlit typewriter + `[n]` panel, RAGAS on a real LangSmith trace) stay **UAT** after Execute (may be blocked by B-001). Do **not** call live OpenAI, Voyage, LangSmith, or RAGAS `ascore` in unittest discover. Do **not** `import ragas` from any file under `tests/`.
 

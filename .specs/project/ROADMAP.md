@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** Voyage 4 large embeddings (code executed; live UAT pending)  
-**Status:** `.specs/features/voyage-4-large-embeddings/` T1–T8 executed 2026-09-08 (not committed). Corpus reset is `scripts/wipe_paper_chunks.py --yes`, not boot. Live Independent Tests (1024 ingest after wipe; leftover 1536 INSERT fail; `2609.01617` / `1706.03762` retrieve) remain UAT (may be blocked by B-001). SSE agent dispatcher T1–T7 remain validated/uncommitted.
+**Current Milestone:** Writer stream + RAGAS report (executed; UAT pending)  
+**Status:** `.specs/features/writer-stream-ragas/` T1–T10 executed 2026-09-08 (unittest discover 88/88). Live Independent Tests remain UAT. Spec + design + tasks still formally Draft.
 
 ---
 
@@ -129,7 +129,7 @@
 - Headers: `Cache-Control`, `Connection: keep-alive`, `X-Accel-Buffering: no`
 - Dispatcher owns `include_types` and kind → handler; unknown kind fails
 - Facade `execute` + graph wrapper compiled once (no ReAct `call_model`)
-- Out: Chainlit Strategy, `/agent/execute`, body `message`, `answer_delta`, LC callback event names on the wire
+- Out: Chainlit Strategy, `/agent/execute`, body `message`, LC callback event names on the wire. Writer `answer_delta` is **in** `writer-stream-ragas` (supersedes this row’s old “no delta” lock).
 
 ---
 
@@ -139,7 +139,7 @@
 **Target:** Approve spec + design + tasks, then Execute T1–T8. Independent Tests: 1024-d ingest, wipe script `--yes`, `VoyageAIRerank` still feeds the current cut.
 **Spec:** Executed 2026-09-08 (grill-me locks; wipe amended to operator script). Discuss skipped. Live Independent Tests UAT pending.  
 **Design:** Executed 2026-09-08.  
-**Tasks:** Executed T1–T8 2026-09-08 (not committed).
+**Tasks:** Executed T1–T8 2026-09-08.
 
 ### Features
 
@@ -151,12 +151,31 @@
 
 ---
 
+## Writer stream + RAGAS report
+
+**Goal:** Stream Writer markdown as `answer_delta`; send `citations[]` once; drop Writer eval/retry; measure faithfulness + answer relevancy offline from LangSmith.
+**Target:** Independent Tests: in-domain SSE typewriter; Chainlit side panel; RAGAS script on a real trace.
+**Spec:** Executed T1–T10 2026-09-08 (grill-me locks; discuss skipped). Live Independent Tests UAT pending.  
+**Design:** Executed 2026-09-08.  
+**Tasks:** Executed T1–T10 2026-09-08.
+
+### Features
+
+**Writer stream + RAGAS report** - IMPLEMENTED (UAT pending)
+
+- Custom SSE `answer_delta` + `citations`; `answer_complete` removed
+- Writer one-shot (no `WriterEvalStrategy`)
+- Chainlit typewriter + existing `[n]` panel
+- `scripts/` RAGAS report (Faithfulness + AnswerRelevancy); contexts = Writer `evidence_chunks`
+
+---
+
 ## Future Considerations
 
 - Auth, multi-user accounts, billing
 - Thread TTL / delete and cross-session history UI
 - Hover/JSX citation tooltips
-- Writer `answer_delta` after eval pass
+- Writer `answer_delta` after eval pass — **superseded** by `writer-stream-ragas` (deltas without eval)
 - Image/figure units and vision embeddings (cut from structured-aware-chunking)
 - LLM unit summaries (cut; extractive/caption heuristics in v1 of that feature)
 - Dockerize API and Chainlit

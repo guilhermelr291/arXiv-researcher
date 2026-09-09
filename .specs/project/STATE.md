@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-09-08
-**Current Work:** Feature `voyage-4-large-embeddings` T1–T8 validated (code; 57/57). Live Independent Tests remain UAT. Not committed. SSE dispatcher T1–T7 still validated/uncommitted.
+**Last Updated:** 2026-09-09
+**Current Work:** Feature `writer-stream-ragas` — T1–T10 verified and committed (unittest discover 88/88). Live Independent Tests remain UAT. Spec + design still formally Draft.
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-022: Writer stream + offline RAGAS report (2026-09-08)
+
+**Decision:** Specify `.specs/features/writer-stream-ragas/spec.md`. Student sees Writer tokens as SSE `answer_delta` (`{ "text" }`) via `get_stream_writer`. After the last token, event `citations` carries `citations[]` only (no markdown). `answer_complete` is removed. Writer is one-shot: no `WriterEvalStrategy`, no Writer `eval`, no Writer retry; search/retrieve eval and caps stay. WRITE-02 remains prompt-only. Chainlit is in the slice (typewriter + existing side panel). RAGAS is a LangSmith-backed **report** (`Faithfulness` + `AnswerRelevancy` collections `ascore`); `retrieved_contexts` are post-cut Writer `evidence_chunks` excerpts; no context_* metrics; no CI threshold. Judge embeddings for AnswerRelevancy stay OpenAI `text-embedding-3-small` (not Voyage retrieve).
+**Reason:** Grill-me 2026-09-08: latency of generate+judge; student may see ungrounded prose; quality moves to offline traces.
+**Trade-off:** Hole fill, bad `[n]`, and extra URLs are no longer retried at runtime. RAGAS does not block the student and does not auto-fail CI.
+**Impact:** Supersedes AD-007 streaming/eval-gate, SSE-02, STRM-11, WRITE-01 as a gate. Execute T1–T10 2026-09-08. Live Independent Tests still UAT.
 
 ### AD-021: Voyage-4-large embeddings + LangChain Voyage clients (2026-09-08)
 
@@ -213,6 +220,7 @@
 | 016 | LangSmith span on Voyage rerank fallback | 2026-09-06 | — | ✅ Done |
 | 018 | Retrieve judge passes core student request; no T3 retry for extra facets | 2026-09-06 | — | ✅ Done |
 | 019 | Planner English lock after student query so Voyage task is not Portuguese | 2026-09-06 | — | ✅ Done |
+| 020 | RAGAS report judge `max_tokens` so Faithfulness ascore is not truncated | 2026-09-09 | — | ✅ Done |
 
 ---
 
@@ -220,7 +228,8 @@
 
 - [ ] Automated test suite (pytest / Testcontainers) — Captured during: tasks phase (explicitly deferred)
 - [ ] Remove unused `encode_payload` from `api/sse.py` (orphaned after T7 deleted `iter_sse`) — Captured during: sse-agent-dispatcher Execute
-- [ ] Writer `answer_delta` after eval pass — Captured during: grill-me
+- [x] Writer `answer_delta` after eval pass — Promoted to `writer-stream-ragas` (deltas **without** eval; Execute T1–T10 2026-09-08)
+- [ ] RAGAS CLI skip lines for every non-Writer LangGraph child run (planner/search/retrieve) — Captured during: `writer-stream-ragas` T10; mapper `None` is correct, stdout is noisy
 - [ ] Auth, multi-user, billing — Captured during: project init
 - [ ] Thread TTL/delete and history UI across browser sessions — Captured during: grill-me
 - [x] arXiv TeX/HTML instead of PDF extract — Promoted to feature `structured-aware-chunking` (spec draft 2026-09-02)
@@ -292,14 +301,21 @@
 - [x] Execute T1–T7 for `sse-agent-dispatcher`; full unittest discover 34/34
 - [x] Code validation: `sse-agent-dispatcher` T1–T7 (2026-09-07). Restored missing `tests/test_sse_frame.py` (and T2–T7 modules). Live sample: SSE headers + incremental `gate`/`plan`/`step_start`/`step_end` on `:8001`.
 - [ ] Manual UAT: SSE dispatcher Independent Tests (in-domain until `done`/`insufficient`; only SSE-01 names; Chainlit unchanged; follow-up `thread_id`)
-- [ ] Atomic commits per task T1–T7 when the user asks to commit (`sse-agent-dispatcher`)
+- [x] Atomic commits per task T1–T7 (`sse-agent-dispatcher`)
 - [x] User requested Design for `voyage-4-large-embeddings` (2026-09-08; spec still formally Draft)
 - [x] User requested Tasks for `voyage-4-large-embeddings` (2026-09-08; spec/design still formally Draft)
 - [x] User asked to Execute `.specs/features/voyage-4-large-embeddings/tasks.md` (2026-09-08; no commits)
 - [x] Execute T1–T8 for `voyage-4-large-embeddings`; full unittest discover 57/57
 - [x] Code validation: `voyage-4-large-embeddings` T1–T8 (2026-09-08 verify). Gate `unittest discover -s tests` 57/57. Live Independent Tests still UAT.
 - [ ] Manual UAT: after `wipe_paper_chunks.py --yes` + restart, ingest writes 1024-d Voyage vectors; leftover 1536 INSERT fails until wipe; retrieve `2609.01617` / `1706.03762` (may be blocked by B-001)
-- [ ] Atomic commits per task T1–T8 when the user asks to commit (`voyage-4-large-embeddings`)
+- [x] Atomic commits per task T1–T8 (`voyage-4-large-embeddings`)
+- [x] User requested Design for `writer-stream-ragas` (2026-09-08; spec still formally Draft)
+- [x] User requested Tasks for `writer-stream-ragas` (2026-09-08; spec/design still formally Draft)
+- [x] User asked to Execute `.specs/features/writer-stream-ragas/tasks.md` (2026-09-08; no commits; spec/design/tasks still formally Draft)
+- [x] Execute T1–T10 for `writer-stream-ragas`; full unittest discover 88/88
+- [x] Code validation: `writer-stream-ragas` T1–T10 (2026-09-08 verify). Gate `unittest discover -s tests` 88/88. Live Independent Tests still UAT.
+- [ ] Manual UAT: in-domain SSE `answer_delta` then `citations`, no `answer_complete`, no Writer `eval`, no `on_chat_model_*`; Chainlit typewriter + `[n]` panel; RAGAS script on one real mapped trace (may be blocked by B-001)
+- [x] Atomic commits per task T1–T10 (`writer-stream-ragas`, 2026-09-09)
 
 ---
 

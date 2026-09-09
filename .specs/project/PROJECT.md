@@ -38,7 +38,7 @@
 - Auth, multi-user accounts, billing, and a history product across anonymous browser sessions
 - Web search (Tavily or otherwise) and non-arXiv paper APIs
 - Dockerizing API/UI (Postgres only in Compose)
-- Hover-citation JSX, `answer_delta`, HITL plan approval
+- Hover-citation JSX, HITL plan approval
 - Native mobile/desktop clients
 
 ## Constraints

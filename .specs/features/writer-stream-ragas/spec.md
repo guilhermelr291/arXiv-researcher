@@ -1,7 +1,7 @@
 # Writer Stream + RAGAS Report Specification
 
 **Feature:** `writer-stream-ragas`  
-**Spec status:** Verified T1–T10 2026-09-08 (code; unittest discover 88/88). Live Independent Tests remain UAT. Not committed.  
+**Spec status:** Verified T1–T10 2026-09-08 (code; unittest discover 88/88). Live Independent Tests remain UAT.  
 **Date:** 2026-09-08  
 **Gray areas:** Locked in grill-me 2026-09-08; `discuss.md` skipped  
 **Parent product:** `.specs/features/arxiv-grounded-research/spec.md` (SSE-01, SSE-02, GROUND-01–03, UI-01–03, ORCH-03)  

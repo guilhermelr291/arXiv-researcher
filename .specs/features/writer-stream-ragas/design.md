@@ -3,7 +3,7 @@
 **Spec**: `.specs/features/writer-stream-ragas/spec.md`  
 **Parent designs**: `.specs/features/sse-agent-dispatcher/design.md` (consume path, `get_stream_writer` unwrap) · `.specs/features/orchestrator-eval-replan/design.md` (evaluate routing; Writer Strategy **removed** here) · `.specs/features/admission-retrieve-per-topic/design.md` (WRITE-02 prompt hole rule stays)  
 **Architecture constraints**: `.specs/features/arxiv-grounded-research/context.md` (PAT-01, PAT-02, PAT-07, PAT-08, PAT-11 consume path as amended by sse-agent-dispatcher, PAT-12)  
-**Status**: Verified T1–T10 2026-09-08 (code; unittest discover 88/88). Live Independent Tests remain UAT. Not committed.
+**Status**: Verified T1–T10 2026-09-08 (code; unittest discover 88/88). Live Independent Tests remain UAT.
 
 This feature does **not** change Gate, plan vocabulary, admission, retrieve cut, `[n]` prompt format, search/retrieve eval, Voyage embeddings, or the HTTP body `{ query, thread_id }`. It changes **when** Writer markdown is visible, **which SSE names** carry it, and **where** faithfulness is measured.
 
