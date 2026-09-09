@@ -10,7 +10,6 @@ from plan_based_researcher.agents.factory import AgentFactory
 from plan_based_researcher.eval.strategies import (
     RetrieveEvalStrategy,
     SearchEvalStrategy,
-    WriterEvalStrategy,
 )
 from plan_based_researcher.graph.build import GraphDeps, build_graph
 
@@ -47,7 +46,6 @@ def main() -> None:
         factory=cast(AgentFactory, _StubFactory()),
         search_eval=SearchEvalStrategy(api_key=None),
         retrieve_eval=RetrieveEvalStrategy(api_key=None),
-        writer_eval=WriterEvalStrategy(api_key=None),
     )
     drawable = build_graph(deps).get_graph()
 

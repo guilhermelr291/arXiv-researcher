@@ -20,7 +20,6 @@ from plan_based_researcher.config import Settings
 from plan_based_researcher.eval.strategies import (
     RetrieveEvalStrategy,
     SearchEvalStrategy,
-    WriterEvalStrategy,
 )
 from plan_based_researcher.graph.build import GraphDeps
 from plan_based_researcher.graph.research_graph import ResearchGraph
@@ -55,7 +54,6 @@ async def lifespan(app: FastAPI):
         factory=factory,
         search_eval=SearchEvalStrategy(api_key=settings.openai_api_key),
         retrieve_eval=RetrieveEvalStrategy(api_key=settings.openai_api_key),
-        writer_eval=WriterEvalStrategy(api_key=settings.openai_api_key),
     )
     app.state.settings = settings
     app.state.pool = pool

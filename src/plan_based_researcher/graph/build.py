@@ -11,7 +11,6 @@ from plan_based_researcher.agents.factory import AgentFactory
 from plan_based_researcher.eval.strategies import (
     RetrieveEvalStrategy,
     SearchEvalStrategy,
-    WriterEvalStrategy,
 )
 from plan_based_researcher.graph.nodes.dispatch import make_dispatch_node
 from plan_based_researcher.graph.nodes.evaluate import make_evaluate_node
@@ -31,7 +30,6 @@ class GraphDeps:
     factory: AgentFactory
     search_eval: SearchEvalStrategy
     retrieve_eval: RetrieveEvalStrategy
-    writer_eval: WriterEvalStrategy
 
 
 def _after_gate(state: GraphState) -> Literal["planner", "finalize"]:
@@ -64,7 +62,7 @@ def build_graph(deps: GraphDeps, checkpointer: Any | None = None):
     graph.add_node("execute", make_execute_node(deps.factory))
     graph.add_node(
         "evaluate",
-        make_evaluate_node(deps.search_eval, deps.retrieve_eval, deps.writer_eval),
+        make_evaluate_node(deps.search_eval, deps.retrieve_eval),
     )
     graph.add_node("replan", make_replan_node(deps.factory))
     graph.add_node("finalize", make_finalize_node())
