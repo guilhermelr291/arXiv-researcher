@@ -27,6 +27,7 @@ class Policy:
     chunk_size: int = 512
     chunk_overlap: int = 50
     chunk_encoding: str = "cl100k_base"
+    embedding_dimensions: int = 1024
     hybrid_vector_weight: float = 0.7
     hybrid_lexical_weight: float = 0.3
     search_max_results: int = 8
