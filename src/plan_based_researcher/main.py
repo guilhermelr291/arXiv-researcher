@@ -11,7 +11,7 @@ from psycopg_pool import AsyncConnectionPool
 
 from plan_based_researcher.adapters.arxiv import ArxivPaperAdapter
 from plan_based_researcher.adapters.hybrid import HybridRetrieveAdapter
-from plan_based_researcher.adapters.openai_embeddings import OpenAIEmbeddingAdapter
+from plan_based_researcher.adapters.voyage_embeddings import VoyageEmbeddingAdapter
 from plan_based_researcher.agents.factory import AgentFactory
 from plan_based_researcher.api.executor import ResearchExecutor
 from plan_based_researcher.api.routes import router
@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
     await checkpointer.setup()
     repo = PgChunkRepository(pool)
     await repo.ensure_schema()
-    embeddings = OpenAIEmbeddingAdapter(api_key=settings.openai_api_key)
+    embeddings = VoyageEmbeddingAdapter(api_key=settings.voyage_api_key)
     papers = ArxivPaperAdapter(mock_arxiv_id=settings.mock_arxiv_id or None)
     hybrid = HybridRetrieveAdapter(repo, embeddings)
     factory = AgentFactory(
