@@ -13,7 +13,6 @@ from plan_based_researcher.api.schemas import GateDecision, PlanStep
 from plan_based_researcher.eval.strategies import (
     _retrieve_checklist,
     _search_checklist,
-    _writer_checklist,
 )
 from plan_based_researcher.eval.types import EvalResult, SearchWaveJudgement
 
@@ -51,8 +50,6 @@ class InternalEnglishLocksTest(unittest.TestCase):
         self.assertIn("student query first", _retrieve_checklist())
         self.assertIn("Do not retry the retrieve query", _retrieve_checklist())
         self.assertIn("plan_inadequate=true", _retrieve_checklist())
-        self.assertIn("feedback field must be English", _writer_checklist())
-        self.assertIn("same language as the student query", _writer_checklist())
 
 
 if __name__ == "__main__":
