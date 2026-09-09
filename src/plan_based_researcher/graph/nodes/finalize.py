@@ -14,13 +14,6 @@ def make_finalize_node():
         writer = get_stream_writer()
         outcome = state.get("outcome") or "error"
         if outcome == "done":
-            writer({
-                "event": "answer_complete",
-                "data": {
-                    "markdown": state.get("writer_markdown") or "",
-                    "citations": state.get("citations") or [],
-                },
-            })
             writer({"event": "done", "data": {"outcome": "done"}})
         elif outcome == "refused":
             writer({
