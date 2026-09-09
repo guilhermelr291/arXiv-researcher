@@ -11,6 +11,7 @@ from pgvector.psycopg import register_vector_async
 from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
 
+from plan_based_researcher.policy import Policy
 from plan_based_researcher.ports.chunks import ChunkDraft, ChunkRecord, PaperRecord
 
 _METADATA_KEYS = frozenset({"section", "caption", "unit_ids"})
@@ -30,7 +31,7 @@ CREATE TABLE IF NOT EXISTS papers (
 );
 """
 
-_CHUNKS_SQL = """
+_CHUNKS_SQL = f"""
 CREATE TABLE IF NOT EXISTS chunks (
   chunk_id UUID PRIMARY KEY,
   arxiv_id TEXT NOT NULL,
@@ -40,7 +41,7 @@ CREATE TABLE IF NOT EXISTS chunks (
   unit_id TEXT,
   embedding_text TEXT NOT NULL,
   content TEXT NOT NULL,
-  embedding vector(1536) NOT NULL,
+  embedding vector({Policy.embedding_dimensions}) NOT NULL,
   metadata JSONB NOT NULL,
   UNIQUE (arxiv_id, version, chunk_index),
   FOREIGN KEY (arxiv_id, version) REFERENCES papers (arxiv_id, version)
@@ -51,23 +52,6 @@ CREATE UNIQUE INDEX IF NOT EXISTS chunks_atomic_identity
   WHERE unit_id IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS chunks_papers_idx ON chunks (arxiv_id, version);
-"""
-
-_CHUNKS_KIND_STATE_SQL = """
-SELECT
-  EXISTS (
-    SELECT 1
-    FROM information_schema.tables
-    WHERE table_schema = current_schema()
-      AND table_name = 'chunks'
-  ) AS table_exists,
-  EXISTS (
-    SELECT 1
-    FROM information_schema.columns
-    WHERE table_schema = current_schema()
-      AND table_name = 'chunks'
-      AND column_name = 'kind'
-  ) AS kind_exists
 """
 
 _GET_PAPER_SQL = """
@@ -203,14 +187,6 @@ def _chunk_from_row(row: Mapping[str, Any]) -> ChunkRecord:
     )
 
 
-async def _legacy_chunks_without_kind(conn: Any) -> bool:
-    cur = await conn.execute(_CHUNKS_KIND_STATE_SQL)
-    row = await cur.fetchone()
-    if row is None:
-        return False
-    return bool(row["table_exists"]) and not bool(row["kind_exists"])
-
-
 class PgChunkRepository:
     def __init__(self, pool: AsyncConnectionPool) -> None:
         self._pool = pool
@@ -219,9 +195,6 @@ class PgChunkRepository:
         async with self._pool.connection() as conn:
             for statement in _schema_statements(_PREAMBLE_SQL):
                 await conn.execute(statement)
-            if await _legacy_chunks_without_kind(conn):
-                await conn.execute("DROP TABLE chunks")
-                await conn.execute("DELETE FROM papers")
             for statement in _schema_statements(_CHUNKS_SQL):
                 await conn.execute(statement)
 
