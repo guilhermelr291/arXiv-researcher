@@ -42,6 +42,16 @@ class RagasReportScriptTest(unittest.TestCase):
         self.assertNotIn("voyage", source.lower())
         self.assertNotIn("Voyage", source)
 
+    def test_persists_reasoning_under_reports_ragas(self) -> None:
+        source = _source()
+        self.assertIn("reports/ragas", source.replace("\\", "/"))
+        self.assertIn("--no-save", source)
+        self.assertIn("index.jsonl", source)
+        self.assertIn("json.dumps", source)
+        self.assertIn("verdict", source)
+        self.assertIn("generated_questions", source)
+        self.assertIn("faithfulness reasoning", source)
+
 
 if __name__ == "__main__":
     unittest.main()

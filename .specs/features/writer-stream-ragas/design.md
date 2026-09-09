@@ -19,7 +19,7 @@ The HTTP consume path stays the sse-agent-dispatcher facade: `ResearchExecutor` 
 
 The graph topology stays `execute → evaluate → finalize`. Evaluate **auto-passes** a Writer execute (append `passed_steps`, `writer_just_passed` → `outcome=done`) and **does not** call a Strategy or emit `eval`. Finalize on `done` emits **only** `done` (no second copy of the markdown). Chainlit typewriters `answer_delta` onto one `cl.Message` and attaches side-panel `cl.Text` when `citations` arrives.
 
-Offline quality moves to `scripts/ragas_writer_report.py`: LangSmith `Client.list_runs` → map to `(user_input, retrieved_contexts, response)` → collections `ascore` → print `result.value` (optional feedback). Not a graph node. Not CI.
+Offline quality moves to `scripts/ragas_writer_report.py`: LangSmith `Client.list_runs` → map to `(user_input, retrieved_contexts, response)` → collections `ascore` → print scores and judge reasoning, save JSON/Markdown under `reports/ragas/` (optional LangSmith feedback). Not a graph node. Not CI.
 
 ```mermaid
 flowchart LR
@@ -68,8 +68,9 @@ flowchart TB
   Map -->|skip if query, excerpts, or markdown missing| Skip[print skip]
   Map -->|complete triple| F[Faithfulness.ascore]
   Map --> A[AnswerRelevancy.ascore]
-  F --> Out[stdout result.value]
+  F --> Out[stdout scores + reasoning]
   A --> Out
+  Out --> Files[reports/ragas JSON Markdown index.jsonl]
   Out -->|optional| FB[Client.create_feedback]
   Map -.->|SHALL NOT read| RR[rerank / voyage_rerank chunks lists]
 ```
@@ -224,9 +225,10 @@ Do **not** introduce a Chainlit Strategy dict in this slice (still deferred from
   - `map_execute_run(run: object, *, retrieve_chunks_by_trace: dict[str, list[str]] | None = None) -> WriterTriple | None` — require writer markdown on **outputs**; query from inputs (or messages[0].content); contexts from inputs.evidence_chunks excerpts, else same-trace retrieve fallback. Return `None` to skip.
   - SHALL NOT read keys `chunks`, `chunks_scored`, or runs named `rerank` / `voyage_rerank`.
 - **Interfaces** (`ragas_writer_report.py`):
-  - argparse: `--project` (default `LANGSMITH_PROJECT` or `plan-based-researcher`), `--limit`, `--run-id`, `--write-feedback` (default off).
+  - argparse: `--project` (default `LANGSMITH_PROJECT` or `plan-based-researcher`), `--limit`, `--run-id`, `--write-feedback` (default off), `--no-save`, `--out-dir` (default `reports/ragas/`).
   - `langsmith.Client().list_runs(...)`; collect retrieve `evidence_chunks` per `trace_id` from retrieve/execute outputs **before** scoring writers.
-  - For each mapped triple: `Faithfulness.ascore` + `AnswerRelevancy.ascore`; print both `.value` and the `run_id`. Skip (print reason) on mapper `None` or collections `ValueError` (empty response/contexts).
+  - For each mapped triple: logged `Faithfulness.ascore` + `AnswerRelevancy.ascore` (keep NLI statements and generated questions; collections drop them); print `.value`, judge reasoning, and `run_id`. Skip (print reason) on mapper `None` or collections `ValueError` (empty response/contexts).
+  - Default: write `{timestamp}_{run_id}.json`, `.md`, and append `index.jsonl` under `reports/ragas/` so evals can be committed over time.
   - Judge: `AsyncOpenAI()` + `llm_factory(os.environ.get("RAGAS_LLM_MODEL", "gpt-4o-mini"), client=...)` + `embedding_factory("openai", model="text-embedding-3-small", client=...)`. SHALL NOT use Voyage.
   - Process exit: `0` after a finished report even if every score is 0.0. Non-zero only for missing `OPENAI_API_KEY` / LangSmith auth / import errors / unexpected crashes.
   - Do not construct `Settings()`. `load_dotenv()`. On Windows, set `WindowsSelectorEventLoopPolicy`.
@@ -291,6 +293,7 @@ class WriterTriple(TypedDict):
 | RAGAS trace missing query, Writer chunks, or markdown | Skip; print reason; not score 0 | Report continues |
 | RAGAS `ascore` ValueError (empty response/contexts) | Skip that trace | Report continues |
 | RAGAS `create_feedback` fails | Warn; still print scores; exit 0 | Maintainer still has stdout |
+| RAGAS report file write fails | Warn; still print scores and reasoning; exit 0 | Repo archive missing that run |
 | `get_stream_writer` outside graph (unit test) | `_emit_custom` no-op | Parse helpers still testable |
 
 ---

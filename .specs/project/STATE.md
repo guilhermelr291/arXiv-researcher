@@ -12,7 +12,7 @@
 **Decision:** Specify `.specs/features/writer-stream-ragas/spec.md`. Student sees Writer tokens as SSE `answer_delta` (`{ "text" }`) via `get_stream_writer`. After the last token, event `citations` carries `citations[]` only (no markdown). `answer_complete` is removed. Writer is one-shot: no `WriterEvalStrategy`, no Writer `eval`, no Writer retry; search/retrieve eval and caps stay. WRITE-02 remains prompt-only. Chainlit is in the slice (typewriter + existing side panel). RAGAS is a LangSmith-backed **report** (`Faithfulness` + `AnswerRelevancy` collections `ascore`); `retrieved_contexts` are post-cut Writer `evidence_chunks` excerpts; no context_* metrics; no CI threshold. Judge embeddings for AnswerRelevancy stay OpenAI `text-embedding-3-small` (not Voyage retrieve).
 **Reason:** Grill-me 2026-09-08: latency of generate+judge; student may see ungrounded prose; quality moves to offline traces.
 **Trade-off:** Hole fill, bad `[n]`, and extra URLs are no longer retried at runtime. RAGAS does not block the student and does not auto-fail CI.
-**Impact:** Supersedes AD-007 streaming/eval-gate, SSE-02, STRM-11, WRITE-01 as a gate. Execute T1–T10 2026-09-08. Live Independent Tests still UAT.
+**Impact:** Supersedes AD-007 streaming/eval-gate, SSE-02, STRM-11, WRITE-01 as a gate. Execute T1–T10 2026-09-08. Live Independent Tests still UAT. Quick 021: the report CLI keeps NLI verdicts and AnswerRelevancy generated questions (collections `ascore` drops them) and writes JSON/Markdown under `reports/ragas/` so evals can be committed over time.
 
 ### AD-021: Voyage-4-large embeddings + LangChain Voyage clients (2026-09-08)
 
@@ -221,6 +221,7 @@
 | 018 | Retrieve judge passes core student request; no T3 retry for extra facets | 2026-09-06 | — | ✅ Done |
 | 019 | Planner English lock after student query so Voyage task is not Portuguese | 2026-09-06 | — | ✅ Done |
 | 020 | RAGAS report judge `max_tokens` so Faithfulness ascore is not truncated | 2026-09-09 | — | ✅ Done |
+| 021 | Persist RAGAS reasoning (NLI + generated questions) under `reports/ragas/` | 2026-09-09 | — | ✅ Done |
 
 ---
 
@@ -314,8 +315,9 @@
 - [x] User asked to Execute `.specs/features/writer-stream-ragas/tasks.md` (2026-09-08; no commits; spec/design/tasks still formally Draft)
 - [x] Execute T1–T10 for `writer-stream-ragas`; full unittest discover 88/88
 - [x] Code validation: `writer-stream-ragas` T1–T10 (2026-09-08 verify). Gate `unittest discover -s tests` 88/88. Live Independent Tests still UAT.
-- [ ] Manual UAT: in-domain SSE `answer_delta` then `citations`, no `answer_complete`, no Writer `eval`, no `on_chat_model_*`; Chainlit typewriter + `[n]` panel; RAGAS script on one real mapped trace (may be blocked by B-001)
+- [ ] Manual UAT: in-domain SSE `answer_delta` then `citations`, no `answer_complete`, no Writer `eval`, no `on_chat_model_*`; Chainlit typewriter + `[n]` panel; RAGAS script on one real mapped trace writes `reports/ragas/` (may be blocked by B-001)
 - [x] Atomic commits per task T1–T10 (`writer-stream-ragas`, 2026-09-09)
+- [x] Quick 021: persist RAGAS reasoning under `reports/ragas/` (2026-09-09; commit when asked)
 
 ---
 

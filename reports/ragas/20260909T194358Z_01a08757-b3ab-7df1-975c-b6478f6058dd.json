@@ -1,0 +1,514 @@
+{
+  "scored_at": "2026-09-09T19:43:58Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a08757-b3ab-7df1-975c-b6478f6058dd",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "Me explique a metodologia usada nesse artigo 2609.01617v1: Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search",
+  "retrieved_contexts": [
+    "Getting accurate, grounded answers out of large enterprise document\nrepositories is a difficult problem. Dense vector retrieval alone\nfrequently performs poorly on queries that mix technical\nterminology, vendor-specific acronyms, or require reasoning\nacross several non-adjacent sections. DocuSearch was built\nto address exactly this gap — an offline, multi-agent document\nintelligence system developed and evaluated in a production\ntelecom network operations environment. Rather than relying on a\nsingle retrieval signal, DocuSearch pulls together three\ncomplementary sources of evidence: semantic search over a Qdrant\nvector store using BGE-Large embeddings, BM25 full-text search\nover an SQLite FTS5 index, and Knowledge Graph neighbour expansion\nfrom a structured edge table. These three ranked lists are merged\nthrough Reciprocal Rank Fusion (RRF) with signal weights\n$w_{v}=0.50$, $w_{b}=0.35$, and $w_{kg}=0.15$, giving:  \nEquation\n$$\ns_{\\mathrm{RRF}}(d)\\;=\\;\\sum_{i\\in\\{v,\\,b,\\,kg\\}}\\frac{w_{i}}{k+r_{i}(d)},\\quad k=60\n$$  \nwhere $r_{i}(d)$ is the rank of chunk $d$ in signal list $i$.\nA cross-encoder then reranks the fused list, and Maximal\nMarginal Relevance (MMR) with $\\lambda=0.65$ prunes it\nfor both relevance and diversity. What makes DocuSearch\ndistinctive is a per-chunk evaluation loop that\ntreats each selected chunk as its own mini-retrieval problem:\nan LLM decides whether the chunk needs additional neighbouring\ncontext, whether it is actually sufficient to answer the query,\nand whether the answer it generates is genuinely grounded in\nthe retrieved text. Ungrounded answers are not returned; the\nsystem falls back to a multi-chunk merge instead. On an\ninternal telecom document corpus, DocuSearch reaches\nPrecision@10 of $0.69$, Recall@10 of $0.79$, and a grounding\nrate of $89.6\\%$ — gains of $15$, $16$, and $18.4$ percentage\npoints over a dense-only RAG baseline.",
+    "The system is organised across six functional tiers spanning\nthe two phases shown in Figures[1](#S4.F1 \"Figure 1 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\")\nand[2](#S4.F2 \"Figure 2 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\").  \nFigure 1: Pre-MMR Phase ( run_supervisor ):\nStep 1 — Template Selection (LLM call);\nStep 2 — BM25 Keyword Extraction (LLM + Rule Based);\nStep 2b — Vendor Detection (LLM call);\nSteps 3/4/5 — Parallel Vector Search, BM25 Retrieval,\nKG Expansion;\nStep 5b — RRF Fusion\n( w v = 0.50 , w b = 0.35 , w k  g = 0.15 w_{v}{=}0.50,\\,w_{b}{=}0.35,\\,w_{kg}{=}0.15 );\nStep 6 — Cross-Encoder Reranking;\nStep 7 — MMR Selection\n( λ = 0.65 \\lambda{=}0.65 , relevance + diversity).\nOutput: ordered MMR chunks passed to Post-MMR phase.\nFigure 2: Post-MMR Phase ( run_per_chunk_evaluation ):\nPer-chunk loop — LLM evaluates current chunk;\nif more context needed, neighbouring chunks are fetched\n(green path); sufficiency check gates answer generation;\ngroundedness LLM verifies the generated answer;\nif grounded, pipeline terminates ( method=per_chunk );\notherwise retries next MMR chunk.\nWhen all MMR chunks are exhausted, fallback merges all\nexpanded contexts and returns a consolidated answer\n( method=fallback_merge ).  \nThe Document Ingestion Layer handles parsing and\nchunking, producing overlapping segments ($s=900$ chars,\n$\\delta=140$ chars) stored in both Qdrant[6] and SQLite FTS5.\nThe Multi-Signal Retrieval Layer runs three parallel\nagents ($k_{v}{=}40$, $k_{b}{=}40$, $k_{kg}{=}15$), each",
+    "DocuSearch tackles the four sub-problems through a layered\nmulti-agent pipeline split into two phases, illustrated in\nFigure[1](#S4.F1 \"Figure 1 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") and Figure[2](#S4.F2 \"Figure 2 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\").\nPre-MMR Phase. When a query $q$ arrives, a Template\nSelection agent first classifies it into one of five answer\ntemplates $\\mathcal{T}$. A BM25 Keyword agent then pulls\nout domain-specific terms, and a Vendor Detection agent\noptionally narrows all three retrieval signals to a specific\nvendor namespace $v\\in\\mathcal{V}$. Dense vector search,\nBM25 full-text search, and KG neighbour expansion run in\nparallel, and their ranked results are merged by weighted\nRRF, reranked by a cross-encoder, and filtered by MMR to\nproduce the evidence set $\\mathcal{E}$.\nPost-MMR Phase. Each chunk $c\\in\\mathcal{E}$ is\nevaluated individually by four sequential LLM-driven nodes:\ncontext need detection, sufficiency scoring against a\nthreshold $\\tau=7$, answer generation, and groundedness\nverification. The first chunk that clears all four checks\nproduces the final answer. When no individual chunk passes,\na fallback merges all expanded contexts, generates a\nconsolidated answer, and runs one final groundedness check\nbefore returning anything to the user.",
+    "In telecom network operations centres, engineers frequently\nmust search through hundreds of vendor manuals for a specific\nconfiguration procedure under time pressure. These environments accumulate vast repositories of\ntechnical documentation — SOPs, RCA reports, audit records,\nmulti-vendor configuration guides — and the gap between\nwhat keyword search surfaces and what an engineer actually\nneeds can be substantial. Conventional search returns too many\nloosely related hits. Standard single-signal\nRetrieval-Augmented Generation (RAG)[1],\nwhile an improvement, still struggles with specialised\ntechnical vocabulary, fragmented document chunks, and the\nreality that relevant information is often spread across\nnon-adjacent sections from different vendors.\nThis paper describes DocuSearch, a hybrid multi-agent\nRAG system designed and deployed within a real telecom\nnetwork operations environment. Three limitations motivated\nits design: signal incompleteness, where a single\nretrieval function misses chunks that are relevant in semantic,\nlexical, and structural senses simultaneously;\ncontext fragmentation, where a retrieved chunk is\nonly half of a procedure; and unverified grounding,\nwhere a generated answer sounds plausible but is not actually\nsupported by the retrieved evidence. DocuSearch addresses all\nthree by combining dense vector retrieval, BM25 sparse\nretrieval [2], and Knowledge Graph\nexpansion[9] into a single fused ranking via Reciprocal Rank\nFusion (RRF) [7], followed by cross-encoder\nreranking, Maximal Marginal Relevance (MMR) selection\n[3], and — the primary novel\ncontribution — a per-chunk agentic evaluation loop\nthat verifies context sufficiency and answer grounding before\ncommitting to a response. The pipeline runs entirely on locally\nhosted models and is orchestrated via LangGraph\n[5], exposed through an interactive Dash web\napplication with vendor-scoped retrieval, session document\nupload, and integrated Knowledge and Learning Hub modules.\nThe main contributions are as follows:  \n* •  \nA three-signal hybrid retrieval architecture fused\nvia weighted RRF with signal weights\n$w_{v}{=}0.50,\\;w_{b}{=}0.35,\\;w_{kg}{=}0.15$.\n* •  \nA per-chunk agentic evaluation loop with LLM-driven\ncontext need detection, sufficiency scoring, and\ngroundedness verification.\n* •  \nVendor-aware retrieval scoping for multi-vendor",
+    "Five aspects of DocuSearch distinguish it from existing\nRAG systems.\nPer-Chunk Agentic Evaluation Loop. Most RAG\npipelines concatenate all retrieved chunks and generate\none answer in a single forward pass. DocuSearch instead\nevaluates each $c\\in\\mathcal{E}$\nindependently through four sequential checks. A chunk\nmust score $\\sigma(\\tilde{c},q)\\geq\\tau=7$ before\ngeneration is even attempted, and the returned answer is\nexplicitly verified as grounded before being committed.\nThis eliminates a whole class of hallucinations that arise\nwhen an LLM is asked to synthesise an answer from a\nmixed bag of partially relevant context.\nWeighted Three-Signal RRF Fusion. Most hybrid RAG\nsystems stop at two signals — typically dense plus sparse.\nA third, KG neighbour expansion, is added as an explicit\nsignal in the RRF formula, with empirically tuned weights\n$w_{v}=0.50$, $w_{b}=0.35$, $w_{kg}=0.15$. The KG\nsignal’s contribution is modest but consistent: it reliably\nsurfaces structural neighbours that neither cosine\nsimilarity nor BM25 would rank highly on their own.\nDynamic Neighbour Context Expansion. Rather than\nusing larger fixed chunk sizes at indexing time (which\nreduces retrieval precision), DocuSearch detects\nfragmentation at query time. When a retrieved chunk is\nidentified as a fragment, up to $L=2$ levels of\nneighbouring chunks are fetched from the metadata database\non the fly, recovering coherent multi-step procedures\nwithout any pre-processing trade-offs.\nVendor-Aware Retrieval Scoping. A vendor\nregistry is built from the document metadata that maps each\n$v\\in\\mathcal{V}$ to its set of document identifiers.\nWhen the Vendor Detection agent identifies a vendor\nreference in the query, all three retrieval signals are\nscoped to that vendor’s documents. The noise reduction for\nvendor-specific configuration and troubleshooting queries\nis substantial.\nLangGraph-Orchestrated Agentic Pipeline. The\nentire pipeline runs as a stateful LangGraph DAG\n[5] with five explicitly defined nodes.\nEvery intermediate state is observable, serialisable, and\nindependently replaceable — which turned out to be\npractically important during development, since individual\ncomponents could be swapped without disturbing anything\nupstream or downstream.",
+    "Each $c\\in\\mathcal{E}$ passes four sequential LLM-driven\nchecks, as shown in Figure[2](#S4.F2 \"Figure 2 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\"):  \n1. 1.  \nContext Need Detection. The LLM assesses\nwhether $c$ is a fragment that requires neighbours\n$c_{\\mathrm{prev}}$ or $c_{\\mathrm{next}}$ to make\nsense. If so, neighbours are fetched and appended,\nfor up to $L=2$ iterations.\n2. 2.  \nSufficiency Scoring. The expanded chunk\n$\\tilde{c}$ proceeds only if the LLM assigns a\nsufficiency score $\\sigma(\\tilde{c},q)\\geq\\tau=7$\non a $1$–$10$ scale. Chunks that do not clear this\nbar are skipped immediately.\n3. 3.  \nAnswer Generation. Given $\\tilde{c}$,\nthe query $q$, and the selected template $t^{\\*}$, the\nLLM generates candidate answer $\\hat{a}$ at temperature\n$T=0.0$ for reproducibility.\n4. 4.  \nGroundedness Verification. A separate\nLLM call checks whether $\\hat{a}$ is fully supported\nby $\\tilde{c}$. If it is, $a$ is set to $\\hat{a}$ and\nthe pipeline terminates (method=per_chunk).  \nWhen no chunk clears all four checks, the fallback merges\nall expanded contexts into $\\tilde{\\mathcal{E}}$, generates\na consolidated answer (method=fallback_merge),\nand runs one final groundedness check before anything is\nreturned to the user.",
+    "* •  \nA per-chunk agentic evaluation loop with LLM-driven\ncontext need detection, sufficiency scoring, and\ngroundedness verification.\n* •  \nVendor-aware retrieval scoping for multi-vendor\nenterprise document corpora.\n* •  \nA production-ready LangGraph-orchestrated pipeline\nwith interactive Dash UI and fully local LLM inference.  \nThe remainder of this paper is organised as follows.\nSection[II](#S2 \"II Problem Statement ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") formalises the problem,\nSection[III](#S3 \"III Proposed Solution ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") describes the proposed solution,\nSection[IV](#S4 \"IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") presents the system\narchitecture, Section[V](#S5 \"V Methodology ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") details the\nmethodology, Section[VI](#S6 \"VI Novel Contributions ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") elaborates\nnovel contributions, Section[VII](#S7 \"VII Implementation Details ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\")\ncovers implementation, Section[VIII](#S8 \"VIII Results and Analysis ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") presents\nresults, and Section[IX](#S9 \"IX Conclusion ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") concludes.",
+    "The Multi-Signal Retrieval Layer runs three parallel\nagents ($k_{v}{=}40$, $k_{b}{=}40$, $k_{kg}{=}15$), each\noptimised for a different aspect of relevance. Fusion,\nreranking ($k_{r}{=}12$), and evidence selection\n($|\\mathcal{E}|{=}10$) happen in the Ranking and\nSelection Layer. The Agentic Evaluation Layer\nthen runs four sequential LLM checks on each candidate\nchunk, which accounts for most of the observed quality gains.\nAbove all of this sits the Orchestration Layer, a\nLangGraph DAG with five nodes: query_analysis,\nretrieve, fuse_and_rank,\nevidence_select, and per_chunk_eval.\nUsers interact through the User Interface Layer,\na Plotly Dash application that exposes a conversational\nsearch interface alongside real-time pipeline visualisation,\na Knowledge Hub, a Learning Hub, and document ingestion\npanels.",
+    "Let $\\mathcal{D}=\\{d_{1},d_{2},\\ldots,d_{N}\\}$ be a large\nheterogeneous corpus of enterprise documents, where each\ndocument $d_{i}$ belongs to one or more vendor namespaces\n$\\mathcal{V}=\\{v_{1},v_{2},\\ldots,v_{M}\\}$. Each document\nis pre-processed into overlapping text chunks:  \nEquation\n$$\n\\mathcal{C}=\\bigcup_{i=1}^{N}\\bigl\\{c_{i,1},\\,c_{i,2},\\,\\ldots,\\,c_{i,k_{i}}\\bigr\\}\n$$  \nwhere $c_{i,j}$ is the $j$-th chunk of $d_{i}$ and $k_{i}$\nis the total chunk count for that document. Given a natural\nlanguage query $q$, the goal is to retrieve a subset\n$\\mathcal{E}\\subset\\mathcal{C}$ and generate an answer\n$a$ such that:  \nEquation\n$$\na=\\mathcal{G}\\!\\left(q,\\;\\mathcal{E}\\right)\n$$  \nwhere $\\mathcal{G}$ synthesises the answer strictly from\nretrieved evidence, without hallucinating content that\ndoes not appear in $\\mathcal{E}$. This deceptively simple\nformulation hides four concrete sub-problems that standard\npipelines fail to handle:  \n1. 1.  \nSignal incompleteness. No single retrieval\nfunction $f:q\\rightarrow\\mathcal{C}$ can capture\nall relevant chunks, because relevance spans semantic,\nlexical, and structural dimensions at the same time.\n2. 2.  \nChunk fragmentation. A chunk $c_{i,j}$\nretrieved in isolation is often incomplete when the\nrelevant procedure spans $c_{i,j-1}$ through $c_{i,j+1}$.\n3. 3.  \nRedundancy in evidence. Naive top-$k$\nselection tends to return clusters of near-duplicate\nchunks, squandering context window capacity on\nrepeated information.\n4. 4.  \nUnverified grounding. Standard RAG hands\nretrieved chunks to $\\mathcal{G}$ without ever checking\nwhether the generated answer $a$ is genuinely supported\nby $\\mathcal{E}$, which is a direct path to confident\nbut wrong responses.  \nDocuSearch addresses all four within a unified pipeline that\nruns entirely on locally hosted models with no dependency on\nexternal API services.",
+    "This paper presented DocuSearch, a hybrid multi-agent RAG system\nbuilt for enterprise document intelligence in multi-vendor\ntelecom environments. The system was designed around three\nfailure modes observed in production: signal\nincompleteness, context fragmentation, and unverified answer\ngrounding. The two-phase pipeline — hybrid retrieval\nfusion followed by per-chunk agentic evaluation — directly\naddresses all three. Results show Precision@10 of $0.69$,\nRecall@10 of $0.79$, and a grounding rate of $89.6\\%$, with\nhallucinations dropping to $6.8\\%$. The ablation confirms\nthat groundedness verification and sufficiency scoring drive\nthe largest improvements, though no single component is\nredundant.\nA key practical finding is that\nproduction-quality document intelligence is achievable\nentirely on locally hosted models. DocuSearch requires no\nexternal API calls, which matters a great deal in telecom\noperations environments where sensitive network configuration\ndata cannot leave the organisation’s infrastructure.",
+    "DocuSearch is implemented entirely in Python3 and served\nfrom a single application.\nTable[I](#S7.T1 \"TABLE I ‣ VII Implementation Details ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") summarises the core technology stack.  \nTABLE I: DocuSearch Core Technology Stack\n| Component | Technology |\n| --- | --- |\n| Vector Store | Qdrant (self-hosted) |\n| Embedding | BGE-Large-EN-v1.5 ($d{=}1024$, CUDA) |\n| Reranker | Cross-Encoder (CUDA) |\n| FTS Index | SQLite FTS5 |\n| Metadata Store | SQLite |\n| LLM Inference | Local REST or vLLM |\n| LLM Model | Mistral [10] |\n| Pipeline Graph | LangGraph |\n| UI Framework | Plotly Dash |\n| Doc Parsing | Docling, PyMuPDF, python-docx, openpyxl |\n| Auto Ingest | watchdog directory monitor |\n  \nDocuments reach the system through three paths: server-side\npath submission, browser upload via Dash dcc.Upload,\nor automatic detection through a watchdog directory\nmonitor. All formats are parsed and chunked with $s=900$\ncharacters and $\\delta=140$ characters overlap. These values were\nsettled on after experimenting with several chunk sizes;\nsmaller chunks hurt sufficiency scoring while larger ones\ndegraded retrieval precision. Table[II](#S7.T2 \"TABLE II ‣ VII Implementation Details ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\")\nsummarises the full retrieval configuration used across\nall experiments.  \nTABLE II: Default Retrieval and Ranking Configuration\n| Parameter | Symbol | Value |\n| --- | --- | --- |\n| Vector top-$k$ | $k_{v}$ | 40 |\n| BM25 top-$k$ | $k_{b}$ | 40 |\n| KG top-$k$ | $k_{kg}$ | 15 |\n| Rerank top-$k$ | $k_{r}$ | 12 |\n| Final evidence | $|\\mathcal{E}|$ | 10 |\n| RRF smoothing | $k$ | 60 |\n| RRF vector weight | $w_{v}$ | 0.50 |\n| RRF BM25 weight | $w_{b}$ | 0.35 |\n| RRF KG weight | $w_{kg}$ | 0.15 |\n| MMR lambda | $\\lambda$ | 0.65 |\n| Sufficiency thresh. | $\\tau$ | 7 |\n| Max neighbour loops | $L$ | 2 |\n| Chunk size | $s$ | 900 chars |\n| Chunk overlap | $\\delta$ | 140 chars |\n| LLM temperature | $T$ | 0.0 |\n  \nSession-only uploads are also supported: documents uploaded\nduring a session are embedded in memory using a local NumPy\narray (max $90{,}000$ chars, top-$k_{u}=8$) without being\nwritten to the persistent knowledge base. All LLM calls use\n$T=0.0$ to keep outputs deterministic across repeated\nqueries, which is important for reproducibility in an\noperational setting.",
+    "Dense Vector Retrieval. The query $q$ is encoded using\nBGE-Large-EN-v1.5 [4] to get\n$\\mathbf{q}\\in\\mathbb{R}^{1024}$. Cosine similarity is\ncomputed against all chunk embeddings in Qdrant, returning\nthe top $k_{v}=40$ chunks:  \nEquation\n$$\n\\mathrm{score}_{v}(c)=\\frac{\\mathbf{q}\\cdot\\mathbf{e}_{c}}{\\|\\mathbf{q}\\|\\cdot\\|\\mathbf{e}_{c}\\|}\n$$  \nBM25 Sparse Retrieval. Extracted keywords query the\nSQLite FTS5 index. Standard BM25 scoring applies:  \nEquation\n$$\n\\mathrm{score}_{b}(c,Q)=\\sum_{q_{i}\\in Q}\\mathrm{IDF}(q_{i})\\cdot\\frac{f(q_{i},c)(k_{1}+1)}{f(q_{i},c)+k_{1}(1-b+b\\cdot\\frac{|c|}{avgdl})}\n$$  \nwith $k_{1}=1.2$, $b=0.75$, where $|c|$ is chunk length\nand $avgdl$ is the average chunk length across $\\mathcal{C}$.\nTop $k_{b}=40$ chunks are retrieved. BM25 is particularly\nuseful here because technical acronyms and model numbers\nthat have no meaningful semantic neighbourhood still\nproduce strong lexical matches.\nKG Neighbour Expansion. Seed chunks from the vector\nand BM25 results traverse a KG edge table stored in SQLite,\npulling in structurally connected chunks (top $k_{kg}=15$).\nThis catches content that is topically related but\nlexically and semantically distant — for instance, a\nconfiguration snippet that references a procedure described\nin a different section.",
+    "Table[IV](#S8.T4 \"TABLE IV ‣ VIII-B Answer Grounding ‣ VIII Results and Analysis ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") compares the per-chunk evaluation\nloop against a conventional single-pass RAG baseline.  \nTABLE IV: Answer Grounding and Hallucination Rates\n| System | Grounded | Hallucinated | Fallback |\n| --- | --- | --- | --- |\n| Single-pass RAG | 71.2% | 21.4% | — |\n| DocuSearch | 89.6% | 6.8% | 3.6% |\n  \nDocuSearch achieves a grounding rate of $89.6\\%$, an\n$18.4$ percentage point improvement over single-pass RAG,\nand cuts the hallucination rate from $21.4\\%$ to $6.8\\%$.\nThe remaining $3.6\\%$ of queries hit the fallback path,\nwhere all expanded contexts are merged — these still\nproduce grounded answers, just through the consolidated\nroute rather than the per-chunk route.",
+    "The sequential LLM calls in the per-chunk evaluation phase\nare the main latency bottleneck, currently averaging $8.4$\nseconds. Parallelising chunk evaluation across inference\nthreads is a natural first step. The RRF signal weights\nwere determined empirically on telecom documentation and\nmay not transfer well to other domains; learning them from\nquery-relevance feedback via a differentiable ranking\nobjective would make the system more broadly applicable.\nThere is also potential in using named entity recognition\nto populate the KG with typed entity-relation triples,\nwhich would strengthen multi-hop query handling. Finally,\nextending DocuSearch to multimodal retrieval — covering\nembedded diagrams and specification tables that are\npervasive in vendor documentation — is a compelling\ndirection worth pursuing.\nReinforcement Learning for Adaptive Retrieval.\nOne promising future direction is treating\nDocuSearch’s multi-step retrieval workflow as a sequential\ndecision problem. The intuition comes from Karpathy’s\ninteractive GridWorld temporal-difference learning\ndemo[11], where an agent learns to\nnavigate a grid by trial-and-error using TD updates —\nwithout any hard-coded path rules. The analogy to the\npipeline is direct: just as that agent discovers which\nmoves lead to reward by accumulating Q-values over many\nepisodes, a retrieval agent in DocuSearch could learn\nwhen to invoke BM25, when to expand KG\nneighbours, and when to stop — adapting\ndynamically to each incoming query rather than applying\nthe same fixed configuration every time.\nFormally, each query-answer interaction can be modelled as\nan episode in a Markov Decision Process\n$\\mathcal{M}=(\\mathcal{S},\\mathcal{A},\\mathcal{P},\\mathcal{R},\\gamma)$.\nThe state $s\\in\\mathcal{S}$ encodes the current query\nintent, the set of chunks retrieved so far, reranker\nconfidence scores, KG expansion status, and evidence\ncoverage. The action space $\\mathcal{A}$ includes\ndiscrete choices such as triggering a BM25 search,\nexpanding KG neighbours by one hop, tightening the\ncross-encoder top-$k$, fetching a neighbouring chunk,\nor terminating retrieval and proceeding to answer\ngeneration. The reward $\\mathcal{R}$ is shaped by\nanswer groundedness (which is already measured at inference\ntime), engineer satisfaction feedback collected through",
+    "Table[III](#S8.T3 \"TABLE III ‣ VIII-A Retrieval Quality ‣ VIII Results and Analysis ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") compares Precision@$k$ and\nRecall@$k$ across three configurations on $120$ manually\nannotated queries spanning all five template categories.  \nTABLE III: Retrieval Quality Comparison\n| Configuration | P@5 | R@5 | P@10 | R@10 |\n| --- | --- | --- | --- | --- |\n| Dense only | 0.61 | 0.48 | 0.54 | 0.63 |\n| Dense + BM25 | 0.68 | 0.56 | 0.61 | 0.71 |\n| DocuSearch (full) | 0.76 | 0.64 | 0.69 | 0.79 |\n  \nThe full three-signal system outperforms both baselines\nacross every metric. The most pronounced gain is in\nRecall@10, where KG expansion consistently recovers\nstructurally related chunks that neither dense nor BM25\nretrieval surfaces on its own — particularly for\ntroubleshooting queries where the relevant fix appears\nin a section referenced by, but not adjacent to, the\ninitial symptom description."
+  ],
+  "response": "# Metodologia do DocuSearch\n\nO artigo **“Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search”**, identificado como **arXiv:2609.01617**, apresenta o **DocuSearch**, um sistema de RAG híbrido para buscar procedimentos e informações em grandes repositórios corporativos, especialmente em operações de redes de telecomunicações [1]. A metodologia combina recuperação semântica, busca lexical, expansão por grafo de conhecimento, reranking, seleção diversificada e verificação individual de cada trecho recuperado [3][4].\n\n## Visão geral do pipeline\n\nO fluxo completo pode ser resumido assim:\n\n1. **Ingestão e segmentação dos documentos**;\n2. **Análise da consulta**;\n3. **Recuperação por três sinais em paralelo**;\n4. **Fusão dos resultados com RRF**;\n5. **Reranking por cross-encoder**;\n6. **Seleção por MMR**;\n7. **Avaliação individual de cada chunk**;\n8. **Geração e verificação da resposta**;\n9. **Fallback para combinação de múltiplos contextos**, se necessário [2][3].\n\nO sistema é dividido em uma fase **pré-MMR**, responsável por recuperar e ordenar evidências, e uma fase **pós-MMR**, responsável por avaliar os chunks e produzir uma resposta fundamentada [2][3].\n\n---\n\n## 1. Ingestão e preparação dos documentos\n\n### Entrada\n\nA entrada inicial é um conjunto heterogêneo de documentos empresariais, como manuais de fornecedores, procedimentos operacionais, relatórios de causa-raiz e registros de auditoria [4]. Os documentos podem ser enviados por caminho no servidor, upload pela interface web ou monitoramento automático de uma pasta [11].\n\n### Processamento\n\nOs documentos são analisados e divididos em chunks sobrepostos. A configuração padrão usa:\n\n- **900 caracteres por chunk**;\n- **140 caracteres de sobreposição** entre chunks [11].\n\nA sobreposição procura evitar que uma informação importante seja separada exatamente na fronteira entre dois chunks. Os segmentos produzidos são armazenados em dois mecanismos:\n\n- **Qdrant**, para busca vetorial;\n- **SQLite FTS5**, para busca textual BM25 [2][11].\n\nAlém disso, o sistema mantém metadados e uma tabela de arestas usada pela expansão do grafo de conhecimento [1][12].\n\n### Saída\n\nA saída dessa etapa é uma coleção de chunks indexados, cada um associado a metadados que permitem recuperar seus vizinhos e, quando possível, restringir a busca aos documentos de um fornecedor específico [5][9].\n\n---\n\n## 2. Análise da consulta\n\nQuando o usuário envia uma consulta \\(q\\), o sistema realiza três operações de preparação.\n\n### Seleção do template\n\nUm agente baseado em LLM classifica a consulta em um de cinco templates de resposta. Esse template é usado posteriormente na geração da resposta [3].\n\n### Extração de palavras-chave\n\nUm agente de palavras-chave, combinando LLM e regras, extrai termos importantes para a busca BM25. Isso é especialmente útil para acrônimos técnicos, números de modelo e nomes de produtos, que podem não ter uma representação semântica adequada [2][12].\n\n### Detecção de fornecedor\n\nUm agente identifica se a consulta menciona um fornecedor. Quando isso acontece, os três mecanismos de recuperação podem ser restringidos aos documentos daquele fornecedor, reduzindo resultados de outros fabricantes [3][5].\n\n### Saída\n\nEssa etapa produz:\n\n- a intenção ou template da consulta;\n- as palavras-chave para BM25;\n- um possível namespace de fornecedor;\n- os parâmetros usados pelas etapas de recuperação [3][5].\n\n---\n\n## 3. Recuperação por três sinais\n\nOs três mecanismos de recuperação são executados em paralelo. Cada um captura uma forma diferente de relevância [1][3].\n\n### 3.1 Busca vetorial semântica\n\nA consulta é convertida em um vetor de dimensão 1024 pelo modelo **BGE-Large-EN-v1.5**. O sistema calcula a similaridade de cosseno entre esse vetor e os embeddings dos chunks armazenados no Qdrant [12].\n\nA pontuação é:\n\n\\[\n\\mathrm{score}_{v}(c)\n=\n\\frac{\\mathbf{q}\\cdot\\mathbf{e}_{c}}\n{\\|\\mathbf{q}\\|\\cdot\\|\\mathbf{e}_{c}\\|}\n\\]\n\nEssa busca retorna os **40 chunks mais relevantes** segundo similaridade semântica \\((k_v=40)\\) [8][12].\n\nEla é útil quando a consulta e o documento expressam a mesma ideia com palavras diferentes [1][12].\n\n### 3.2 Busca lexical BM25\n\nAs palavras-chave extraídas da consulta são usadas para consultar o índice SQLite FTS5 por BM25. A configuração usa:\n\n- \\(k_1=1.2\\);\n- \\(b=0.75\\);\n- \\(k_b=40\\) resultados [12].\n\nO BM25 é importante para termos técnicos, siglas e números de modelo que podem ter correspondência lexical forte mesmo quando não possuem uma vizinhança semântica significativa [12].\n\n### 3.3 Expansão pelo grafo de conhecimento\n\nA expansão pelo grafo começa a partir de chunks recuperados pela busca vetorial e pelo BM25. O sistema percorre uma tabela de arestas em SQLite para encontrar chunks estruturalmente conectados, recuperando até \\(k_{kg}=15\\) resultados [12].\n\nEssa etapa pode encontrar, por exemplo, um procedimento descrito em outra seção do documento, mesmo quando essa seção não é lexical ou semanticamente próxima do trecho inicial [12].\n\nA expansão também é usada mais tarde, durante a avaliação por chunk: se o trecho recuperado parecer fragmentado, seus vizinhos anterior ou posterior podem ser buscados por até \\(L=2\\) iterações [5][6].\n\n### Saída\n\nCada mecanismo produz sua própria lista ranqueada:\n\n- lista vetorial;\n- lista BM25;\n- lista de vizinhos do grafo [1][8].\n\n---\n\n## 4. Fusão das listas com Reciprocal Rank Fusion\n\nAs três listas são combinadas pelo **Reciprocal Rank Fusion (RRF)**. Para um chunk \\(d\\), a pontuação é:\n\n\\[\ns_{\\mathrm{RRF}}(d)\n=\n\\sum_{i\\in\\{v,b,kg\\}}\n\\frac{w_i}{k+r_i(d)}\n\\]\n\nOs valores usados são:\n\n- peso vetorial: \\(w_v=0.50\\);\n- peso BM25: \\(w_b=0.35\\);\n- peso do grafo: \\(w_{kg}=0.15\\);\n- constante de suavização: \\(k=60\\) [1][11].\n\nAqui, \\(r_i(d)\\) é a posição do chunk na lista do mecanismo \\(i\\). Assim, um chunk pode receber uma boa posição final por aparecer bem ranqueado em uma ou mais fontes de evidência [1].\n\nA busca vetorial recebe o maior peso, mas a combinação também preserva sinais lexicais e estruturais. O peso do grafo é menor, porém sua função é recuperar relações que os outros dois sinais podem não identificar [5].\n\n### Saída\n\nA saída é uma lista única de chunks ordenada pela pontuação RRF [2][3].\n\n---\n\n## 5. Reranking com cross-encoder\n\nDepois da fusão, um **cross-encoder** reranqueia a lista combinada. A configuração apresentada mantém os 12 melhores resultados nessa fase, isto é, \\(k_r=12\\) [8][11].\n\nO objetivo é refinar a relevância dos candidatos depois que as três fontes já foram combinadas [1][2].\n\n### Saída\n\nO resultado é uma lista reranqueada de candidatos, que será submetida à seleção final por MMR [2][8].\n\n---\n\n## 6. Seleção por Maximal Marginal Relevance\n\nA seleção por **Maximal Marginal Relevance (MMR)** escolhe evidências equilibrando:\n\n- relevância para a consulta;\n- diversidade entre os chunks selecionados [1][2].\n\nO parâmetro usado é:\n\n\\[\n\\lambda=0.65\n\\]\n\nO objetivo é evitar que os dez resultados finais sejam quase duplicatas entre si. A configuração seleciona:\n\n\\[\n|\\mathcal{E}|=10\n\\]\n\nchunks como conjunto final de evidências [8][11].\n\n### Saída\n\nA saída dessa fase é o conjunto ordenado:\n\n\\[\n\\mathcal{E}=\\{c_1,c_2,\\ldots,c_{10}\\}\n\\]\n\nEsses chunks são enviados individualmente para a fase de avaliação pós-MMR [3][8].\n\n---\n\n# 7. Avaliação individual por chunk\n\nEssa é a principal diferença metodológica do DocuSearch em relação a um RAG convencional. Em vez de concatenar imediatamente todos os chunks e gerar uma única resposta, o sistema trata cada chunk selecionado como um pequeno problema de recuperação e resposta [5].\n\nCada \\(c\\in\\mathcal{E}\\) passa por quatro verificações sequenciais [6].\n\n## 7.1 Detecção da necessidade de contexto\n\nPrimeiro, um LLM verifica se o chunk é autossuficiente ou se parece ser apenas um fragmento de uma explicação maior [6].\n\nSe forem necessários mais dados, o sistema busca os chunks vizinhos, como:\n\n- \\(c_{\\mathrm{prev}}\\), o chunk anterior;\n- \\(c_{\\mathrm{next}}\\), o chunk seguinte [6].\n\nEssa expansão ocorre por no máximo \\(L=2\\) iterações [5][6].\n\nO resultado é um contexto expandido, indicado por \\(\\tilde{c}\\).\n\n## 7.2 Pontuação de suficiência\n\nDepois da expansão, outro julgamento do LLM atribui uma pontuação de suficiência ao contexto em uma escala de 1 a 10:\n\n\\[\n\\sigma(\\tilde{c},q)\n\\]\n\nO chunk só pode avançar se:\n\n\\[\n\\sigma(\\tilde{c},q)\\geq\\tau\n\\]\n\ncom limiar \\(\\tau=7\\) [3][6].\n\nSe o chunk não atingir esse limiar, ele é descartado imediatamente e o sistema passa ao próximo chunk da lista MMR [5][6].\n\n## 7.3 Geração da resposta\n\nSe o contexto for considerado suficiente, o LLM recebe:\n\n- a consulta \\(q\\);\n- o contexto expandido \\(\\tilde{c}\\);\n- o template selecionado \\(t^*\\) [6].\n\nEntão gera uma resposta candidata \\(\\hat{a}\\). A temperatura é fixada em \\(T=0.0\\), para tornar as respostas mais determinísticas e reproduzíveis [6][11].\n\n## 7.4 Verificação de groundedness\n\nA resposta candidata é submetida a uma chamada separada de LLM, que verifica se ela é completamente sustentada pelo contexto recuperado \\(\\tilde{c}\\) [6].\n\nSe a resposta for considerada fundamentada:\n\n- ela é aceita como resposta final;\n- o pipeline termina;\n- o método é registrado como `per_chunk` [2][6].\n\nSe a resposta não for fundamentada, ela não é devolvida ao usuário. O sistema tenta o próximo chunk da lista MMR [1][2].\n\n---\n\n# 8. Caminho de fallback\n\nSe nenhum chunk individual passar pelas quatro verificações, o sistema entra no caminho de fallback.\n\nNesse caso:\n\n1. todos os contextos expandidos são combinados;\n2. um LLM gera uma resposta consolidada;\n3. essa resposta passa por uma verificação final de groundedness;\n4. somente depois ela é retornada [3][6].\n\nEsse caminho é identificado como `fallback_merge` [2][6].\n\nPortanto, o sistema prioriza uma resposta apoiada por um único contexto suficiente, mas ainda possui uma alternativa para perguntas cuja evidência está distribuída por vários chunks [3].\n\n---\n\n# 9. Implementação e orquestração\n\nO DocuSearch é implementado em Python e usa modelos hospedados localmente. Sua pilha inclui:\n\n- Qdrant para armazenamento vetorial;\n- BGE-Large-EN-v1.5 para embeddings;\n- cross-encoder para reranking;\n- SQLite FTS5 para BM25;\n- SQLite para metadados;\n- Mistral para inferência LLM;\n- LangGraph para orquestração;\n- Plotly Dash para a interface [11].\n\nA orquestração é descrita como um DAG do LangGraph com cinco nós principais:\n\n1. `query_analysis`;\n2. `retrieve`;\n3. `fuse_and_rank`;\n4. `evidence_select`;\n5. `per_chunk_eval` [8].\n\nA interface também exibe a conversa, a visualização do pipeline, o Knowledge Hub, o Learning Hub e os painéis de ingestão de documentos [8].\n\n---\n\n# 10. Avaliação experimental\n\n## 10.1 Qualidade da recuperação\n\nA avaliação de recuperação foi feita com **120 consultas anotadas manualmente**, cobrindo as cinco categorias de templates [15].\n\n| Configuração | P@5 | R@5 | P@10 | R@10 |\n|---|---:|---:|---:|---:|\n| Apenas densa | 0,61 | 0,48 | 0,54 | 0,63 |\n| Densa + BM25 | 0,68 | 0,56 | 0,61 | 0,71 |\n| DocuSearch completo | 0,76 | 0,64 | 0,69 | 0,79 |\n\nO sistema completo supera as duas configurações de comparação em todas as métricas apresentadas [15].\n\nEm particular, o ganho de Recall@10 é associado à expansão pelo grafo, que recupera chunks estruturalmente relacionados e não necessariamente próximos por similaridade semântica ou lexical [15].\n\n## 10.2 Groundedness e alucinação\n\nA comparação entre RAG convencional de passagem única e o DocuSearch foi:\n\n| Sistema | Fundamentada | Alucinada | Fallback |\n|---|---:|---:|---:|\n| RAG de passagem única | 71,2% | 21,4% | — |\n| DocuSearch | 89,6% | 6,8% | 3,6% |\n\nO DocuSearch apresenta uma taxa de respostas fundamentadas de **89,6%**, contra **71,2%** no baseline de passagem única, uma diferença de **18,4 pontos percentuais** [13].\n\nA taxa de respostas alucinadas cai de **21,4% para 6,8%** [13]. Os 3,6% restantes correspondem a consultas resolvidas pelo caminho de fallback, no qual os contextos expandidos são combinados [13].\n\n## 10.3 Comparação com o baseline denso\n\nOutro trecho resume os resultados como:\n\n- Precision@10: **0,69**;\n- Recall@10: **0,79**;\n- grounding rate: **89,6%**;\n\ne informa ganhos de 15, 16 e 18,4 pontos percentuais, respectivamente, sobre um baseline de RAG somente denso [1].\n\nA tabela de recuperação confirma os ganhos de Precision@10 e Recall@10 em relação à configuração “Dense only”, que apresenta 0,54 e 0,63, respectivamente [15].\n\n---\n\n# 11. Limitações e contradições nos trechos fornecidos\n\n## 11.1 Latência\n\nA principal limitação operacional é que as chamadas sequenciais do LLM na avaliação por chunk são o maior gargalo de latência, com média de **8,4 segundos** [14].\n\nO artigo sugere paralelizar a avaliação dos chunks usando múltiplos threads de inferência [14].\n\n## 11.2 Generalização dos pesos RRF\n\nOs pesos \\(0.50\\), \\(0.35\\) e \\(0.15\\) foram ajustados empiricamente em documentação de telecomunicações. Portanto, os próprios autores observam que eles podem não funcionar igualmente bem em outros domínios [14].\n\n## 11.3 Limitações do grafo de conhecimento\n\nOs trechos indicam como direção futura o uso de reconhecimento de entidades para construir triplas tipadas de entidade-relação, o que poderia fortalecer consultas com múltiplos saltos [14].\n\nTambém é apontada como extensão futura a recuperação multimodal, incluindo diagramas incorporados e tabelas de especificação [14].\n\n## 11.4 Diferença na contagem dos componentes da arquitetura\n\nHá uma pequena inconsistência de descrição arquitetural:\n\n- um trecho afirma que o sistema possui **seis camadas funcionais** [2];\n- outro descreve um DAG com **cinco nós explicitamente definidos** [5];\n- a descrição dos nós em [8] também lista cinco nós.\n\nIsso não parece contradizer o fluxo principal: “camadas funcionais” e “nós do DAG” podem estar contando unidades diferentes. Porém, os trechos fornecidos não explicam explicitamente como as seis camadas se relacionam aos cinco nós.\n\n## 11.5 Diferença na identificação do baseline\n\nTambém há uma diferença de nomenclatura:\n\n- [1] descreve os ganhos em relação a um baseline de **RAG somente denso**;\n- [13] compara o grounding com um baseline de **RAG de passagem única**;\n- [15] usa “Dense only” especificamente na avaliação de recuperação.\n\nAssim, não é seguro tratar automaticamente esses três rótulos como exatamente o mesmo baseline. Os resultados devem ser lidos conforme a definição apresentada em cada tabela ou trecho.\n\n## Conclusão\n\nA metodologia do DocuSearch é um pipeline de RAG em duas fases. Primeiro, ele combina busca vetorial, BM25 e expansão por grafo, funde os resultados com RRF, aplica reranking e seleciona evidências diversas com MMR. Depois, avalia cada chunk individualmente, expande seu contexto quando necessário, verifica sua suficiência, gera uma resposta e testa se ela está realmente fundamentada no texto recuperado [3][6].\n\nA ideia central é não confiar automaticamente no conjunto inteiro de documentos recuperados. O sistema só retorna uma resposta individual quando o contexto é suficiente e a resposta passa pela verificação de groundedness; caso contrário, tenta outros chunks ou usa o fallback de combinação de contextos [2][6].",
+  "metrics": {
+    "faithfulness": {
+      "value": 0.9891304347826086,
+      "reason": "[unsupported] O artigo \"Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\" é identificado como arXiv:2609.01617. — O contexto não menciona o identificador arXiv do artigo, apenas descreve o sistema DocuSearch.\n[supported] O artigo apresenta o DocuSearch, que é um sistema de RAG híbrido para buscar procedimentos e informações em grandes repositórios corporativos. — O contexto descreve o DocuSearch como um sistema híbrido de RAG para busca em repositórios corporativos.\n[supported] O sistema é especialmente útil em operações de redes de telecomunicações. — O contexto menciona que o DocuSearch foi desenvolvido e avaliado em um ambiente de operações de telecomunicações.\n[supported] A metodologia combina recuperação semântica, busca lexical, expansão por grafo de conhecimento, reranking, seleção diversificada e verificação individual de cada trecho recuperado. — O contexto detalha que a metodologia do DocuSearch envolve esses componentes.\n[supported] O fluxo completo do sistema pode ser resumido em várias etapas. — O contexto descreve várias etapas do fluxo do sistema DocuSearch.\n[supported] A primeira etapa é a ingestão e segmentação dos documentos. — O contexto menciona que a primeira etapa do sistema é a ingestão e segmentação dos documentos.\n[supported] A entrada inicial é um conjunto heterogêneo de documentos empresariais, como manuais de fornecedores, procedimentos operacionais, relatórios de causa-raiz e registros de auditoria. — O contexto descreve a entrada inicial como um conjunto heterogêneo de documentos empresariais.\n[supported] Os documentos podem ser enviados por caminho no servidor, upload pela interface web ou monitoramento automático de uma pasta. — O contexto menciona que os documentos podem ser enviados por essas três maneiras.\n[supported] Os documentos são analisados e divididos em chunks sobrepostos. — O contexto afirma que os documentos são analisados e segmentados em chunks sobrepostos.\n[supported] A configuração padrão usa 900 caracteres por chunk e 140 caracteres de sobreposição entre chunks. — O contexto especifica que a configuração padrão utiliza esses valores para chunks.\n[supported] A sobreposição procura evitar que uma informação importante seja separada exatamente na fronteira entre dois chunks. — O contexto menciona que a sobreposição é utilizada para evitar a separação de informações importantes.\n[supported] Os segmentos produzidos são armazenados em dois mecanismos: Qdrant para busca vetorial e SQLite FTS5 para busca textual BM25. — O contexto descreve que os segmentos são armazenados nesses dois mecanismos.\n[supported] O sistema mantém metadados e uma tabela de arestas usada pela expansão do grafo de conhecimento. — O contexto menciona que o sistema mantém metadados e uma tabela de arestas para a expansão do grafo de conhecimento.\n[supported] A saída dessa etapa é uma coleção de chunks indexados, cada um associado a metadados que permitem recuperar seus vizinhos e restringir a busca aos documentos de um fornecedor específico. — O contexto afirma que a saída é uma coleção de chunks indexados com metadados.\n[supported] A segunda etapa é a análise da consulta. — O contexto menciona que a segunda etapa do sistema é a análise da consulta.\n[supported] Quando um usuário envia uma consulta, o sistema realiza três operações de preparação. — O contexto descreve que o sistema realiza três operações de preparação ao receber uma consulta.\n[supported] Um agente baseado em LLM classifica a consulta em um de cinco templates de resposta. — O contexto menciona que um agente classifica a consulta em um dos templates de resposta.\n[supported] Esse template é usado posteriormente na geração da resposta. — O contexto afirma que o template é utilizado na geração da resposta.\n[supported] Um agente de palavras-chave, combinando LLM e regras, extrai termos importantes para a busca BM25. — O contexto descreve que um agente extrai termos importantes para a busca BM25.\n[supported] Isso é especialmente útil para acrônimos técnicos, números de modelo e nomes de produtos. — O contexto menciona que a extração de palavras-chave é útil para esses termos.\n[supported] Um agente identifica se a consulta menciona um fornecedor. — O contexto afirma que um agente identifica menções a fornecedores na consulta.\n[supported] Quando isso acontece, os três mecanismos de recuperação podem ser restringidos aos documentos daquele fornecedor. — O contexto menciona que os mecanismos de recuperação são restringidos a documentos de um fornecedor específico.\n[supported] Essa etapa produz a intenção ou template da consulta, as palavras-chave para BM25, um possível namespace de fornecedor e os parâmetros usados pelas etapas de recuperação. — O contexto descreve que essa etapa produz esses elementos.\n[supported] A terceira etapa é a recuperação por três sinais. — O contexto menciona que a terceira etapa envolve a recuperação por três sinais.\n[supported] Os três mecanismos de recuperação são executados em paralelo. — O contexto afirma que os três mecanismos de recuperação são executados em paralelo.\n[supported] Cada um captura uma forma diferente de relevância. — O contexto menciona que cada mecanismo captura uma forma diferente de relevância.\n[supported] A consulta é convertida em um vetor de dimensão 1024 pelo modelo BGE-Large-EN-v1.5. — O contexto afirma que a consulta é convertida em um vetor de dimensão 1024.\n[supported] O sistema calcula a similaridade de cosseno entre esse vetor e os embeddings dos chunks armazenados no Qdrant. — O contexto menciona que a similaridade de cosseno é calculada entre o vetor da consulta e os embeddings.\n[supported] Essa busca retorna os 40 chunks mais relevantes segundo similaridade semântica. — O contexto afirma que a busca retorna os 40 chunks mais relevantes.\n[supported] A busca vetorial é útil quando a consulta e o documento expressam a mesma ideia com palavras diferentes. — O contexto menciona que a busca vetorial é útil para capturar similaridades semânticas.\n[supported] As palavras-chave extraídas da consulta são usadas para consultar o índice SQLite FTS5 por BM25. — O contexto afirma que as palavras-chave são usadas para consultar o índice BM25.\n[supported] O BM25 é importante para termos técnicos, siglas e números de modelo que podem ter correspondência lexical forte. — O contexto menciona que o BM25 é útil para esses tipos de termos.\n[supported] A expansão pelo grafo começa a partir de chunks recuperados pela busca vetorial e pelo BM25. — O contexto afirma que a expansão pelo grafo utiliza chunks recuperados por esses métodos.\n[supported] O sistema percorre uma tabela de arestas em SQLite para encontrar chunks estruturalmente conectados. — O contexto menciona que o sistema utiliza uma tabela de arestas para a expansão.\n[supported] Essa etapa pode encontrar um procedimento descrito em outra seção do documento. — O contexto afirma que a expansão pode recuperar informações de diferentes seções.\n[supported] Cada mecanismo produz sua própria lista ranqueada. — O contexto menciona que cada mecanismo gera uma lista ranqueada.\n[supported] As três listas são combinadas pelo Reciprocal Rank Fusion (RRF). — O contexto afirma que as listas são combinadas usando RRF.\n[supported] Os valores usados para a pontuação incluem peso vetorial, peso BM25 e peso do grafo. — O contexto menciona que esses pesos são utilizados na combinação das listas.\n[supported] Um chunk pode receber uma boa posição final por aparecer bem ranqueado em uma ou mais fontes de evidência. — O contexto afirma que a posição final de um chunk depende de seu ranqueamento nas fontes de evidência.\n[supported] A busca vetorial recebe o maior peso, mas a combinação também preserva sinais lexicais e estruturais. — O contexto menciona que a busca vetorial tem o maior peso na combinação.\n[supported] Depois da fusão, um cross-encoder reranqueia a lista combinada. — O contexto afirma que um cross-encoder é utilizado para reranquear a lista após a fusão.\n[supported] O objetivo é refinar a relevância dos candidatos depois que as três fontes já foram combinadas. — O contexto menciona que o objetivo do reranking é refinar a relevância.\n[supported] A seleção por Maximal Marginal Relevance (MMR) escolhe evidências equilibrando relevância para a consulta e diversidade entre os chunks selecionados. — O contexto afirma que a seleção MMR é utilizada para equilibrar relevância e diversidade.\n[supported] O parâmetro usado é lambda igual a 0.65. — O contexto menciona que o parâmetro lambda é definido como 0.65.\n[supported] O objetivo é evitar que os dez resultados finais sejam quase duplicatas entre si. — O contexto afirma que o objetivo da seleção MMR é evitar duplicatas.\n[supported] A saída dessa fase é o conjunto ordenado de chunks. — O contexto menciona que a saída é um conjunto ordenado de chunks.\n[supported] Essa é a principal diferença metodológica do DocuSearch em relação a um RAG convencional. — O contexto afirma que essa abordagem é uma diferença chave do DocuSearch.\n[supported] O sistema trata cada chunk selecionado como um pequeno problema de recuperação e resposta. — O contexto menciona que o sistema avalia cada chunk como um problema de recuperação.\n[supported] Um LLM verifica se o chunk é autossuficiente ou se parece ser apenas um fragmento de uma explicação maior. — O contexto afirma que um LLM verifica a suficiência do chunk.\n[supported] Se forem necessários mais dados, o sistema busca os chunks vizinhos. — O contexto menciona que o sistema busca chunks vizinhos se necessário.\n[supported] Essa expansão ocorre por no máximo L igual a 2 iterações. — O contexto afirma que a expansão é limitada a 2 iterações.\n[supported] O resultado é um contexto expandido. — O contexto menciona que o resultado da expansão é um contexto ampliado.\n[supported] Depois da expansão, outro julgamento do LLM atribui uma pontuação de suficiência ao contexto em uma escala de 1 a 10. — O contexto afirma que um LLM atribui uma pontuação de suficiência após a expansão.\n[supported] O chunk só pode avançar se a pontuação de suficiência for maior ou igual ao limiar de 7. — O contexto menciona que o chunk deve atingir uma pontuação mínima para avançar.\n[supported] Se o chunk não atingir esse limiar, ele é descartado imediatamente. — O contexto afirma que chunks que não atingem o limiar são descartados.\n[supported] Se o contexto for considerado suficiente, o LLM recebe a consulta, o contexto expandido e o template selecionado. — O contexto menciona que o LLM recebe esses elementos se o contexto for suficiente.\n[supported] Então gera uma resposta candidata. — O contexto afirma que o LLM gera uma resposta candidata após receber os elementos.\n[supported] A temperatura é fixada em 0.0 para tornar as respostas mais determinísticas e reproduzíveis. — O contexto menciona que a temperatura é fixada em 0.0 para garantir determinismo.\n[supported] A resposta candidata é submetida a uma chamada separada de LLM, que verifica se ela é completamente sustentada pelo contexto recuperado. — O contexto afirma que a resposta candidata é verificada por um LLM.\n[supported] Se a resposta for considerada fundamentada, ela é aceita como resposta final. — O contexto menciona que a resposta é aceita se for fundamentada.\n[supported] Se a resposta não for fundamentada, ela não é devolvida ao usuário. — O contexto afirma que respostas não fundamentadas não são retornadas.\n[supported] Se nenhum chunk individual passar pelas quatro verificações, o sistema entra no caminho de fallback. — O contexto menciona que o sistema utiliza um caminho de fallback se nenhum chunk passar.\n[supported] Nesse caso, todos os contextos expandidos são combinados. — O contexto afirma que todos os contextos expandidos são combinados no caminho de fallback.\n[supported] Um LLM gera uma resposta consolidada. — O contexto menciona que um LLM gera uma resposta consolidada no caminho de fallback.\n[supported] Essa resposta passa por uma verificação final de groundedness. — O contexto afirma que a resposta consolidada passa por uma verificação final.\n[supported] O sistema prioriza uma resposta apoiada por um único contexto suficiente. — O contexto menciona que o sistema prioriza respostas fundamentadas em contextos suficientes.\n[supported] O DocuSearch é implementado em Python e usa modelos hospedados localmente. — O contexto afirma que o DocuSearch é implementado em Python com modelos locais.\n[supported] A pilha inclui Qdrant para armazenamento vetorial, BGE-Large-EN-v1.5 para embeddings, cross-encoder para reranking, SQLite FTS5 para BM25, SQLite para metadados, Mistral para inferência LLM, LangGraph para orquestração e Plotly Dash para a interface. — O contexto menciona todos esses componentes como parte da pilha do sistema.\n[supported] A orquestração é descrita como um DAG do LangGraph com cinco nós principais. — O contexto afirma que a orquestração é realizada através de um DAG do LangGraph.\n[supported] A interface exibe a conversa, a visualização do pipeline, o Knowledge Hub, o Learning Hub e os painéis de ingestão de documentos. — O contexto menciona que a interface exibe esses elementos.\n[supported] A avaliação de recuperação foi feita com 120 consultas anotadas manualmente, cobrindo as cinco categorias de templates. — O contexto afirma que a avaliação foi realizada com 120 consultas anotadas.\n[supported] O sistema completo supera as duas configurações de comparação em todas as métricas apresentadas. — O contexto menciona que o sistema completo supera as configurações de comparação.\n[supported] O ganho de Recall@10 é associado à expansão pelo grafo, que recupera chunks estruturalmente relacionados. — O contexto afirma que a expansão pelo grafo melhora o Recall@10.\n[supported] A comparação entre RAG convencional de passagem única e o DocuSearch apresenta taxas de respostas fundamentadas e alucinadas. — O contexto menciona que a comparação entre os sistemas apresenta essas taxas.\n[supported] O DocuSearch apresenta uma taxa de respostas fundamentadas de 89,6%, contra 71,2% no baseline de passagem única. — O contexto afirma que o DocuSearch tem uma taxa de respostas fundamentadas de 89,6%.\n[supported] A taxa de respostas alucinadas cai de 21,4% para 6,8%. — O contexto menciona que a taxa de respostas alucinadas do DocuSearch é de 6,8%.\n[supported] Os 3,6% restantes correspondem a consultas resolvidas pelo caminho de fallback. — O contexto afirma que 3,6% das consultas são resolvidas pelo caminho de fallback.\n[supported] Outro trecho resume os resultados de Precision@10, Recall@10 e grounding rate. — O contexto menciona que há um resumo dos resultados de precisão, recall e grounding rate.\n[supported] A tabela de recuperação confirma os ganhos de Precision@10 e Recall@10 em relação à configuração \"Dense only\". — O contexto afirma que a tabela de recuperação confirma esses ganhos.\n[supported] A principal limitação operacional é que as chamadas sequenciais do LLM na avaliação por chunk são o maior gargalo de latência. — O contexto menciona que as chamadas sequenciais do LLM são um gargalo de latência.\n[supported] O artigo sugere paralelizar a avaliação dos chunks usando múltiplos threads de inferência. — O contexto menciona que a paralelização da avaliação é uma sugestão.\n[supported] Os pesos foram ajustados empiricamente em documentação de telecomunicações. — O contexto afirma que os pesos foram ajustados empiricamente.\n[supported] Os próprios autores observam que os pesos podem não funcionar igualmente bem em outros domínios. — O contexto menciona que os autores observam a aplicabilidade dos pesos em outros domínios.\n[supported] Os trechos indicam como direção futura o uso de reconhecimento de entidades para construir triplas tipadas de entidade-relação. — O contexto menciona que o uso de reconhecimento de entidades é uma direção futura.\n[supported] Isso poderia fortalecer consultas com múltiplos saltos. — O contexto afirma que isso poderia melhorar o manuseio de consultas complexas.\n[supported] Os trechos também apontam a recuperação multimodal como extensão futura. — O contexto menciona que a recuperação multimodal é uma direção futura.\n[supported] Há uma pequena inconsistência de descrição arquitetural entre os trechos fornecidos. — O contexto menciona que pode haver inconsistências na descrição arquitetural.\n[supported] Os resultados devem ser lidos conforme a definição apresentada em cada tabela ou trecho. — O contexto menciona que os resultados devem ser interpretados de acordo com as definições.\n[supported] A metodologia do DocuSearch é um pipeline de RAG em duas fases. — O contexto afirma que a metodologia do DocuSearch é um pipeline de RAG em duas fases.\n[supported] Primeiro, o sistema combina busca vetorial, BM25 e expansão por grafo. — O contexto menciona que a primeira fase combina esses métodos.\n[supported] Depois, o sistema avalia cada chunk individualmente, expande seu contexto quando necessário, verifica sua suficiência, gera uma resposta e testa se ela está realmente fundamentada no texto recuperado. — O contexto descreve o processo de avaliação e verificação do sistema.\n[supported] A ideia central é não confiar automaticamente no conjunto inteiro de documentos recuperados. — O contexto menciona que a abordagem do sistema é não confiar automaticamente nos documentos recuperados.",
+      "statements": [
+        {
+          "statement": "O artigo \"Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\" é identificado como arXiv:2609.01617.",
+          "reason": "O contexto não menciona o identificador arXiv do artigo, apenas descreve o sistema DocuSearch.",
+          "verdict": 0
+        },
+        {
+          "statement": "O artigo apresenta o DocuSearch, que é um sistema de RAG híbrido para buscar procedimentos e informações em grandes repositórios corporativos.",
+          "reason": "O contexto descreve o DocuSearch como um sistema híbrido de RAG para busca em repositórios corporativos.",
+          "verdict": 1
+        },
+        {
+          "statement": "O sistema é especialmente útil em operações de redes de telecomunicações.",
+          "reason": "O contexto menciona que o DocuSearch foi desenvolvido e avaliado em um ambiente de operações de telecomunicações.",
+          "verdict": 1
+        },
+        {
+          "statement": "A metodologia combina recuperação semântica, busca lexical, expansão por grafo de conhecimento, reranking, seleção diversificada e verificação individual de cada trecho recuperado.",
+          "reason": "O contexto detalha que a metodologia do DocuSearch envolve esses componentes.",
+          "verdict": 1
+        },
+        {
+          "statement": "O fluxo completo do sistema pode ser resumido em várias etapas.",
+          "reason": "O contexto descreve várias etapas do fluxo do sistema DocuSearch.",
+          "verdict": 1
+        },
+        {
+          "statement": "A primeira etapa é a ingestão e segmentação dos documentos.",
+          "reason": "O contexto menciona que a primeira etapa do sistema é a ingestão e segmentação dos documentos.",
+          "verdict": 1
+        },
+        {
+          "statement": "A entrada inicial é um conjunto heterogêneo de documentos empresariais, como manuais de fornecedores, procedimentos operacionais, relatórios de causa-raiz e registros de auditoria.",
+          "reason": "O contexto descreve a entrada inicial como um conjunto heterogêneo de documentos empresariais.",
+          "verdict": 1
+        },
+        {
+          "statement": "Os documentos podem ser enviados por caminho no servidor, upload pela interface web ou monitoramento automático de uma pasta.",
+          "reason": "O contexto menciona que os documentos podem ser enviados por essas três maneiras.",
+          "verdict": 1
+        },
+        {
+          "statement": "Os documentos são analisados e divididos em chunks sobrepostos.",
+          "reason": "O contexto afirma que os documentos são analisados e segmentados em chunks sobrepostos.",
+          "verdict": 1
+        },
+        {
+          "statement": "A configuração padrão usa 900 caracteres por chunk e 140 caracteres de sobreposição entre chunks.",
+          "reason": "O contexto especifica que a configuração padrão utiliza esses valores para chunks.",
+          "verdict": 1
+        },
+        {
+          "statement": "A sobreposição procura evitar que uma informação importante seja separada exatamente na fronteira entre dois chunks.",
+          "reason": "O contexto menciona que a sobreposição é utilizada para evitar a separação de informações importantes.",
+          "verdict": 1
+        },
+        {
+          "statement": "Os segmentos produzidos são armazenados em dois mecanismos: Qdrant para busca vetorial e SQLite FTS5 para busca textual BM25.",
+          "reason": "O contexto descreve que os segmentos são armazenados nesses dois mecanismos.",
+          "verdict": 1
+        },
+        {
+          "statement": "O sistema mantém metadados e uma tabela de arestas usada pela expansão do grafo de conhecimento.",
+          "reason": "O contexto menciona que o sistema mantém metadados e uma tabela de arestas para a expansão do grafo de conhecimento.",
+          "verdict": 1
+        },
+        {
+          "statement": "A saída dessa etapa é uma coleção de chunks indexados, cada um associado a metadados que permitem recuperar seus vizinhos e restringir a busca aos documentos de um fornecedor específico.",
+          "reason": "O contexto afirma que a saída é uma coleção de chunks indexados com metadados.",
+          "verdict": 1
+        },
+        {
+          "statement": "A segunda etapa é a análise da consulta.",
+          "reason": "O contexto menciona que a segunda etapa do sistema é a análise da consulta.",
+          "verdict": 1
+        },
+        {
+          "statement": "Quando um usuário envia uma consulta, o sistema realiza três operações de preparação.",
+          "reason": "O contexto descreve que o sistema realiza três operações de preparação ao receber uma consulta.",
+          "verdict": 1
+        },
+        {
+          "statement": "Um agente baseado em LLM classifica a consulta em um de cinco templates de resposta.",
+          "reason": "O contexto menciona que um agente classifica a consulta em um dos templates de resposta.",
+          "verdict": 1
+        },
+        {
+          "statement": "Esse template é usado posteriormente na geração da resposta.",
+          "reason": "O contexto afirma que o template é utilizado na geração da resposta.",
+          "verdict": 1
+        },
+        {
+          "statement": "Um agente de palavras-chave, combinando LLM e regras, extrai termos importantes para a busca BM25.",
+          "reason": "O contexto descreve que um agente extrai termos importantes para a busca BM25.",
+          "verdict": 1
+        },
+        {
+          "statement": "Isso é especialmente útil para acrônimos técnicos, números de modelo e nomes de produtos.",
+          "reason": "O contexto menciona que a extração de palavras-chave é útil para esses termos.",
+          "verdict": 1
+        },
+        {
+          "statement": "Um agente identifica se a consulta menciona um fornecedor.",
+          "reason": "O contexto afirma que um agente identifica menções a fornecedores na consulta.",
+          "verdict": 1
+        },
+        {
+          "statement": "Quando isso acontece, os três mecanismos de recuperação podem ser restringidos aos documentos daquele fornecedor.",
+          "reason": "O contexto menciona que os mecanismos de recuperação são restringidos a documentos de um fornecedor específico.",
+          "verdict": 1
+        },
+        {
+          "statement": "Essa etapa produz a intenção ou template da consulta, as palavras-chave para BM25, um possível namespace de fornecedor e os parâmetros usados pelas etapas de recuperação.",
+          "reason": "O contexto descreve que essa etapa produz esses elementos.",
+          "verdict": 1
+        },
+        {
+          "statement": "A terceira etapa é a recuperação por três sinais.",
+          "reason": "O contexto menciona que a terceira etapa envolve a recuperação por três sinais.",
+          "verdict": 1
+        },
+        {
+          "statement": "Os três mecanismos de recuperação são executados em paralelo.",
+          "reason": "O contexto afirma que os três mecanismos de recuperação são executados em paralelo.",
+          "verdict": 1
+        },
+        {
+          "statement": "Cada um captura uma forma diferente de relevância.",
+          "reason": "O contexto menciona que cada mecanismo captura uma forma diferente de relevância.",
+          "verdict": 1
+        },
+        {
+          "statement": "A consulta é convertida em um vetor de dimensão 1024 pelo modelo BGE-Large-EN-v1.5.",
+          "reason": "O contexto afirma que a consulta é convertida em um vetor de dimensão 1024.",
+          "verdict": 1
+        },
+        {
+          "statement": "O sistema calcula a similaridade de cosseno entre esse vetor e os embeddings dos chunks armazenados no Qdrant.",
+          "reason": "O contexto menciona que a similaridade de cosseno é calculada entre o vetor da consulta e os embeddings.",
+          "verdict": 1
+        },
+        {
+          "statement": "Essa busca retorna os 40 chunks mais relevantes segundo similaridade semântica.",
+          "reason": "O contexto afirma que a busca retorna os 40 chunks mais relevantes.",
+          "verdict": 1
+        },
+        {
+          "statement": "A busca vetorial é útil quando a consulta e o documento expressam a mesma ideia com palavras diferentes.",
+          "reason": "O contexto menciona que a busca vetorial é útil para capturar similaridades semânticas.",
+          "verdict": 1
+        },
+        {
+          "statement": "As palavras-chave extraídas da consulta são usadas para consultar o índice SQLite FTS5 por BM25.",
+          "reason": "O contexto afirma que as palavras-chave são usadas para consultar o índice BM25.",
+          "verdict": 1
+        },
+        {
+          "statement": "O BM25 é importante para termos técnicos, siglas e números de modelo que podem ter correspondência lexical forte.",
+          "reason": "O contexto menciona que o BM25 é útil para esses tipos de termos.",
+          "verdict": 1
+        },
+        {
+          "statement": "A expansão pelo grafo começa a partir de chunks recuperados pela busca vetorial e pelo BM25.",
+          "reason": "O contexto afirma que a expansão pelo grafo utiliza chunks recuperados por esses métodos.",
+          "verdict": 1
+        },
+        {
+          "statement": "O sistema percorre uma tabela de arestas em SQLite para encontrar chunks estruturalmente conectados.",
+          "reason": "O contexto menciona que o sistema utiliza uma tabela de arestas para a expansão.",
+          "verdict": 1
+        },
+        {
+          "statement": "Essa etapa pode encontrar um procedimento descrito em outra seção do documento.",
+          "reason": "O contexto afirma que a expansão pode recuperar informações de diferentes seções.",
+          "verdict": 1
+        },
+        {
+          "statement": "Cada mecanismo produz sua própria lista ranqueada.",
+          "reason": "O contexto menciona que cada mecanismo gera uma lista ranqueada.",
+          "verdict": 1
+        },
+        {
+          "statement": "As três listas são combinadas pelo Reciprocal Rank Fusion (RRF).",
+          "reason": "O contexto afirma que as listas são combinadas usando RRF.",
+          "verdict": 1
+        },
+        {
+          "statement": "Os valores usados para a pontuação incluem peso vetorial, peso BM25 e peso do grafo.",
+          "reason": "O contexto menciona que esses pesos são utilizados na combinação das listas.",
+          "verdict": 1
+        },
+        {
+          "statement": "Um chunk pode receber uma boa posição final por aparecer bem ranqueado em uma ou mais fontes de evidência.",
+          "reason": "O contexto afirma que a posição final de um chunk depende de seu ranqueamento nas fontes de evidência.",
+          "verdict": 1
+        },
+        {
+          "statement": "A busca vetorial recebe o maior peso, mas a combinação também preserva sinais lexicais e estruturais.",
+          "reason": "O contexto menciona que a busca vetorial tem o maior peso na combinação.",
+          "verdict": 1
+        },
+        {
+          "statement": "Depois da fusão, um cross-encoder reranqueia a lista combinada.",
+          "reason": "O contexto afirma que um cross-encoder é utilizado para reranquear a lista após a fusão.",
+          "verdict": 1
+        },
+        {
+          "statement": "O objetivo é refinar a relevância dos candidatos depois que as três fontes já foram combinadas.",
+          "reason": "O contexto menciona que o objetivo do reranking é refinar a relevância.",
+          "verdict": 1
+        },
+        {
+          "statement": "A seleção por Maximal Marginal Relevance (MMR) escolhe evidências equilibrando relevância para a consulta e diversidade entre os chunks selecionados.",
+          "reason": "O contexto afirma que a seleção MMR é utilizada para equilibrar relevância e diversidade.",
+          "verdict": 1
+        },
+        {
+          "statement": "O parâmetro usado é lambda igual a 0.65.",
+          "reason": "O contexto menciona que o parâmetro lambda é definido como 0.65.",
+          "verdict": 1
+        },
+        {
+          "statement": "O objetivo é evitar que os dez resultados finais sejam quase duplicatas entre si.",
+          "reason": "O contexto afirma que o objetivo da seleção MMR é evitar duplicatas.",
+          "verdict": 1
+        },
+        {
+          "statement": "A saída dessa fase é o conjunto ordenado de chunks.",
+          "reason": "O contexto menciona que a saída é um conjunto ordenado de chunks.",
+          "verdict": 1
+        },
+        {
+          "statement": "Essa é a principal diferença metodológica do DocuSearch em relação a um RAG convencional.",
+          "reason": "O contexto afirma que essa abordagem é uma diferença chave do DocuSearch.",
+          "verdict": 1
+        },
+        {
+          "statement": "O sistema trata cada chunk selecionado como um pequeno problema de recuperação e resposta.",
+          "reason": "O contexto menciona que o sistema avalia cada chunk como um problema de recuperação.",
+          "verdict": 1
+        },
+        {
+          "statement": "Um LLM verifica se o chunk é autossuficiente ou se parece ser apenas um fragmento de uma explicação maior.",
+          "reason": "O contexto afirma que um LLM verifica a suficiência do chunk.",
+          "verdict": 1
+        },
+        {
+          "statement": "Se forem necessários mais dados, o sistema busca os chunks vizinhos.",
+          "reason": "O contexto menciona que o sistema busca chunks vizinhos se necessário.",
+          "verdict": 1
+        },
+        {
+          "statement": "Essa expansão ocorre por no máximo L igual a 2 iterações.",
+          "reason": "O contexto afirma que a expansão é limitada a 2 iterações.",
+          "verdict": 1
+        },
+        {
+          "statement": "O resultado é um contexto expandido.",
+          "reason": "O contexto menciona que o resultado da expansão é um contexto ampliado.",
+          "verdict": 1
+        },
+        {
+          "statement": "Depois da expansão, outro julgamento do LLM atribui uma pontuação de suficiência ao contexto em uma escala de 1 a 10.",
+          "reason": "O contexto afirma que um LLM atribui uma pontuação de suficiência após a expansão.",
+          "verdict": 1
+        },
+        {
+          "statement": "O chunk só pode avançar se a pontuação de suficiência for maior ou igual ao limiar de 7.",
+          "reason": "O contexto menciona que o chunk deve atingir uma pontuação mínima para avançar.",
+          "verdict": 1
+        },
+        {
+          "statement": "Se o chunk não atingir esse limiar, ele é descartado imediatamente.",
+          "reason": "O contexto afirma que chunks que não atingem o limiar são descartados.",
+          "verdict": 1
+        },
+        {
+          "statement": "Se o contexto for considerado suficiente, o LLM recebe a consulta, o contexto expandido e o template selecionado.",
+          "reason": "O contexto menciona que o LLM recebe esses elementos se o contexto for suficiente.",
+          "verdict": 1
+        },
+        {
+          "statement": "Então gera uma resposta candidata.",
+          "reason": "O contexto afirma que o LLM gera uma resposta candidata após receber os elementos.",
+          "verdict": 1
+        },
+        {
+          "statement": "A temperatura é fixada em 0.0 para tornar as respostas mais determinísticas e reproduzíveis.",
+          "reason": "O contexto menciona que a temperatura é fixada em 0.0 para garantir determinismo.",
+          "verdict": 1
+        },
+        {
+          "statement": "A resposta candidata é submetida a uma chamada separada de LLM, que verifica se ela é completamente sustentada pelo contexto recuperado.",
+          "reason": "O contexto afirma que a resposta candidata é verificada por um LLM.",
+          "verdict": 1
+        },
+        {
+          "statement": "Se a resposta for considerada fundamentada, ela é aceita como resposta final.",
+          "reason": "O contexto menciona que a resposta é aceita se for fundamentada.",
+          "verdict": 1
+        },
+        {
+          "statement": "Se a resposta não for fundamentada, ela não é devolvida ao usuário.",
+          "reason": "O contexto afirma que respostas não fundamentadas não são retornadas.",
+          "verdict": 1
+        },
+        {
+          "statement": "Se nenhum chunk individual passar pelas quatro verificações, o sistema entra no caminho de fallback.",
+          "reason": "O contexto menciona que o sistema utiliza um caminho de fallback se nenhum chunk passar.",
+          "verdict": 1
+        },
+        {
+          "statement": "Nesse caso, todos os contextos expandidos são combinados.",
+          "reason": "O contexto afirma que todos os contextos expandidos são combinados no caminho de fallback.",
+          "verdict": 1
+        },
+        {
+          "statement": "Um LLM gera uma resposta consolidada.",
+          "reason": "O contexto menciona que um LLM gera uma resposta consolidada no caminho de fallback.",
+          "verdict": 1
+        },
+        {
+          "statement": "Essa resposta passa por uma verificação final de groundedness.",
+          "reason": "O contexto afirma que a resposta consolidada passa por uma verificação final.",
+          "verdict": 1
+        },
+        {
+          "statement": "O sistema prioriza uma resposta apoiada por um único contexto suficiente.",
+          "reason": "O contexto menciona que o sistema prioriza respostas fundamentadas em contextos suficientes.",
+          "verdict": 1
+        },
+        {
+          "statement": "O DocuSearch é implementado em Python e usa modelos hospedados localmente.",
+          "reason": "O contexto afirma que o DocuSearch é implementado em Python com modelos locais.",
+          "verdict": 1
+        },
+        {
+          "statement": "A pilha inclui Qdrant para armazenamento vetorial, BGE-Large-EN-v1.5 para embeddings, cross-encoder para reranking, SQLite FTS5 para BM25, SQLite para metadados, Mistral para inferência LLM, LangGraph para orquestração e Plotly Dash para a interface.",
+          "reason": "O contexto menciona todos esses componentes como parte da pilha do sistema.",
+          "verdict": 1
+        },
+        {
+          "statement": "A orquestração é descrita como um DAG do LangGraph com cinco nós principais.",
+          "reason": "O contexto afirma que a orquestração é realizada através de um DAG do LangGraph.",
+          "verdict": 1
+        },
+        {
+          "statement": "A interface exibe a conversa, a visualização do pipeline, o Knowledge Hub, o Learning Hub e os painéis de ingestão de documentos.",
+          "reason": "O contexto menciona que a interface exibe esses elementos.",
+          "verdict": 1
+        },
+        {
+          "statement": "A avaliação de recuperação foi feita com 120 consultas anotadas manualmente, cobrindo as cinco categorias de templates.",
+          "reason": "O contexto afirma que a avaliação foi realizada com 120 consultas anotadas.",
+          "verdict": 1
+        },
+        {
+          "statement": "O sistema completo supera as duas configurações de comparação em todas as métricas apresentadas.",
+          "reason": "O contexto menciona que o sistema completo supera as configurações de comparação.",
+          "verdict": 1
+        },
+        {
+          "statement": "O ganho de Recall@10 é associado à expansão pelo grafo, que recupera chunks estruturalmente relacionados.",
+          "reason": "O contexto afirma que a expansão pelo grafo melhora o Recall@10.",
+          "verdict": 1
+        },
+        {
+          "statement": "A comparação entre RAG convencional de passagem única e o DocuSearch apresenta taxas de respostas fundamentadas e alucinadas.",
+          "reason": "O contexto menciona que a comparação entre os sistemas apresenta essas taxas.",
+          "verdict": 1
+        },
+        {
+          "statement": "O DocuSearch apresenta uma taxa de respostas fundamentadas de 89,6%, contra 71,2% no baseline de passagem única.",
+          "reason": "O contexto afirma que o DocuSearch tem uma taxa de respostas fundamentadas de 89,6%.",
+          "verdict": 1
+        },
+        {
+          "statement": "A taxa de respostas alucinadas cai de 21,4% para 6,8%.",
+          "reason": "O contexto menciona que a taxa de respostas alucinadas do DocuSearch é de 6,8%.",
+          "verdict": 1
+        },
+        {
+          "statement": "Os 3,6% restantes correspondem a consultas resolvidas pelo caminho de fallback.",
+          "reason": "O contexto afirma que 3,6% das consultas são resolvidas pelo caminho de fallback.",
+          "verdict": 1
+        },
+        {
+          "statement": "Outro trecho resume os resultados de Precision@10, Recall@10 e grounding rate.",
+          "reason": "O contexto menciona que há um resumo dos resultados de precisão, recall e grounding rate.",
+          "verdict": 1
+        },
+        {
+          "statement": "A tabela de recuperação confirma os ganhos de Precision@10 e Recall@10 em relação à configuração \"Dense only\".",
+          "reason": "O contexto afirma que a tabela de recuperação confirma esses ganhos.",
+          "verdict": 1
+        },
+        {
+          "statement": "A principal limitação operacional é que as chamadas sequenciais do LLM na avaliação por chunk são o maior gargalo de latência.",
+          "reason": "O contexto menciona que as chamadas sequenciais do LLM são um gargalo de latência.",
+          "verdict": 1
+        },
+        {
+          "statement": "O artigo sugere paralelizar a avaliação dos chunks usando múltiplos threads de inferência.",
+          "reason": "O contexto menciona que a paralelização da avaliação é uma sugestão.",
+          "verdict": 1
+        },
+        {
+          "statement": "Os pesos foram ajustados empiricamente em documentação de telecomunicações.",
+          "reason": "O contexto afirma que os pesos foram ajustados empiricamente.",
+          "verdict": 1
+        },
+        {
+          "statement": "Os próprios autores observam que os pesos podem não funcionar igualmente bem em outros domínios.",
+          "reason": "O contexto menciona que os autores observam a aplicabilidade dos pesos em outros domínios.",
+          "verdict": 1
+        },
+        {
+          "statement": "Os trechos indicam como direção futura o uso de reconhecimento de entidades para construir triplas tipadas de entidade-relação.",
+          "reason": "O contexto menciona que o uso de reconhecimento de entidades é uma direção futura.",
+          "verdict": 1
+        },
+        {
+          "statement": "Isso poderia fortalecer consultas com múltiplos saltos.",
+          "reason": "O contexto afirma que isso poderia melhorar o manuseio de consultas complexas.",
+          "verdict": 1
+        },
+        {
+          "statement": "Os trechos também apontam a recuperação multimodal como extensão futura.",
+          "reason": "O contexto menciona que a recuperação multimodal é uma direção futura.",
+          "verdict": 1
+        },
+        {
+          "statement": "Há uma pequena inconsistência de descrição arquitetural entre os trechos fornecidos.",
+          "reason": "O contexto menciona que pode haver inconsistências na descrição arquitetural.",
+          "verdict": 1
+        },
+        {
+          "statement": "Os resultados devem ser lidos conforme a definição apresentada em cada tabela ou trecho.",
+          "reason": "O contexto menciona que os resultados devem ser interpretados de acordo com as definições.",
+          "verdict": 1
+        },
+        {
+          "statement": "A metodologia do DocuSearch é um pipeline de RAG em duas fases.",
+          "reason": "O contexto afirma que a metodologia do DocuSearch é um pipeline de RAG em duas fases.",
+          "verdict": 1
+        },
+        {
+          "statement": "Primeiro, o sistema combina busca vetorial, BM25 e expansão por grafo.",
+          "reason": "O contexto menciona que a primeira fase combina esses métodos.",
+          "verdict": 1
+        },
+        {
+          "statement": "Depois, o sistema avalia cada chunk individualmente, expande seu contexto quando necessário, verifica sua suficiência, gera uma resposta e testa se ela está realmente fundamentada no texto recuperado.",
+          "reason": "O contexto descreve o processo de avaliação e verificação do sistema.",
+          "verdict": 1
+        },
+        {
+          "statement": "A ideia central é não confiar automaticamente no conjunto inteiro de documentos recuperados.",
+          "reason": "O contexto menciona que a abordagem do sistema é não confiar automaticamente nos documentos recuperados.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.4865869821041178,
+      "reason": "generated='What is the methodology of the DocuSearch system?' similarity=0.4756 noncommittal=0; generated='What is the methodology of the DocuSearch system?' similarity=0.4756 noncommittal=0; generated='What is the methodology of DocuSearch as described in the article?' similarity=0.5086 noncommittal=0",
+      "generated_questions": [
+        "What is the methodology of the DocuSearch system?",
+        "What is the methodology of the DocuSearch system?",
+        "What is the methodology of DocuSearch as described in the article?"
+      ],
+      "noncommittal": [
+        0,
+        0,
+        0
+      ],
+      "similarities": [
+        0.47556004722383644,
+        0.47556004722383644,
+        0.5086408518646808
+      ],
+      "all_noncommittal": false
+    }
+  }
+}
