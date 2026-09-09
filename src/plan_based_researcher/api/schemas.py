@@ -16,11 +16,6 @@ class Citation(BaseModel):
     chunk_id: str
 
 
-class AnswerCompleteData(BaseModel):
-    markdown: str
-    citations: list[Citation]
-
-
 class PlanStep(BaseModel):
     agent: str  # REGISTRY key; validated later after parse, not here
     task: str = Field(

@@ -45,12 +45,15 @@ class StreamDispatcherTest(unittest.TestCase):
             self.assertIsNotNone(frame)
             self.assertEqual(frame.event, name)
 
-    def test_no_answer_delta_handler(self) -> None:
+    def test_answer_delta_and_citations_handlers(self) -> None:
         dispatcher = StreamDispatcher.default()
-        self.assertNotIn("answer_delta", _handlers(dispatcher))
+        handlers = _handlers(dispatcher)
+        self.assertIn("answer_delta", handlers)
+        self.assertIn("citations", handlers)
+        self.assertNotIn("answer_complete", handlers)
         with self.assertRaises(UnknownStreamKindError):
             dispatcher.dispatch(
-                _on_chain_stream({"event": "answer_delta", "data": {}})
+                _on_chain_stream({"event": "answer_complete", "data": {}})
             )
 
     def test_include_types_default_is_chain_only(self) -> None:
