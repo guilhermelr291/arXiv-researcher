@@ -10,7 +10,6 @@ from plan_based_researcher.eval.admission import finalize_wave_rankings
 from plan_based_researcher.eval.strategies import (
     RetrieveEvalStrategy,
     SearchEvalStrategy,
-    WriterEvalStrategy,
 )
 from plan_based_researcher.eval.types import EvalResult
 from plan_based_researcher.graph.nodes.dispatch import search_wave_indices
@@ -211,16 +210,36 @@ def _t3_query_miss(state: GraphState, result: EvalResult) -> bool:
 def make_evaluate_node(
     search_eval: SearchEvalStrategy,
     retrieve_eval: RetrieveEvalStrategy,
-    writer_eval: WriterEvalStrategy,
 ):
     async def evaluate(state: GraphState) -> dict:
-        writer = get_stream_writer()
         last_agent = state.get("last_agent") or ""
         if _use_search_wave(state, last_agent):
+            writer = get_stream_writer()
             return await _evaluate_wave(state, search_eval, writer)
         agent = last_agent if last_agent in ("retrieve", "writer") else _plan_agent(state)
-        strategy = writer_eval if agent == "writer" else retrieve_eval
-        result = await strategy.evaluate(state)
+        if agent == "writer":
+            idx = _step_index(state)
+            passed_steps = list(state.get("passed_steps") or [])
+            if idx not in passed_steps:
+                passed_steps.append(idx)
+            plan = state.get("plan") or []
+            step_index = _first_unpassed(plan, passed_steps)
+            update: dict = {
+                "passed_steps": passed_steps,
+                "step_index": step_index,
+            }
+            _apply_route(
+                update,
+                need_replan=False,
+                need_retry=False,
+                replan_used=bool(state.get("replan_used") or False),
+                writer_passed=_writer_passed(plan, passed_steps),
+                has_unpassed=step_index < len(plan),
+                writer_just_passed=True,
+            )
+            return _apply_max_steps(state, update)
+        writer = get_stream_writer()
+        result = await retrieve_eval.evaluate(state)
         return _evaluate_step(state, result, agent or "retrieve", writer)
 
     return evaluate

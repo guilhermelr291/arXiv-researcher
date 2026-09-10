@@ -1,16 +1,13 @@
-"""Search-wave, retrieve, and writer eval strategies (SEARCH-02, RETR-01, WRITE-01, LOOP-02, LOOP-03)."""
+"""Search-wave and retrieve eval strategies (SEARCH-02, RETR-01, LOOP-02, LOOP-03)."""
 
 from __future__ import annotations
 
-import re
 from datetime import date, datetime
 from typing import Protocol
-from urllib.parse import urlparse
 
 from langchain_openai import ChatOpenAI
 
 from plan_based_researcher.agents.registry import REGISTRY
-from plan_based_researcher.agents.writer import living_and_missing
 from plan_based_researcher.eval.types import (
     EvalResult,
     SearchStepVerdict,
@@ -23,11 +20,7 @@ __all__ = [
     "EvalStrategy",
     "SearchEvalStrategy",
     "RetrieveEvalStrategy",
-    "WriterEvalStrategy",
 ]
-
-_CITATION_RE = re.compile(r"\[(\d+)\]")
-_URL_RE = re.compile(r"https?://[^\s\]\)>\"']+", re.IGNORECASE)
 
 
 class EvalStrategy(Protocol):
@@ -74,77 +67,6 @@ def _categories(paper: dict) -> list[str]:
     if isinstance(raw, list):
         return [str(item) for item in raw]
     return [str(raw)]
-
-
-def _chunk_ns(chunks: object) -> set[int]:
-    numbers: set[int] = set()
-    if not isinstance(chunks, list):
-        return numbers
-    for chunk in chunks:
-        if not isinstance(chunk, dict):
-            continue
-        n = chunk.get("n")
-        if isinstance(n, int):
-            numbers.add(n)
-        elif isinstance(n, str) and n.isdigit():
-            numbers.add(int(n))
-    return numbers
-
-
-def _is_arxiv_url(url: str) -> bool:
-    host = (urlparse(url).hostname or "").lower()
-    return host == "arxiv.org" or host.endswith(".arxiv.org")
-
-
-def _writer_checklist() -> str:
-    categories = ", ".join(sorted(Policy.arxiv_categories))
-    return (
-        f"Allowed evidence domain: arXiv categories only ({categories}).\n"
-        f"Grounding: {Policy.GROUNDING_RULE}.\n"
-        "Your feedback field must be English.\n"
-        "The student markdown must be in the same language as the student query; "
-        "do not fail it for being a different language from the English plan task.\n"
-        "Use a didactic, student-friendly tone.\n"
-        "Do not introduce sources outside the provided evidence chunks or arxiv.org URLs.\n"
-        "Fail if the answer teaches a definition, mechanism, or comparison of a missing "
-        "topic (parametric fill).\n"
-        "Fail if living [n] citations are used as if they were the missing topic.\n"
-        "A sentence that no usable paper was found for a named topic is not a technical "
-        "claim and does not need [n].\n"
-        "Living topics still need real [n] (ORCH-03 is enforced deterministically).\n"
-        "Pass when the student-requested facts are present and cited with living [n].\n"
-        "Do not retry to rephrase, add headings, or demand extra caveats when those "
-        "facts are already cited. If the evidence contains two conflicting values for "
-        "the same fact and the markdown states both with citations, that is a pass; "
-        "do not retry to pick one canonical number or to expand the caveat.\n"
-        "Retry only when a requested fact is missing, a technical claim lacks [n], "
-        "a missing topic is filled from memory, or living [n] are used as the missing "
-        "topic."
-    )
-
-
-def _format_living_missing(living: list[dict], missing: list[dict]) -> str:
-    if living:
-        living_body = "\n".join(
-            f"- {item['task']} arXiv:{item['arxiv_id']}v{item['version']} "
-            f"{' '.join(f'[{n}]' for n in item['ns'])}"
-            for item in living
-        )
-    else:
-        living_body = "(none)"
-    if missing:
-        missing_body = "\n".join(
-            f"- {item['task']} ({item['reason']})" for item in missing
-        )
-    else:
-        missing_body = "(none)"
-    return (
-        "Living topics (cite only these [n] for those topics):\n"
-        f"{living_body}\n\n"
-        "Missing topics (announce absence; do not define/compare from memory; "
-        "do not cite living [n] as the missing topic):\n"
-        f"{missing_body}"
-    )
 
 
 def _search_checklist() -> str:
@@ -557,118 +479,6 @@ class RetrieveEvalStrategy:
                         f"Retrieve task (research goal, not an exhaustive inventory):\n{task}\n\n"
                         f"Admitted papers:\n{_format_admitted(data.get('papers'))}\n\n"
                         f"Evidence chunks:\n{_format_chunks(data.get('evidence_chunks'))}",
-                    ),
-                ]
-            )
-        except Exception:
-            return None
-        if isinstance(result, EvalResult):
-            return result
-        try:
-            return EvalResult.model_validate(result)
-        except Exception:
-            return None
-
-
-class WriterEvalStrategy:
-    """ORCH-03 + WRITE-02: real [n], language/tone, no extra sources, hole rule."""
-
-    def __init__(self, api_key: str | None = None) -> None:
-        self._api_key = api_key
-        self._judge = None
-        if api_key is not None:
-            self._judge = ChatOpenAI(
-                model=REGISTRY["planner"].model, api_key=api_key
-            ).with_structured_output(EvalResult, method="json_schema")
-
-    async def evaluate(self, state: GraphState | dict) -> EvalResult:
-        data = _as_state(state)
-        markdown = data.get("writer_markdown") or ""
-        if not isinstance(markdown, str):
-            markdown = str(markdown)
-
-        deterministic = self._deterministic(markdown, data.get("evidence_chunks"))
-        if deterministic.status != "pass":
-            return deterministic
-
-        judged = await self._judge_language_and_tone(data, markdown)
-        return judged if judged is not None else deterministic
-
-    def _deterministic(self, markdown: str, chunks: object) -> EvalResult:
-        if not markdown.strip():
-            return EvalResult(
-                status="retry",
-                feedback="writer_markdown is empty. Write the student answer with real [n] citations.",
-            )
-
-        cited = [int(match.group(1)) for match in _CITATION_RE.finditer(markdown)]
-        if not cited:
-            return EvalResult(
-                status="retry",
-                feedback=(
-                    f"No [n] citations found. {Policy.GROUNDING_RULE}."
-                ),
-            )
-
-        valid_ns = _chunk_ns(chunks)
-        real = [n for n in cited if n in valid_ns]
-        if not real:
-            return EvalResult(
-                status="retry",
-                feedback=(
-                    "Citations must use [n] values from evidence_chunks. "
-                    f"{Policy.GROUNDING_RULE}."
-                ),
-            )
-        unknown = sorted({n for n in cited if n not in valid_ns})
-        if unknown:
-            return EvalResult(
-                status="retry",
-                feedback=(
-                    f"Citation(s) {unknown} are not in evidence_chunks. "
-                    f"{Policy.GROUNDING_RULE}."
-                ),
-            )
-
-        extra = [
-            url for url in _URL_RE.findall(markdown) if not _is_arxiv_url(url)
-        ]
-        if extra:
-            return EvalResult(
-                status="retry",
-                feedback=(
-                    "Extra HTTP sources are not allowed; only arxiv.org URLs. "
-                    f"Found: {extra[0]}"
-                ),
-            )
-
-        return EvalResult(
-            status="pass",
-            feedback="Deterministic grounding passed: real [n] citations and no extra sources.",
-        )
-
-    async def _judge_language_and_tone(
-        self, data: dict, markdown: str
-    ) -> EvalResult | None:
-        if self._judge is None:
-            return None
-        query = str(data.get("query") or "")
-        living, missing = living_and_missing(data)
-        coverage = _format_living_missing(living, missing)
-        try:
-            result = await self._judge.ainvoke(
-                [
-                    (
-                        "system",
-                        "You evaluate a student research answer. "
-                        "Return status pass, retry, or fail with English feedback.\n"
-                        f"{_writer_checklist()}",
-                    ),
-                    (
-                        "human",
-                        f"Student query:\n{query}\n\n"
-                        f"{coverage}\n\n"
-                        f"Writer markdown:\n{markdown}",
                     ),
                 ]
             )

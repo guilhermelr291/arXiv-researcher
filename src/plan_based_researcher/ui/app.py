@@ -31,6 +31,7 @@ async def on_message(message: cl.Message) -> None:
         cl.user_session.set("thread_id", thread_id)
 
     open_steps: dict[object, cl.Step] = {}
+    answer: dict = {"message": None, "finalized": False}
     try:
         async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream(
@@ -45,7 +46,7 @@ async def on_message(message: cl.Message) -> None:
                     ).send()
                     return
                 async for event, data in iter_sse_frames(response.aiter_lines()):
-                    await _handle_event(event, data, open_steps)
+                    await _handle_event(event, data, open_steps, answer)
     except httpx.HTTPError as exc:
         await cl.Message(content=f"Research request failed: {exc}").send()
     finally:
@@ -54,7 +55,7 @@ async def on_message(message: cl.Message) -> None:
 
 
 async def _handle_event(
-    event: str, data: dict, open_steps: dict[object, cl.Step]
+    event: str, data: dict, open_steps: dict[object, cl.Step], answer: dict
 ) -> None:
     if event == "step_start":
         await _on_step_start(data, open_steps)
@@ -77,7 +78,17 @@ async def _handle_event(
             if status == "fail":
                 step.is_error = True
         return
-    if event == "answer_complete":
+    if event == "answer_delta":
+        text = data.get("text") or ""
+        if not text:
+            return
+        msg = answer["message"]
+        if msg is None:
+            msg = cl.Message(content="")
+            answer["message"] = msg
+        await msg.stream_token(text)
+        return
+    if event == "citations":
         citations = data.get("citations") or []
         if not isinstance(citations, list):
             citations = []
@@ -85,10 +96,13 @@ async def _handle_event(
             cl.Text(name=name, content=excerpt, display="side")
             for name, excerpt in side_panel_texts(citations)
         ]
-        await cl.Message(
-            content=str(data.get("markdown") or ""),
-            elements=elements,
-        ).send()
+        msg = answer["message"]
+        if msg is None:
+            msg = cl.Message(content="")
+            answer["message"] = msg
+        msg.elements = elements
+        await msg.send()
+        answer["finalized"] = True
         return
     if event == "gate":
         await cl.Message(content=_gate_text(data)).send()
@@ -103,7 +117,12 @@ async def _handle_event(
         ).send()
         return
     if event == "error":
+        msg = answer.get("message")
+        if msg is not None and not answer.get("finalized"):
+            await msg.send()
+            answer["finalized"] = True
         await cl.Message(content=str(data.get("message") or "Research error.")).send()
+        return
 
 
 def _step_key(data: dict) -> object:

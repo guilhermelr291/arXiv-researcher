@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 
 from langchain_openai import ChatOpenAI
-from pydantic import BaseModel, Field
+from langgraph.config import get_stream_writer
 
 from plan_based_researcher.agents.query_schema import step_eval_feedback
 from plan_based_researcher.agents.registry import REGISTRY
@@ -13,17 +13,35 @@ from plan_based_researcher.api.schemas import Citation
 from plan_based_researcher.graph.state import EvidenceChunk, GraphState
 from plan_based_researcher.policy import Policy
 
-__all__ = ["WriterOutput", "WriterRunner", "living_and_missing"]
+__all__ = ["WriterRunner", "living_and_missing"]
 
 _CITATION_RE = re.compile(r"\[(\d+)\]")
 
 
-class WriterOutput(BaseModel):
-    markdown: str = Field(description="Student-facing markdown that cites evidence as [n]")
-    citation_ns: list[int] = Field(
-        default_factory=list,
-        description="The [n] indices actually used in markdown",
-    )
+def _visible_text(chunk: object) -> str:
+    content = getattr(chunk, "content", None)
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                text = block.get("text")
+                if text is None:
+                    text = block.get("content")
+                if isinstance(text, str) and text:
+                    parts.append(text)
+            elif isinstance(block, str) and block:
+                parts.append(block)
+        return "".join(parts)
+    return ""
+
+
+def _emit_custom(event: str, data: object) -> None:
+    try:
+        get_stream_writer()({"event": event, "data": data})
+    except RuntimeError:
+        return
 
 
 def _format_chunks(chunks: list[EvidenceChunk]) -> str:
@@ -322,21 +340,28 @@ class WriterRunner:
         kwargs: dict = {"model": REGISTRY["writer"].model}
         if api_key is not None:
             kwargs["api_key"] = api_key
-        self._llm = ChatOpenAI(**kwargs).with_structured_output(WriterOutput)
+        self._llm = ChatOpenAI(**kwargs)
 
     async def run(self, state: GraphState) -> dict:
         chunks: list[EvidenceChunk] = list(state.get("evidence_chunks") or [])
         formatted = _format_chunks(chunks)
-        output = await self._llm.ainvoke(
-            [
-                {"role": "system", "content": _system_prompt()},
-                {"role": "user", "content": _user_prompt(state, formatted)},
-            ]
-        )
-        markdown = output.markdown if isinstance(output, WriterOutput) else str(output)
+        messages = [
+            {"role": "system", "content": _system_prompt()},
+            {"role": "user", "content": _user_prompt(state, formatted)},
+        ]
+        pieces: list[str] = []
+        async for chunk in self._llm.astream(messages):
+            text = _visible_text(chunk)
+            if not text:
+                continue
+            pieces.append(text)
+            _emit_custom("answer_delta", {"text": text})
+        markdown = "".join(pieces)
         used_ns = _used_citation_ns(markdown, chunks)
+        citations = _citations_from_chunks(chunks, used_ns)
+        _emit_custom("citations", {"citations": citations})
         return {
             "writer_markdown": markdown,
-            "citations": _citations_from_chunks(chunks, used_ns),
+            "citations": citations,
             "last_agent": "writer",
         }
