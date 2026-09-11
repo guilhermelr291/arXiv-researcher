@@ -1,7 +1,7 @@
 # State
 
 **Last Updated:** 2026-09-11
-**Current Work:** Quick 022 — writer-visible recall counts expanded table/equation hits. Feature `retrieve-writer-recall` Independent Test still UAT.
+**Current Work:** Quick 024 — dump ingested chunks to `eval/retrieve/` for recall qrels. Feature `retrieve-writer-recall` Independent Test still UAT.
 
 ---
 
@@ -252,6 +252,8 @@
 | 020 | RAGAS report judge `max_tokens` so Faithfulness ascore is not truncated | 2026-09-09 | — | ✅ Done |
 | 021 | Persist RAGAS reasoning (NLI + generated questions) under `reports/ragas/` | 2026-09-09 | — | ✅ Done |
 | 022 | Count expanded table/equation as writer-pack recall; annotate injection | 2026-09-11 | — | ✅ Done |
+| 023 | Drop Contributors end-matter at HTML parse | 2026-09-11 | — | ✅ Done |
+| 024 | Dump ingested paper chunks to `eval/retrieve/` JSONL for qrel labeling | 2026-09-11 | — | ✅ Done |
 
 ---
 
@@ -355,6 +357,7 @@
 - [x] Code validation: `retrieve-writer-recall` T1–T8 (2026-09-10 verify). Gate `unittest discover -s tests` 130/130. Live Independent Test still UAT.
 - [ ] Manual UAT: run `uv run python scripts/retrieve_writer_recall.py` (paper already ingested 2026-09-10; 0 missing qrels); traces show retrieve execute and no Writer `run` / no `answer_delta`
 - [ ] Atomic commits per task T1–T8 when the user asks to commit (`retrieve-writer-recall`)
+- [x] Quick 024: dump ingested chunks to `eval/retrieve/` JSONL (2026-09-11; commit when asked)
 
 ---
 
