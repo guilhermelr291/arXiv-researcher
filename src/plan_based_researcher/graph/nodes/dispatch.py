@@ -57,7 +57,7 @@ def _insufficient() -> Command:
     return Command(update={"outcome": "insufficient"}, goto="finalize")
 
 
-def make_dispatch_node():
+def make_dispatch_node(*, halt_before_writer: bool = False):
     async def dispatch(state: GraphState) -> Command:
         outcome = state.get("outcome") or "pending"
         if outcome != "pending":
@@ -86,6 +86,8 @@ def make_dispatch_node():
         if not isinstance(step, dict):
             step = {}
         agent = step.get("agent") or ""
+        if halt_before_writer and agent == "writer":
+            return Command(update={"outcome": "done"}, goto="finalize")
         if agent in ("retrieve", "writer"):
             return Command(update={"step_index": first}, goto="execute")
         return Command(

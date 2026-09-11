@@ -1,0 +1,809 @@
+{
+  "arxiv_id": "2609.01617",
+  "version": "1",
+  "ks": [
+    5,
+    10,
+    15
+  ],
+  "macro": {
+    "5": 0.8555555555555556,
+    "10": 0.8555555555555556,
+    "15": 0.8555555555555556
+  },
+  "micro": {
+    "5": 0.72,
+    "10": 0.72,
+    "15": 0.72
+  },
+  "items": [
+    {
+      "id": "q01",
+      "query": "What three retrieval signals does DocuSearch combine in its hybrid retrieval architecture? (2609.01617)",
+      "question_type": "factual",
+      "required_chunk_ids": [
+        "dfc801c9-ffe0-447f-8c9c-7e182fb8bfc3"
+      ],
+      "delivered_ids": [
+        "dfc801c9-ffe0-447f-8c9c-7e182fb8bfc3",
+        "390228cd-f3ca-4ec1-873f-236ebfac7ee5",
+        "26684cad-6566-40b4-b020-ae6014e568cb",
+        "cff5d3f5-1a38-4b65-a2b1-d5db61550509",
+        "eac58ea0-a1c9-401b-b62c-64cb2b57e3d1",
+        "5aa65b3a-22bf-4bc6-a6b3-78e3e0a35f12",
+        "bf117c2c-d607-4122-97eb-9dfc15edb7f6"
+      ],
+      "retrieve_query_used": "DocuSearch hybrid retrieval architecture retrieval signals lexical semantic structural signal combination",
+      "retrieve_task": "Extract authoritative evidence from the DocuSearch paper specifying the three retrieval signals used in its hybrid retrieval architecture, preserving the paper's terminology and any relevant explanation of how they are combined.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "8b74b4de-5d31-467b-a726-3a9b0bceea8c",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 1.0,
+          "hits": [
+            "dfc801c9-ffe0-447f-8c9c-7e182fb8bfc3"
+          ],
+          "misses": []
+        },
+        {
+          "k": 10,
+          "recall": 1.0,
+          "hits": [
+            "dfc801c9-ffe0-447f-8c9c-7e182fb8bfc3"
+          ],
+          "misses": []
+        },
+        {
+          "k": 15,
+          "recall": 1.0,
+          "hits": [
+            "dfc801c9-ffe0-447f-8c9c-7e182fb8bfc3"
+          ],
+          "misses": []
+        }
+      ]
+    },
+    {
+      "id": "q02",
+      "query": "What weight values and smoothing constant does DocuSearch's Reciprocal Rank Fusion use for the three retrieval signals? (2609.01617)",
+      "question_type": "factual",
+      "required_chunk_ids": [
+        "4cdbb16c-3817-4bf1-963f-e41eaebe8733"
+      ],
+      "delivered_ids": [
+        "dfc801c9-ffe0-447f-8c9c-7e182fb8bfc3",
+        "a9f14f0d-c5fb-4f35-9828-cff9be8e1e3e",
+        "26684cad-6566-40b4-b020-ae6014e568cb",
+        "4cdbb16c-3817-4bf1-963f-e41eaebe8733",
+        "390228cd-f3ca-4ec1-873f-236ebfac7ee5",
+        "d0ce0fb8-9f96-48be-899b-24b426ccba40",
+        "bf117c2c-d607-4122-97eb-9dfc15edb7f6"
+      ],
+      "retrieve_query_used": "DocuSearch reciprocal rank fusion three retrieval signals weighted fusion formula signal weights smoothing constant k methodological notation",
+      "retrieve_task": "Extract the exact weight values assigned to DocuSearch’s three retrieval signals in Reciprocal Rank Fusion and the smoothing constant used in the fusion formula, preserving the surrounding methodological context and any notation.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "c35ee7d1-5eae-4183-a8d9-dad27d0a3624",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 1.0,
+          "hits": [
+            "4cdbb16c-3817-4bf1-963f-e41eaebe8733"
+          ],
+          "misses": []
+        },
+        {
+          "k": 10,
+          "recall": 1.0,
+          "hits": [
+            "4cdbb16c-3817-4bf1-963f-e41eaebe8733"
+          ],
+          "misses": []
+        },
+        {
+          "k": 15,
+          "recall": 1.0,
+          "hits": [
+            "4cdbb16c-3817-4bf1-963f-e41eaebe8733"
+          ],
+          "misses": []
+        }
+      ]
+    },
+    {
+      "id": "q03",
+      "query": "What four sequential checks does each candidate chunk pass through in DocuSearch's per-chunk agentic evaluation loop? (2609.01617)",
+      "question_type": "methodological",
+      "required_chunk_ids": [
+        "69885bfe-b65f-4153-91c5-bd16eeb63057"
+      ],
+      "delivered_ids": [
+        "69885bfe-b65f-4153-91c5-bd16eeb63057",
+        "26684cad-6566-40b4-b020-ae6014e568cb",
+        "eac58ea0-a1c9-401b-b62c-64cb2b57e3d1"
+      ],
+      "retrieve_query_used": "DocuSearch per-chunk agentic evaluation loop four checks sequential order purpose decision criterion chunk evaluation",
+      "retrieve_task": "Extract the relevant passage from the DocuSearch paper that defines the per-chunk agentic evaluation loop, preserving the order, purpose, and decision criterion of all four checks.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "f15239e7-c98c-45df-9841-aebdfb6c41dd",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 1.0,
+          "hits": [
+            "69885bfe-b65f-4153-91c5-bd16eeb63057"
+          ],
+          "misses": []
+        },
+        {
+          "k": 10,
+          "recall": 1.0,
+          "hits": [
+            "69885bfe-b65f-4153-91c5-bd16eeb63057"
+          ],
+          "misses": []
+        },
+        {
+          "k": 15,
+          "recall": 1.0,
+          "hits": [
+            "69885bfe-b65f-4153-91c5-bd16eeb63057"
+          ],
+          "misses": []
+        }
+      ]
+    },
+    {
+      "id": "q04",
+      "query": "How much does the full DocuSearch system improve Precision@10 and Recall@10 relative to the dense-only retrieval baseline? (2609.01617)",
+      "question_type": "experimental",
+      "required_chunk_ids": [
+        "f65cbe13-d55f-4ce3-81c1-11a540296763",
+        "709a4be6-d86e-442e-a07e-77bf8014a69a"
+      ],
+      "delivered_ids": [
+        "709a4be6-d86e-442e-a07e-77bf8014a69a",
+        "dfc801c9-ffe0-447f-8c9c-7e182fb8bfc3",
+        "0c65c42b-363f-4207-abc7-018af4cbe217",
+        "f65cbe13-d55f-4ce3-81c1-11a540296763",
+        "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1"
+      ],
+      "retrieve_query_used": "DocuSearch full system dense-only retrieval baseline Precision@10 Recall@10 evaluation table dataset test setting absolute relative improvement",
+      "retrieve_task": "Extract the evaluation table or passage that reports Precision@10 and Recall@10 for the full DocuSearch system and the dense-only retrieval baseline, including the values, dataset or test setting, and any stated absolute or relative improvements.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "13467912-b728-4800-b246-28dcacfb58e9",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 1.0,
+          "hits": [
+            "f65cbe13-d55f-4ce3-81c1-11a540296763",
+            "709a4be6-d86e-442e-a07e-77bf8014a69a"
+          ],
+          "misses": []
+        },
+        {
+          "k": 10,
+          "recall": 1.0,
+          "hits": [
+            "f65cbe13-d55f-4ce3-81c1-11a540296763",
+            "709a4be6-d86e-442e-a07e-77bf8014a69a"
+          ],
+          "misses": []
+        },
+        {
+          "k": 15,
+          "recall": 1.0,
+          "hits": [
+            "f65cbe13-d55f-4ce3-81c1-11a540296763",
+            "709a4be6-d86e-442e-a07e-77bf8014a69a"
+          ],
+          "misses": []
+        }
+      ]
+    },
+    {
+      "id": "q05",
+      "query": "What grounding and hallucination rates does DocuSearch achieve compared to a single-pass RAG baseline? (2609.01617)",
+      "question_type": "experimental",
+      "required_chunk_ids": [
+        "51ed7f15-1f15-4f69-93f1-748e5ba8e8eb"
+      ],
+      "delivered_ids": [
+        "51ed7f15-1f15-4f69-93f1-748e5ba8e8eb",
+        "0c65c42b-363f-4207-abc7-018af4cbe217",
+        "dfc801c9-ffe0-447f-8c9c-7e182fb8bfc3"
+      ],
+      "retrieve_query_used": "DocuSearch grounding rate hallucination rate single-pass RAG baseline metric definitions evaluation setup datasets test conditions reported results caveats",
+      "retrieve_task": "Gather the reported grounding and hallucination rates for DocuSearch and the single-pass RAG baseline, including metric definitions, evaluation setup, datasets or test conditions, and any stated differences or caveats.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "bd3f38f2-23ca-4082-95c7-d74208ac15d3",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 1.0,
+          "hits": [
+            "51ed7f15-1f15-4f69-93f1-748e5ba8e8eb"
+          ],
+          "misses": []
+        },
+        {
+          "k": 10,
+          "recall": 1.0,
+          "hits": [
+            "51ed7f15-1f15-4f69-93f1-748e5ba8e8eb"
+          ],
+          "misses": []
+        },
+        {
+          "k": 15,
+          "recall": 1.0,
+          "hits": [
+            "51ed7f15-1f15-4f69-93f1-748e5ba8e8eb"
+          ],
+          "misses": []
+        }
+      ]
+    },
+    {
+      "id": "q06",
+      "query": "According to the ablation study, which component contributes most to DocuSearch's grounding rate when removed, and which contributes least? (2609.01617)",
+      "question_type": "experimental",
+      "required_chunk_ids": [
+        "7b32bea3-a51c-46f2-bf30-bd5cdbf55dde"
+      ],
+      "delivered_ids": [
+        "2aaa7f5f-bd2d-4e45-8ecb-7a0d061083a2"
+      ],
+      "retrieve_query_used": "DocuSearch ablation study grounding rate component removal table removed components contribution",
+      "retrieve_task": "Extract the ablation table or discussion for DocuSearch, including each removed component and the resulting grounding rate, so the components with the largest and smallest contributions can be compared directly.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "f80b1c72-9617-4bf7-a93f-dbcd603a6e27",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 0.0,
+          "hits": [],
+          "misses": [
+            "7b32bea3-a51c-46f2-bf30-bd5cdbf55dde"
+          ]
+        },
+        {
+          "k": 10,
+          "recall": 0.0,
+          "hits": [],
+          "misses": [
+            "7b32bea3-a51c-46f2-bf30-bd5cdbf55dde"
+          ]
+        },
+        {
+          "k": 15,
+          "recall": 0.0,
+          "hits": [],
+          "misses": [
+            "7b32bea3-a51c-46f2-bf30-bd5cdbf55dde"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "q07",
+      "query": "What four sub-problems does the paper identify as the core challenges that standard RAG pipelines fail to handle? (2609.01617)",
+      "question_type": "conceptual",
+      "required_chunk_ids": [
+        "d5b1b8f1-1a3d-4963-8af7-3f5de0f99328"
+      ],
+      "delivered_ids": [
+        "d5b1b8f1-1a3d-4963-8af7-3f5de0f99328"
+      ],
+      "retrieve_query_used": "standard RAG pipeline four subproblems limitations distinct challenges definitions retrieval augmentation generation evidence paper terminology",
+      "retrieve_task": "Gather direct evidence from the identified paper stating and explaining the four sub-problems that standard RAG pipelines fail to handle, preserving the paper’s terminology and any surrounding distinctions or definitions.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "2449132f-d1ed-4f98-9f6f-a1ce21fc5d96",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 1.0,
+          "hits": [
+            "d5b1b8f1-1a3d-4963-8af7-3f5de0f99328"
+          ],
+          "misses": []
+        },
+        {
+          "k": 10,
+          "recall": 1.0,
+          "hits": [
+            "d5b1b8f1-1a3d-4963-8af7-3f5de0f99328"
+          ],
+          "misses": []
+        },
+        {
+          "k": 15,
+          "recall": 1.0,
+          "hits": [
+            "d5b1b8f1-1a3d-4963-8af7-3f5de0f99328"
+          ],
+          "misses": []
+        }
+      ]
+    },
+    {
+      "id": "q08",
+      "query": "What chunk size and overlap does DocuSearch use for document ingestion, and why were these particular values chosen? (2609.01617)",
+      "question_type": "methodological",
+      "required_chunk_ids": [
+        "c5222792-6a8d-47b7-9efe-da4c85caee8d"
+      ],
+      "delivered_ids": [
+        "c5222792-6a8d-47b7-9efe-da4c85caee8d"
+      ],
+      "retrieve_query_used": "DocuSearch document ingestion chunk size chunk overlap implementation settings text splitting chunking rationale retrieval performance context window",
+      "retrieve_task": "Extract the exact document-ingestion chunk size and overlap used by DocuSearch, together with the authors’ stated or directly supported reasons for selecting those values; preserve relevant implementation context and distinguish explicit explanations from inference.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "b62d2015-3827-4b42-8c71-8866d6b0d316",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 1.0,
+          "hits": [
+            "c5222792-6a8d-47b7-9efe-da4c85caee8d"
+          ],
+          "misses": []
+        },
+        {
+          "k": 10,
+          "recall": 1.0,
+          "hits": [
+            "c5222792-6a8d-47b7-9efe-da4c85caee8d"
+          ],
+          "misses": []
+        },
+        {
+          "k": 15,
+          "recall": 1.0,
+          "hits": [
+            "c5222792-6a8d-47b7-9efe-da4c85caee8d"
+          ],
+          "misses": []
+        }
+      ]
+    },
+    {
+      "id": "q09",
+      "query": "How does DocuSearch's dynamic neighbour context expansion avoid the trade-offs of simply using larger fixed chunk sizes at indexing time? (2609.01617)",
+      "question_type": "comparative",
+      "required_chunk_ids": [
+        "26684cad-6566-40b4-b020-ae6014e568cb"
+      ],
+      "delivered_ids": [
+        "26684cad-6566-40b4-b020-ae6014e568cb",
+        "dfc801c9-ffe0-447f-8c9c-7e182fb8bfc3"
+      ],
+      "retrieve_query_used": "DocuSearch dynamic neighboring-context expansion retrieval time adjacent passages surrounding context document structure neighboring chunks accuracy efficiency indexing overhead context window fixed large chunks",
+      "retrieve_task": "Gather evidence from the DocuSearch paper on how dynamic neighboring-context expansion works, what information it adds at retrieval time, and why it avoids the accuracy, efficiency, indexing, and context-size trade-offs of simply using larger fixed chunks during indexing.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "1577fca3-2683-4dca-af78-2d4725a025c3",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 1.0,
+          "hits": [
+            "26684cad-6566-40b4-b020-ae6014e568cb"
+          ],
+          "misses": []
+        },
+        {
+          "k": 10,
+          "recall": 1.0,
+          "hits": [
+            "26684cad-6566-40b4-b020-ae6014e568cb"
+          ],
+          "misses": []
+        },
+        {
+          "k": 15,
+          "recall": 1.0,
+          "hits": [
+            "26684cad-6566-40b4-b020-ae6014e568cb"
+          ],
+          "misses": []
+        }
+      ]
+    },
+    {
+      "id": "q10",
+      "query": "What is DocuSearch's mean end-to-end latency, which phase dominates that latency, and what future work does the paper propose to reduce it? (2609.01617)",
+      "question_type": "multi_hop",
+      "required_chunk_ids": [
+        "5b151f18-830f-434b-93aa-01f4cbf9fea0",
+        "094fa9f2-0503-4e79-87f5-c757f45c4335"
+      ],
+      "delivered_ids": [
+        "5b151f18-830f-434b-93aa-01f4cbf9fea0",
+        "094fa9f2-0503-4e79-87f5-c757f45c4335"
+      ],
+      "retrieve_query_used": "DocuSearch mean end-to-end latency latency breakdown dominant phase largest contribution future work reduce latency exact milliseconds",
+      "retrieve_task": "Gather evidence from the DocuSearch paper on the mean end-to-end latency, the phase that contributes most to that latency, and the paper's explicitly proposed future work for reducing latency. Preserve exact numerical values, phase names, and supporting context.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "7546e973-22cb-4041-a5b6-7bb7cd2f2c6e",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 1.0,
+          "hits": [
+            "5b151f18-830f-434b-93aa-01f4cbf9fea0",
+            "094fa9f2-0503-4e79-87f5-c757f45c4335"
+          ],
+          "misses": []
+        },
+        {
+          "k": 10,
+          "recall": 1.0,
+          "hits": [
+            "5b151f18-830f-434b-93aa-01f4cbf9fea0",
+            "094fa9f2-0503-4e79-87f5-c757f45c4335"
+          ],
+          "misses": []
+        },
+        {
+          "k": 15,
+          "recall": 1.0,
+          "hits": [
+            "5b151f18-830f-434b-93aa-01f4cbf9fea0",
+            "094fa9f2-0503-4e79-87f5-c757f45c4335"
+          ],
+          "misses": []
+        }
+      ]
+    },
+    {
+      "id": "q11",
+      "query": "How does the paper propose applying reinforcement learning to DocuSearch's retrieval pipeline, and what performance gains does it project from this approach? (2609.01617)",
+      "question_type": "multi_hop",
+      "required_chunk_ids": [
+        "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1",
+        "7cd01370-7e8d-4418-81f7-33250f7c8916",
+        "c7f0766c-4c95-4b0b-961c-c65e9adc39e4"
+      ],
+      "delivered_ids": [
+        "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1",
+        "094fa9f2-0503-4e79-87f5-c757f45c4335",
+        "7cd01370-7e8d-4418-81f7-33250f7c8916"
+      ],
+      "retrieve_query_used": "DocuSearch reinforcement learning retrieval pipeline optimization objective reward training signal retriever reranker query reformulation execution workflow performance gains quantitative comparison",
+      "retrieve_task": "Gather evidence from the identified paper on how reinforcement learning is integrated into DocuSearch's retrieval pipeline, including the optimization target, training signals or rewards, affected retrieval stages, execution workflow, and any projected performance gains or quantitative comparisons.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "b2a22728-c007-493a-9d69-ffd3ed950727",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 0.6666666666666666,
+          "hits": [
+            "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1",
+            "7cd01370-7e8d-4418-81f7-33250f7c8916"
+          ],
+          "misses": [
+            "c7f0766c-4c95-4b0b-961c-c65e9adc39e4"
+          ]
+        },
+        {
+          "k": 10,
+          "recall": 0.6666666666666666,
+          "hits": [
+            "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1",
+            "7cd01370-7e8d-4418-81f7-33250f7c8916"
+          ],
+          "misses": [
+            "c7f0766c-4c95-4b0b-961c-c65e9adc39e4"
+          ]
+        },
+        {
+          "k": 15,
+          "recall": 0.6666666666666666,
+          "hits": [
+            "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1",
+            "7cd01370-7e8d-4418-81f7-33250f7c8916"
+          ],
+          "misses": [
+            "c7f0766c-4c95-4b0b-961c-c65e9adc39e4"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "q12",
+      "query": "What core technologies does DocuSearch use for embeddings, vector storage, and LLM inference, and how does the paper connect this technology choice to data privacy in telecom operations? (2609.01617)",
+      "question_type": "multi_hop",
+      "required_chunk_ids": [
+        "b30acfdb-1218-406c-93cc-32fa4c95a3be",
+        "0c65c42b-363f-4207-abc7-018af4cbe217"
+      ],
+      "delivered_ids": [
+        "b30acfdb-1218-406c-93cc-32fa4c95a3be",
+        "dfc801c9-ffe0-447f-8c9c-7e182fb8bfc3",
+        "390228cd-f3ca-4ec1-873f-236ebfac7ee5",
+        "0c65c42b-363f-4207-abc7-018af4cbe217"
+      ],
+      "retrieve_query_used": "DocuSearch embedding model service vector database storage layer LLM inference technology data privacy confidentiality telecom operational constraints",
+      "retrieve_task": "Gather evidence from the DocuSearch paper on the specific embedding model or service, vector database or storage layer, LLM inference technology, and the paper’s explanation of how these choices support data privacy, confidentiality, or operational constraints in telecom settings.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "eedb3ef2-2f9d-4ca6-b788-22b791624fa0",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 1.0,
+          "hits": [
+            "b30acfdb-1218-406c-93cc-32fa4c95a3be",
+            "0c65c42b-363f-4207-abc7-018af4cbe217"
+          ],
+          "misses": []
+        },
+        {
+          "k": 10,
+          "recall": 1.0,
+          "hits": [
+            "b30acfdb-1218-406c-93cc-32fa4c95a3be",
+            "0c65c42b-363f-4207-abc7-018af4cbe217"
+          ],
+          "misses": []
+        },
+        {
+          "k": 15,
+          "recall": 1.0,
+          "hits": [
+            "b30acfdb-1218-406c-93cc-32fa4c95a3be",
+            "0c65c42b-363f-4207-abc7-018af4cbe217"
+          ],
+          "misses": []
+        }
+      ]
+    },
+    {
+      "id": "q13",
+      "query": "What sufficiency score threshold must a chunk clear before DocuSearch attempts to generate an answer from it, and on what scale is it scored? (2609.01617)",
+      "question_type": "factual",
+      "required_chunk_ids": [
+        "69885bfe-b65f-4153-91c5-bd16eeb63057"
+      ],
+      "delivered_ids": [
+        "69885bfe-b65f-4153-91c5-bd16eeb63057",
+        "26684cad-6566-40b4-b020-ae6014e568cb",
+        "eac58ea0-a1c9-401b-b62c-64cb2b57e3d1"
+      ],
+      "retrieve_query_used": "DocuSearch sufficiency score threshold cutoff attempt answer generation numerical scale qualification context",
+      "retrieve_task": "Extract the exact statement describing DocuSearch's sufficiency-score cutoff for attempting answer generation, including the score's numerical scale and any surrounding qualification or context.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "a19ee55e-1d63-4f97-81cf-a0c4bd4c3632",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 1.0,
+          "hits": [
+            "69885bfe-b65f-4153-91c5-bd16eeb63057"
+          ],
+          "misses": []
+        },
+        {
+          "k": 10,
+          "recall": 1.0,
+          "hits": [
+            "69885bfe-b65f-4153-91c5-bd16eeb63057"
+          ],
+          "misses": []
+        },
+        {
+          "k": 15,
+          "recall": 1.0,
+          "hits": [
+            "69885bfe-b65f-4153-91c5-bd16eeb63057"
+          ],
+          "misses": []
+        }
+      ]
+    },
+    {
+      "id": "q14",
+      "query": "How do DocuSearch's Pre-MMR and Post-MMR phases differ in purpose? (2609.01617)",
+      "question_type": "comparative",
+      "required_chunk_ids": [
+        "eac58ea0-a1c9-401b-b62c-64cb2b57e3d1"
+      ],
+      "delivered_ids": [
+        "eac58ea0-a1c9-401b-b62c-64cb2b57e3d1",
+        "bf117c2c-d607-4122-97eb-9dfc15edb7f6"
+      ],
+      "retrieve_query_used": "DocuSearch Pre-MMR Post-MMR maximum marginal relevance MMR inputs retrieval objectives candidate document sets selected outputs separation rationale",
+      "retrieve_task": "Gather evidence from the DocuSearch paper explaining what happens before and after MMR, including the inputs, objectives, candidate sets, and outputs of the Pre-MMR and Post-MMR phases, and the rationale for separating them.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "27a20a59-aabc-4959-bcd5-bdc1173f4505",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 1.0,
+          "hits": [
+            "eac58ea0-a1c9-401b-b62c-64cb2b57e3d1"
+          ],
+          "misses": []
+        },
+        {
+          "k": 10,
+          "recall": 1.0,
+          "hits": [
+            "eac58ea0-a1c9-401b-b62c-64cb2b57e3d1"
+          ],
+          "misses": []
+        },
+        {
+          "k": 15,
+          "recall": 1.0,
+          "hits": [
+            "eac58ea0-a1c9-401b-b62c-64cb2b57e3d1"
+          ],
+          "misses": []
+        }
+      ]
+    },
+    {
+      "id": "q15",
+      "query": "Tracing the DocuSearch pipeline end to end, what happens to a query from initial analysis through to final answer selection, including how the three retrieval signals are combined and how the resulting evidence is evaluated? (2609.01617)",
+      "question_type": "multi_hop",
+      "required_chunk_ids": [
+        "0f78a63a-5b1e-437c-94c5-aae927265a09",
+        "cff5d3f5-1a38-4b65-a2b1-d5db61550509",
+        "bf117c2c-d607-4122-97eb-9dfc15edb7f6",
+        "a46befae-aabc-4a11-bf4b-759c5889062b",
+        "97cbcf23-8c57-4e39-a047-b6a71085a060",
+        "69885bfe-b65f-4153-91c5-bd16eeb63057"
+      ],
+      "delivered_ids": [
+        "dfc801c9-ffe0-447f-8c9c-7e182fb8bfc3",
+        "eac58ea0-a1c9-401b-b62c-64cb2b57e3d1",
+        "390228cd-f3ca-4ec1-873f-236ebfac7ee5",
+        "bf117c2c-d607-4122-97eb-9dfc15edb7f6",
+        "26684cad-6566-40b4-b020-ae6014e568cb",
+        "5aa65b3a-22bf-4bc6-a6b3-78e3e0a35f12"
+      ],
+      "retrieve_query_used": "DocuSearch end-to-end execution flow query analysis three retrieval signals lexical semantic structural evidence fusion ranking aggregation generation answer selection evaluation metrics inputs intermediate representations algorithms limitations contradictions",
+      "retrieve_task": "Gather evidence from the DocuSearch paper covering the full execution flow from initial query analysis to final answer selection, with precise details on each of the three retrieval signals, how they are combined, how evidence is passed into generation or selection, and how the resulting evidence and answers are evaluated. Include relevant inputs, intermediate artifacts, algorithms, metrics, and any stated limitations or contradictions.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "6acf1457-8fe6-4d7e-baa3-394f482c5384",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 0.16666666666666666,
+          "hits": [
+            "bf117c2c-d607-4122-97eb-9dfc15edb7f6"
+          ],
+          "misses": [
+            "0f78a63a-5b1e-437c-94c5-aae927265a09",
+            "cff5d3f5-1a38-4b65-a2b1-d5db61550509",
+            "a46befae-aabc-4a11-bf4b-759c5889062b",
+            "97cbcf23-8c57-4e39-a047-b6a71085a060",
+            "69885bfe-b65f-4153-91c5-bd16eeb63057"
+          ]
+        },
+        {
+          "k": 10,
+          "recall": 0.16666666666666666,
+          "hits": [
+            "bf117c2c-d607-4122-97eb-9dfc15edb7f6"
+          ],
+          "misses": [
+            "0f78a63a-5b1e-437c-94c5-aae927265a09",
+            "cff5d3f5-1a38-4b65-a2b1-d5db61550509",
+            "a46befae-aabc-4a11-bf4b-759c5889062b",
+            "97cbcf23-8c57-4e39-a047-b6a71085a060",
+            "69885bfe-b65f-4153-91c5-bd16eeb63057"
+          ]
+        },
+        {
+          "k": 15,
+          "recall": 0.16666666666666666,
+          "hits": [
+            "bf117c2c-d607-4122-97eb-9dfc15edb7f6"
+          ],
+          "misses": [
+            "0f78a63a-5b1e-437c-94c5-aae927265a09",
+            "cff5d3f5-1a38-4b65-a2b1-d5db61550509",
+            "a46befae-aabc-4a11-bf4b-759c5889062b",
+            "97cbcf23-8c57-4e39-a047-b6a71085a060",
+            "69885bfe-b65f-4153-91c5-bd16eeb63057"
+          ]
+        }
+      ]
+    }
+  ],
+  "scored_at": "2026-09-11T16:52:31Z",
+  "dataset": "D:\\Cursos\\TI\\Projetos\\plan-based-researcher\\eval\\retrieve\\2609.01617v1.json"
+}

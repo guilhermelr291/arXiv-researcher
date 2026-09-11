@@ -8,11 +8,24 @@ from plan_based_researcher.graph.build import GraphDeps, build_graph
 
 
 class ResearchGraph:
-    def __init__(self, deps: GraphDeps, checkpointer: Any | None = None):
-        self._compiled = build_graph(deps, checkpointer=checkpointer)
+    def __init__(
+        self,
+        deps: GraphDeps,
+        checkpointer: Any | None = None,
+        *,
+        halt_before_writer: bool = False,
+    ):
+        self._compiled = build_graph(
+            deps,
+            checkpointer=checkpointer,
+            halt_before_writer=halt_before_writer,
+        )
 
     def astream_events(self, input, config=None, **kwargs):
         return self._compiled.astream_events(input, config, **kwargs)
+
+    def ainvoke(self, input, config=None, **kwargs):
+        return self._compiled.ainvoke(input, config, **kwargs)
 
     def initial_graph_state(self, query: str) -> dict[str, Any]:
         return {

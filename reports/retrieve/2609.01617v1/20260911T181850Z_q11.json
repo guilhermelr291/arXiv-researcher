@@ -1,0 +1,102 @@
+{
+  "arxiv_id": "2609.01617",
+  "version": "1",
+  "ks": [
+    5,
+    10,
+    15
+  ],
+  "macro": {
+    "5": 1.0,
+    "10": 1.0,
+    "15": 1.0
+  },
+  "micro": {
+    "5": 1.0,
+    "10": 1.0,
+    "15": 1.0
+  },
+  "items": [
+    {
+      "id": "q11",
+      "query": "How does the paper propose applying reinforcement learning to DocuSearch's retrieval pipeline, and what performance gains does it project from this approach? (2609.01617)",
+      "question_type": "multi_hop",
+      "required_chunk_ids": [
+        "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1",
+        "7cd01370-7e8d-4418-81f7-33250f7c8916",
+        "c7f0766c-4c95-4b0b-961c-c65e9adc39e4"
+      ],
+      "delivered_ids": [
+        "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1",
+        "094fa9f2-0503-4e79-87f5-c757f45c4335",
+        "7cd01370-7e8d-4418-81f7-33250f7c8916"
+      ],
+      "retrieve_query_used": "DocuSearch reinforcement learning retrieval pipeline optimization objective reward training signal retriever reranker query reformulation retrieval components execution flow performance improvement evaluation conditions",
+      "retrieve_task": "Gather evidence from the DocuSearch paper on how reinforcement learning is integrated into the retrieval pipeline, including the optimization target, training signals or rewards, affected retrieval components, execution flow, and all stated or projected performance gains and evaluation conditions.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "86ec88c3-48c8-4155-9c7f-08df463f4404",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 1.0,
+          "hits": [
+            "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1",
+            "7cd01370-7e8d-4418-81f7-33250f7c8916",
+            "c7f0766c-4c95-4b0b-961c-c65e9adc39e4"
+          ],
+          "misses": [],
+          "injected": [
+            {
+              "chunk_id": "c7f0766c-4c95-4b0b-961c-c65e9adc39e4",
+              "host_chunk_id": "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1",
+              "kind": "table"
+            }
+          ]
+        },
+        {
+          "k": 10,
+          "recall": 1.0,
+          "hits": [
+            "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1",
+            "7cd01370-7e8d-4418-81f7-33250f7c8916",
+            "c7f0766c-4c95-4b0b-961c-c65e9adc39e4"
+          ],
+          "misses": [],
+          "injected": [
+            {
+              "chunk_id": "c7f0766c-4c95-4b0b-961c-c65e9adc39e4",
+              "host_chunk_id": "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1",
+              "kind": "table"
+            }
+          ]
+        },
+        {
+          "k": 15,
+          "recall": 1.0,
+          "hits": [
+            "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1",
+            "7cd01370-7e8d-4418-81f7-33250f7c8916",
+            "c7f0766c-4c95-4b0b-961c-c65e9adc39e4"
+          ],
+          "misses": [],
+          "injected": [
+            {
+              "chunk_id": "c7f0766c-4c95-4b0b-961c-c65e9adc39e4",
+              "host_chunk_id": "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1",
+              "kind": "table"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scored_at": "2026-09-11T18:18:50Z",
+  "dataset": "D:\\Cursos\\TI\\Projetos\\plan-based-researcher\\eval\\retrieve\\2609.01617v1.json",
+  "item_id": "q11"
+}

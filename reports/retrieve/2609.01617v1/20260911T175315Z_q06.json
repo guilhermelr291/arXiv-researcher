@@ -1,0 +1,92 @@
+{
+  "arxiv_id": "2609.01617",
+  "version": "1",
+  "ks": [
+    5,
+    10,
+    15
+  ],
+  "macro": {
+    "5": 1.0,
+    "10": 1.0,
+    "15": 1.0
+  },
+  "micro": {
+    "5": 1.0,
+    "10": 1.0,
+    "15": 1.0
+  },
+  "items": [
+    {
+      "id": "q06",
+      "query": "According to the ablation study, which component contributes most to DocuSearch's grounding rate when removed, and which contributes least? (2609.01617)",
+      "question_type": "experimental",
+      "required_chunk_ids": [
+        "7b32bea3-a51c-46f2-bf30-bd5cdbf55dde"
+      ],
+      "delivered_ids": [
+        "2aaa7f5f-bd2d-4e45-8ecb-7a0d061083a2"
+      ],
+      "retrieve_query_used": "DocuSearch ablation study grounding rate removing each component component removal largest decrease smallest decrease",
+      "retrieve_task": "Extract the ablation table or passage from the DocuSearch paper showing the grounding rate after removing each component, including the component with the largest decrease and the component with the smallest decrease.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "e3a3c588-fa08-4951-8026-a7cd9ea856f7",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 1.0,
+          "hits": [
+            "7b32bea3-a51c-46f2-bf30-bd5cdbf55dde"
+          ],
+          "misses": [],
+          "injected": [
+            {
+              "chunk_id": "7b32bea3-a51c-46f2-bf30-bd5cdbf55dde",
+              "host_chunk_id": "2aaa7f5f-bd2d-4e45-8ecb-7a0d061083a2",
+              "kind": "table"
+            }
+          ]
+        },
+        {
+          "k": 10,
+          "recall": 1.0,
+          "hits": [
+            "7b32bea3-a51c-46f2-bf30-bd5cdbf55dde"
+          ],
+          "misses": [],
+          "injected": [
+            {
+              "chunk_id": "7b32bea3-a51c-46f2-bf30-bd5cdbf55dde",
+              "host_chunk_id": "2aaa7f5f-bd2d-4e45-8ecb-7a0d061083a2",
+              "kind": "table"
+            }
+          ]
+        },
+        {
+          "k": 15,
+          "recall": 1.0,
+          "hits": [
+            "7b32bea3-a51c-46f2-bf30-bd5cdbf55dde"
+          ],
+          "misses": [],
+          "injected": [
+            {
+              "chunk_id": "7b32bea3-a51c-46f2-bf30-bd5cdbf55dde",
+              "host_chunk_id": "2aaa7f5f-bd2d-4e45-8ecb-7a0d061083a2",
+              "kind": "table"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "scored_at": "2026-09-11T17:53:15Z",
+  "dataset": "D:\\Cursos\\TI\\Projetos\\plan-based-researcher\\eval\\retrieve\\2609.01617v1.json",
+  "item_id": "q06"
+}

@@ -1,0 +1,101 @@
+{
+  "arxiv_id": "2609.01617",
+  "version": "1",
+  "ks": [
+    5,
+    10,
+    15
+  ],
+  "macro": {
+    "5": 0.0,
+    "10": 0.16666666666666666,
+    "15": 0.16666666666666666
+  },
+  "micro": {
+    "5": 0.0,
+    "10": 0.16666666666666666,
+    "15": 0.16666666666666666
+  },
+  "items": [
+    {
+      "id": "q15",
+      "query": "Tracing the DocuSearch pipeline end to end, what happens to a query from initial analysis through to final answer selection, including how the three retrieval signals are combined and how the resulting evidence is evaluated? (2609.01617)",
+      "question_type": "multi_hop",
+      "required_chunk_ids": [
+        "0f78a63a-5b1e-437c-94c5-aae927265a09",
+        "cff5d3f5-1a38-4b65-a2b1-d5db61550509",
+        "bf117c2c-d607-4122-97eb-9dfc15edb7f6",
+        "a46befae-aabc-4a11-bf4b-759c5889062b",
+        "97cbcf23-8c57-4e39-a047-b6a71085a060",
+        "69885bfe-b65f-4153-91c5-bd16eeb63057"
+      ],
+      "delivered_ids": [
+        "eac58ea0-a1c9-401b-b62c-64cb2b57e3d1",
+        "dfc801c9-ffe0-447f-8c9c-7e182fb8bfc3",
+        "390228cd-f3ca-4ec1-873f-236ebfac7ee5",
+        "26684cad-6566-40b4-b020-ae6014e568cb",
+        "5aa65b3a-22bf-4bc6-a6b3-78e3e0a35f12",
+        "bf117c2c-d607-4122-97eb-9dfc15edb7f6"
+      ],
+      "retrieve_query_used": "DocuSearch complete query-to-answer pipeline query analysis three retrieval signals signal computation score combination evidence ranking selection evidence quality grounding evaluation final answer generation candidate answer selection algorithm inputs outputs metrics",
+      "retrieve_task": "Gather evidence from the DocuSearch paper covering the complete query-to-answer workflow: initial query analysis, the definition and computation of all three retrieval signals, their combination mechanism, evidence ranking or selection, evaluation of evidence quality or grounding, and the procedure used to produce and select the final answer. Preserve relevant algorithms, inputs, outputs, and metrics.",
+      "admitted_papers": [
+        {
+          "arxiv_id": "2609.01617",
+          "version": "1"
+        }
+      ],
+      "stop_reason": "writer_skipped",
+      "thread_id": "a00736cf-3ce4-49fd-b4ae-db128361776a",
+      "scores": [
+        {
+          "k": 5,
+          "recall": 0.0,
+          "hits": [],
+          "misses": [
+            "0f78a63a-5b1e-437c-94c5-aae927265a09",
+            "cff5d3f5-1a38-4b65-a2b1-d5db61550509",
+            "bf117c2c-d607-4122-97eb-9dfc15edb7f6",
+            "a46befae-aabc-4a11-bf4b-759c5889062b",
+            "97cbcf23-8c57-4e39-a047-b6a71085a060",
+            "69885bfe-b65f-4153-91c5-bd16eeb63057"
+          ],
+          "injected": []
+        },
+        {
+          "k": 10,
+          "recall": 0.16666666666666666,
+          "hits": [
+            "bf117c2c-d607-4122-97eb-9dfc15edb7f6"
+          ],
+          "misses": [
+            "0f78a63a-5b1e-437c-94c5-aae927265a09",
+            "cff5d3f5-1a38-4b65-a2b1-d5db61550509",
+            "a46befae-aabc-4a11-bf4b-759c5889062b",
+            "97cbcf23-8c57-4e39-a047-b6a71085a060",
+            "69885bfe-b65f-4153-91c5-bd16eeb63057"
+          ],
+          "injected": []
+        },
+        {
+          "k": 15,
+          "recall": 0.16666666666666666,
+          "hits": [
+            "bf117c2c-d607-4122-97eb-9dfc15edb7f6"
+          ],
+          "misses": [
+            "0f78a63a-5b1e-437c-94c5-aae927265a09",
+            "cff5d3f5-1a38-4b65-a2b1-d5db61550509",
+            "a46befae-aabc-4a11-bf4b-759c5889062b",
+            "97cbcf23-8c57-4e39-a047-b6a71085a060",
+            "69885bfe-b65f-4153-91c5-bd16eeb63057"
+          ],
+          "injected": []
+        }
+      ]
+    }
+  ],
+  "scored_at": "2026-09-11T18:20:17Z",
+  "dataset": "D:\\Cursos\\TI\\Projetos\\plan-based-researcher\\eval\\retrieve\\2609.01617v1.json",
+  "item_id": "q15"
+}
