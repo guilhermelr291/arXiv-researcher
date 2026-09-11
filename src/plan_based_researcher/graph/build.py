@@ -48,14 +48,19 @@ def _after_evaluate(state: GraphState) -> Literal["dispatch", "replan", "finaliz
     return "dispatch"
 
 
-def build_graph(deps: GraphDeps, checkpointer: Any | None = None):
+def build_graph(
+    deps: GraphDeps,
+    checkpointer: Any | None = None,
+    *,
+    halt_before_writer: bool = False,
+):
     """Compile gate → planner → dispatch → search|execute → evaluate → replan|finalize."""
     graph = StateGraph(GraphState)
     graph.add_node("gate", make_gate_node(deps.factory))
     graph.add_node("planner", make_planner_node(deps.factory))
     graph.add_node(
         "dispatch",
-        make_dispatch_node(),
+        make_dispatch_node(halt_before_writer=halt_before_writer),
         destinations=("search", "execute", "finalize"),
     )
     graph.add_node("search", make_search_node(deps.factory))
