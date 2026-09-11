@@ -1,7 +1,7 @@
 # Roadmap
 
-**Current Milestone:** Writer stream + RAGAS report (executed; UAT pending)  
-**Status:** `.specs/features/writer-stream-ragas/` T1–T10 executed 2026-09-08 (unittest discover 88/88). Live Independent Tests remain UAT. Spec + design + tasks still formally Draft.
+**Current Milestone:** Retrieve writer-pack recall — code-validated T1–T8 (uncommitted); live Independent Test UAT pending  
+**Status:** `.specs/features/retrieve-writer-recall/tasks.md` code-validated 2026-09-10 (T1–T8, no commits). Gate 130/130. Isolated retrieve deleted (RWR-03). Live CLI UAT unblocked (paper + qrels in Postgres). Writer-stream RAGAS live UAT still pending.
 
 ---
 
@@ -167,6 +167,25 @@
 - Writer one-shot (no `WriterEvalStrategy`)
 - Chainlit typewriter + existing `[n]` panel
 - `scripts/` RAGAS report (Faithfulness + AnswerRelevancy); contexts = Writer `evidence_chunks`
+
+---
+
+## Retrieve writer-pack recall
+
+**Goal:** Score whether required chunk ids appear in `evidence_chunks` after a **real** gate → planner → search → retrieve session (student query with pinned arXiv id). Writer does not run on the eval harness.
+**Target:** Independent Test: paper ingested, E2E CLI writes `reports/retrieve/` with no Writer execute (may be blocked by B-001).
+**Spec:** `.specs/features/retrieve-writer-recall/spec.md` (executed T1–T8 2026-09-10; live UAT pending). Isolated retrieve is out of scope.
+**Design:** Executed 2026-09-10 (AD-025).
+**Tasks:** Executed T1–T8 2026-09-10 (uncommitted).
+
+### Features
+
+**Writer-pack Recall@k (E2E)** - VALIDATED (live Independent Test pending)
+
+- Golden set: student `query` containing `arxiv_id` + `required_chunk_ids`
+- Production graph through retrieve; dispatch halt before Writer (`halt_before_writer`)
+- Reports under `reports/retrieve/`
+- Isolated `RetrieveRunner` harness: deleted, not deferred
 
 ---
 

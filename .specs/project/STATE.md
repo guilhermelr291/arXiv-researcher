@@ -1,11 +1,39 @@
 # State
 
-**Last Updated:** 2026-09-09
-**Current Work:** Feature `writer-stream-ragas` — T1–T10 verified and committed (unittest discover 88/88). Live Independent Tests remain UAT. Spec + design still formally Draft.
+**Last Updated:** 2026-09-11
+**Current Work:** Quick 022 — writer-visible recall counts expanded table/equation hits. Feature `retrieve-writer-recall` Independent Test still UAT.
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-026: Writer-visible recall counts expanded table/equation (2026-09-11)
+
+**Decision:** Product Recall@k is whether the qrel reached the Writer. A table or equation counts as a hit when `expand_hits` inlined its `content` into another packed excerpt, even if that atomic `chunk_id` is absent from `evidence_chunks`. The report annotates injected hits (qrel id, host id, kind). Prose qrels stay `chunk_id` equality.
+**Reason:** Live run `20260911T165231Z` q06 packed prose `2aaa7f5f` with `[TABLE:S8.T5]`; the Writer excerpt contained Table V, but id-only scoring was 0.000. The product question is evidence delivery, not packer slot identity.
+**Trade-off:** Packer dropping an atomic no longer lowers product recall when the body is inlined. Citation `n` still points at the host prose chunk.
+**Impact:** Quick 022. Amends `.specs/features/retrieve-writer-recall/spec.md` hit lock (AD-023/AD-024 id-equality). Scoring uses ingested chunk `kind`+`content` plus evidence `excerpt`s; scorer stays offline given that lookup.
+
+### AD-025: E2E recall halt at dispatch; delete isolated RetrieveRunner (2026-09-10)
+
+**Decision:** Approve-pending design `.specs/features/retrieve-writer-recall/design.md`. Compile the production graph with `halt_before_writer=True` only in the eval CLI. Dispatch sends leftover `writer` to `finalize` (`outcome="done"`) and never `execute`. CLI `ainvoke`s `initial_graph_state(query)` (no `ResearchExecutor`). Isolated `retrieve_eval_state` / `evaluate_writer_pack` / frozen-task schema are deleted. Dataset is `items[].query` with a mandatory `arxiv_id` substring pin. Eval compile uses `checkpointer=None`. FastAPI lifespan stays default (Writer on).
+**Reason:** Shared `execute` node cannot use `interrupt_before`. Stopping at dispatch is the last hop before Writer tokens. Isolated retrieve is cancelled (AD-024).
+**Trade-off:** `outcome="done"` on halt is not a Writer pass; the report `stop_reason=writer_skipped` disambiguates. No new `GraphState` key.
+**Impact:** Tasks executed 2026-09-10 (`tasks.md` T1–T8, uncommitted). Isolated leftover harness deleted (T7). Code validation 2026-09-10: unit AC pass; live Independent Test still UAT.
+
+### AD-024: E2E writer-pack recall; Writer off (2026-09-10)
+
+**Decision:** The product eval for “did the right chunks reach the Writer pack?” is a golden set of **student queries** that include the target arXiv id, run on the production graph through retrieve, then Recall@k on `evidence_chunks`. The eval harness SHALL NOT execute the Writer. Production `POST /research` / Chainlit still run the Writer. Isolated `RetrieveRunner` + frozen task is **out of scope** for this feature (no P2, not a follow-up).
+**Reason:** Isolated retrieve can pass while a real session fails. Keeping it as P2 would invite optimizing the wrong input later. Writer generation is out of this slice (tokens + RAGAS already covers answers).
+**Trade-off:** A miss does not by itself name the failing stage; the E2E report must include retrieve task + admitted papers. Collection is closed per item by the id in the query, not open-world arXiv.
+**Impact:** Amends `.specs/features/retrieve-writer-recall/spec.md`. Supersedes AD-023. RWR-03 cancelled. Execute of the E2E harness is pending. The isolated CLI written under AD-023 is leftover code, not part of this spec.
+
+### AD-023: Writer-pack Recall@k without the planner (2026-09-10) — SUPERSEDED as north-star by AD-024
+
+**Decision:** Offline retrieve eval calls `RetrieveRunner` with a frozen task and an already-admitted paper. Metric is Recall@k on `evidence_chunks` `chunk_id`s (`k` = 5, 10, 15). Planner, gate, search, writer, LangSmith, and arXiv-id prompt prefixes are out of this harness. Qrel ids that are missing from Postgres fail the run. No CI threshold. Dataset: `eval/retrieve/2609.01617v1.json`. Report: `reports/retrieve/`.
+**Reason:** Grill-me 2026-09-10: full plan-and-solve plus “use article id” confounds search/plan with the writer pack; planner tasks are not deterministic.
+**Trade-off:** Does not prove the planner would emit that task. Table atomics dropped by `pack_hits` count as misses even if `expand_hits` inlined the table.
+**Impact:** Spec `.specs/features/retrieve-writer-recall/spec.md`. Complements RAGAS (generation), does not replace it. **AD-024:** isolated retrieve is out of scope (not a lantern, not a later story).
 
 ### AD-022: Writer stream + offline RAGAS report (2026-09-08)
 
@@ -171,6 +199,7 @@
 **Impact:** `docker compose up` for this project's pgvector cannot bind 5432.
 **Workaround:** Temporary pgvector on 5433 for repo smoke. Stop the other container, or map compose to a free port, before API/Chainlit UAT.
 **Resolution:** Free 5432 or change this project's published port.
+**Re-check 2026-09-10:** `plan-based-researcher-postgres-1` is bound to 5432 and healthy. Retrieve Independent Test preflight succeeded (`2609.01617` v1 present, 43 chunks, 0 missing qrels). Leaving open until the occupying `hackathon2026-postgres` conflict is confirmed gone for good.
 
 ---
 
@@ -222,6 +251,7 @@
 | 019 | Planner English lock after student query so Voyage task is not Portuguese | 2026-09-06 | — | ✅ Done |
 | 020 | RAGAS report judge `max_tokens` so Faithfulness ascore is not truncated | 2026-09-09 | — | ✅ Done |
 | 021 | Persist RAGAS reasoning (NLI + generated questions) under `reports/ragas/` | 2026-09-09 | — | ✅ Done |
+| 022 | Count expanded table/equation as writer-pack recall; annotate injection | 2026-09-11 | — | ✅ Done |
 
 ---
 
@@ -318,6 +348,13 @@
 - [ ] Manual UAT: in-domain SSE `answer_delta` then `citations`, no `answer_complete`, no Writer `eval`, no `on_chat_model_*`; Chainlit typewriter + `[n]` panel; RAGAS script on one real mapped trace writes `reports/ragas/` (may be blocked by B-001)
 - [x] Atomic commits per task T1–T10 (`writer-stream-ragas`, 2026-09-09)
 - [x] Quick 021: persist RAGAS reasoning under `reports/ragas/` (2026-09-09; commit when asked)
+- [x] User requested Design for `retrieve-writer-recall` (2026-09-10; spec still formally Draft)
+- [x] User requested Tasks for `retrieve-writer-recall` (2026-09-10; spec/design still formally Draft)
+- [x] User asked to Execute `.specs/features/retrieve-writer-recall/tasks.md` (2026-09-10; no commits)
+- [x] Execute T1–T8 for `retrieve-writer-recall`; full unittest discover 130/130
+- [x] Code validation: `retrieve-writer-recall` T1–T8 (2026-09-10 verify). Gate `unittest discover -s tests` 130/130. Live Independent Test still UAT.
+- [ ] Manual UAT: run `uv run python scripts/retrieve_writer_recall.py` (paper already ingested 2026-09-10; 0 missing qrels); traces show retrieve execute and no Writer `run` / no `answer_delta`
+- [ ] Atomic commits per task T1–T8 when the user asks to commit (`retrieve-writer-recall`)
 
 ---
 
