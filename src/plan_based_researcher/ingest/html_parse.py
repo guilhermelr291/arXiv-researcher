@@ -20,7 +20,11 @@ _ARTICLE_ROOT = (
 _DISPLAYSTYLE = re.compile(r"\\displaystyle\s*")
 _EQUATION_CLASSES = frozenset({"ltx_equation", "ltx_equationgroup"})
 _ZERO_WIDTH_RULE = re.compile(r"width\s*:\s*0(\.0)?pt", re.I)
-_ACK_HEADING = re.compile(r"^(acknowledgements?|acknowledgments?)$", re.I)
+_END_MATTER_HEADING = re.compile(
+    r"^(?:(?:\d+(?:\.\d+)*|[IVXLCM]+)\.?\s+)?"
+    r"(?:acknowledgements?|acknowledgments?|contributors?)$",
+    re.I,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,26 +202,27 @@ def _drop_bibliography(root: Any) -> None:
 
 
 def _drop_frontmatter(root: Any) -> None:
-    """Remove author/thanks/email blocks and acknowledgement sections.
+    """Remove author/thanks/email blocks and end-matter people lists.
 
     Author names already live on the arXiv metadata. Body footnotes outside
-    ``div.ltx_authors`` are kept.
+    ``div.ltx_authors`` are kept. Scientific ``Contributions`` sections stay.
     """
     if not hasattr(root, "select"):
         return
     for node in list(root.select("div.ltx_authors, section.ltx_acknowledgements")):
         node.decompose()
-    _drop_acknowledgement_sections(root)
+    _drop_end_matter_heading_sections(root)
 
 
-def _drop_acknowledgement_sections(root: Any) -> None:
+def _drop_end_matter_heading_sections(root: Any) -> None:
     if not hasattr(root, "find_all"):
         return
     heading_names = ["h1", "h2", "h3", "h4", "h5", "h6"]
     for heading in list(root.find_all(heading_names)):
         if not isinstance(heading, Tag):
             continue
-        if not _ACK_HEADING.fullmatch(heading.get_text(" ", strip=True)):
+        title = " ".join(heading.get_text(" ", strip=True).split())
+        if not _END_MATTER_HEADING.fullmatch(title):
             continue
         section = heading.find_parent("section")
         if (
