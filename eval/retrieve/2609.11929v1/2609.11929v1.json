@@ -1,0 +1,142 @@
+{
+  "arxiv_id": "2609.11929",
+  "version": "1",
+  "title": "SenseNova-U1.5: Towards Native Unified Visual Intelligence",
+  "items": [
+    {
+      "id": "q01",
+      "query": "What is the architectural configuration of SenseNova-U1.5 in terms of patch size, number of layers, attention heads, and parameter count? (2609.11929)",
+      "reference_answer": "SenseNova-U1.5 uses a patch size of 32×32 with a Pre-Buffer design, native RoPE for unified spatiotemporal encoding, and a Mixture-of-Transformers architecture. It has 42 layers, 32 query heads and 8 key/value heads, head sizes of 64/32/32 for T/H/W, a hidden size of 4,096, and 8.2B parameters each for the understanding and generation branches.",
+      "required_chunk_ids": ["28e63840-7e04-46cb-a9e6-43dade95418e"],
+      "question_type": "factual"
+    },
+    {
+      "id": "q02",
+      "query": "What limitation of SenseNova-U1's visual interface motivated the architectural change in SenseNova-U1.5, and how does the new decoder design address it? (2609.11929)",
+      "reference_answer": "SenseNova-U1's lightweight visual interface reconstructed each visual token as an independent RGB patch via an MLP. This factorization prevented information exchange across neighbouring patches during final image formation, causing seams, texture discontinuities, and geometric inconsistencies at high resolutions. SenseNova-U1.5 addresses this by replacing the patch-wise MLP head with a spatially coupled decoder: backbone hidden states are restored to a 2D topology and progressively reconstructed into the full-resolution RGB image through Pixel Shuffle upsampling stages with factors of 2, 2, and 8, with 3×3 convolutions between stages that let neighbouring token regions exchange information before pixels are finalized.",
+      "required_chunk_ids": [
+        "2b7ef204-1275-4d31-b6d8-2256d082e692",
+        "04af4013-53fb-4082-8691-d94d83c96ae6",
+        "edb6b50a-2ab3-4e2f-92ad-6031558b3bda"
+      ],
+      "question_type": "multi_hop"
+    },
+    {
+      "id": "q03",
+      "query": "How does SenseNova-U1.5's near-lossless visual interface convert raw images into token sequences? (2609.11929)",
+      "reference_answer": "Two convolutional projections with GELU activations downsample the input image by factors of 16 and 2 respectively, yielding one visual token for each 32×32 image region. Two-dimensional sinusoidal positional embeddings preserve spatial coordinates, and special <img> and </img> tokens delimit individual visual blocks. Visual and textual representations are then projected into a shared hidden space and jointly processed by the unified backbone, without relying on an external visual encoder or VAE.",
+      "required_chunk_ids": ["e692844d-fbf9-4ed4-9991-cbd9ff7725e8"],
+      "question_type": "methodological"
+    },
+    {
+      "id": "q04",
+      "query": "How was the resolution-dependent noise-scale conditioning extended in SenseNova-U1.5 compared to SenseNova-U1? (2609.11929)",
+      "reference_answer": "SenseNova-U1's normalization range for resolution-dependent noise conditioning was calibrated up to 2048×2048. SenseNova-U1.5 extends this reference resolution to 4096×4096 to better support native high-resolution synthesis, normalizing the noise scale as a fraction of the value at this larger reference resolution and encoding it via a dedicated sinusoidal MLP combined with the diffusion timestep representation.",
+      "required_chunk_ids": ["e692844d-fbf9-4ed4-9991-cbd9ff7725e8"],
+      "question_type": "factual"
+    },
+    {
+      "id": "q05",
+      "query": "Explain SenseNova-U1.5's 'specialize-then-unify' strategy: why is joint RL optimization problematic, how are the specialized experts trained, and how are their capabilities finally consolidated? (2609.11929)",
+      "reference_answer": "Visual creation spans fundamentally different capabilities (aesthetics, bilingual text rendering, infographics, editing) with distinct reward signals, rollout dynamics, and optimization challenges, so jointly optimizing them in a single policy can entangle competing objectives and dilute task-specific gains. SenseNova-U1.5 therefore first trains four dedicated reinforcement-learning experts (Stage 4) for aesthetics, text rendering, infographic generation, and image editing, each with tailored data, rewards, sampling strategies, and regularization. Their complementary strengths are then consolidated (Stage 5) through multi-expert on-policy distillation: the student generates its own denoising trajectory, and at a student-generated state, timestep, and condition, it is trained to match the routed frozen expert's velocity prediction (with stop-gradient through the trajectory), transferring expert capabilities into a single unified policy while preserving their complementary strengths.",
+      "required_chunk_ids": [
+        "09e8390c-fa3d-40e6-a3e4-bf1747e1914e",
+        "96674650-eba4-446e-b7d8-b4b4be82f0b0",
+        "4002ef92-6608-4a3a-ad01-72384460596f"
+      ],
+      "question_type": "multi_hop"
+    },
+    {
+      "id": "q06",
+      "query": "What sampling strategy and key hyperparameters were used to train the aesthetic RL expert, and how did the training avoid degrading text legibility? (2609.11929)",
+      "reference_answer": "The aesthetic expert is trained by interleaving aesthetic-preference and typography data across epochs, routing samples from each partition to task-specific rewards (HPSv3++ for perceptual quality/prompt alignment, a bilingual PaddleOCR-based reward for text fidelity) to avoid mixing rewards of different scales. For each prompt, 16 candidates are generated using a 30-step trajectory with guidance scale 4.0 and timestep shift 3, using coefficients-preserving sampling (CPS) with η=0.7 for stochastic exploration. At each update, a contiguous five-step window from the first ten trajectory steps is sampled. Training uses dynamic resolutions/aspect ratios, a constant learning rate of 2×10⁻⁵, a reference-policy KL coefficient of 0.01, and freezes the final generation Transformer block, flow-matching output head, and output-normalization layer to reduce reward-induced drift.",
+      "required_chunk_ids": ["62a86737-34e9-4f86-a916-c34f2b526589"],
+      "question_type": "methodological"
+    },
+    {
+      "id": "q07",
+      "query": "What are the five dimensions of the editing reward, and how are they combined into a single scalar reward? (2609.11929)",
+      "reference_answer": "The editing reward evaluates five dimensions: (i) instruction fulfillment, (ii) edit execution quality, (iii) overall visual quality, (iv) text-editing quality (when text modification is applicable), and (v) unedited-region preservation. After normalization, the applicable scores are aggregated by taking the minimum across the applicable dimensions (a bottleneck-style aggregation). The text-editing criterion is omitted when no text modification is required, and the edit-execution score is set to zero if no requested change is visibly realized, ensuring the reward remains sensitive to the weakest aspect of each edit rather than letting strong performance in one dimension mask failures in another.",
+      "required_chunk_ids": ["87060535-eaf7-44d1-94ad-c82d93f76af1"],
+      "question_type": "methodological"
+    },
+    {
+      "id": "q08",
+      "query": "How does SenseNova-U1.5 perform on GenEval compared to SenseNova-U1, and in which sub-categories are the improvements most notable? (2609.11929)",
+      "reference_answer": "SenseNova-U1.5 achieves the best overall performance among open-source models on GenEval with an overall score of 0.92, surpassing SenseNova-U1's 0.91. The improvements are particularly clear in counting (0.93 vs 0.92), position (0.92 vs 0.91), and attribute binding (0.81 vs 0.76), while single- and two-object generation scores remain similarly strong (1.00/0.97 for U1.5 vs 1.00/0.96 for U1).",
+      "required_chunk_ids": [
+        "26e886f4-2547-4049-be01-caa20c13ddd7",
+        "9d06eb7e-d839-4af6-969e-65de0dbc2c5f"
+      ],
+      "question_type": "comparative"
+    },
+    {
+      "id": "q09",
+      "query": "What overall score did SenseNova-U1.5 achieve on DPG-Bench, and how does it compare to SenseNova-U1? (2609.11929)",
+      "reference_answer": "SenseNova-U1.5 achieves an overall score of 88.11 on DPG-Bench, placing it among the top-performing open-source models, with consistently strong results across entity, attribute, relation, and other dimensions. This improves over SenseNova-U1's overall score of 87.78, while maintaining a balanced performance profile across prompt components.",
+      "required_chunk_ids": [
+        "f191f8d7-529a-4679-aaf8-bb096ebd7fcf",
+        "2167f629-c770-4b13-80be-a3049729e027"
+      ],
+      "question_type": "comparative"
+    },
+    {
+      "id": "q10",
+      "query": "On the ImgEdit benchmark, how does SenseNova-U1.5's overall score compare to SenseNova-U1 and to leading closed-source editing models? (2609.11929)",
+      "reference_answer": "SenseNova-U1.5 achieves leading overall performance on ImgEdit with a score of 4.59, showing substantial gains over SenseNova-U1's score of 3.90, with consistent improvements across edit categories such as Add, Adjust, Replace, and Hybrid. This score also exceeds the listed closed-source models, including UniWorld-V2 (4.49) and Nano-Banana-Pro (4.37).",
+      "required_chunk_ids": [
+        "896504b4-41a0-4b1f-a525-e04158c0cdf1",
+        "b8f22319-f29b-4c5d-a2f3-fef23e5c2242"
+      ],
+      "question_type": "comparative"
+    },
+    {
+      "id": "q11",
+      "query": "How large are the image generation, image editing, and interleaved training corpora used for SenseNova-U1.5, and what are their main compositional categories? (2609.11929)",
+      "reference_answer": "The image-generation corpus adds roughly 59M additional text–image pairs collected from 78 sources beyond SenseNova-U1's data, spanning general scenes, human-centric content, objects/materials, text-rich imagery, infographics, and other domains, with about 88.2% of the effective training volume exceeding 1024² resolution and 64.4% exceeding 2048². The image-editing corpus contains approximately 38M examples split into roughly 43% general editing, 42% spatially controlled infographic editing, and 15% reference-conditioned editing (supporting up to ten reference images per example). The interleaved data corpus is dominated by lifestyle-oriented trajectories (~44%, including tutorials and picture-book narratives), followed by infographic data (~29%), video-derived sequences (~19%), and reasoning-intensive examples (~8%).",
+      "required_chunk_ids": [
+        "637a6c38-50f8-4d96-99fc-2199b803636d",
+        "033f160f-56a5-40ed-b3d0-aee8812c61e4",
+        "b87b59a7-ee39-4d9e-9f10-9515b6cca7a4"
+      ],
+      "question_type": "multi_hop"
+    },
+    {
+      "id": "q12",
+      "query": "How does chain-of-thought (CoT) reasoning affect SenseNova-U1.5's performance on RISEBench, and which edit types benefit most and least? (2609.11929)",
+      "reference_answer": "On RISEBench, SenseNova-U1.5 already outperforms evaluated open-source baselines without CoT (overall score 33.6), and explicit CoT reasoning provides a further substantial improvement, raising the overall score to 38.6. The gains are most pronounced for causal (37.8 to 52.2), logical (10.6 to 20.0), and temporal (34.1 to 38.8) edits, indicating CoT is particularly effective for transformations that must first be inferred. In contrast, spatial editing benefits less consistently (49.0 without CoT vs 42.0 with CoT), suggesting explicit reasoning is most valuable for implicit multi-step transformations rather than directly grounded edits.",
+      "required_chunk_ids": [
+        "f480bd0d-0938-441b-93cc-f6de61e0d0c4",
+        "1c1ae597-c84f-4f0a-85b6-86dab6d05c41"
+      ],
+      "question_type": "experimental"
+    },
+    {
+      "id": "q13",
+      "query": "How does the native Mixture-of-Transformers attention pattern reconcile causal language modeling with bidirectional visual processing? (2609.11929)",
+      "reference_answer": "In SenseNova-U1.5's Mixture-of-Transformers backbone, text tokens attend only to preceding context (causal), while tokens within each clean image block attend bidirectionally to capture spatial dependencies. Noise-conditioned generation tokens likewise interact bidirectionally within their own image block and attend to all preceding clean multimodal context, but the reverse path is explicitly masked so clean representations cannot access stochastic generation states. This asymmetric information flow exposes generation to rich semantic and visual context while preserving the integrity of representations used for understanding and reasoning. Understanding and generation retain separate attention projections, normalization layers, and feedforward modules, dynamically routed by token type, so shared attention serves as the interface for cross-stream communication while stream-specific parameters preserve distinct computation.",
+      "required_chunk_ids": ["edb6b50a-2ab3-4e2f-92ad-6031558b3bda"],
+      "question_type": "conceptual"
+    },
+    {
+      "id": "q14",
+      "query": "How does SenseNova-U1.5's instruction-following performance on IFEval and IFBench compare to SenseNova-U1? (2609.11929)",
+      "reference_answer": "SenseNova-U1.5 substantially improves instruction-following performance over SenseNova-U1, achieving 93.35 versus 91.13 on IFEval and 69.00 versus 67.01 on IFBench, suggesting that the visual generation and editing capabilities introduced in U1.5 do not significantly dilute its underlying language competence.",
+      "required_chunk_ids": [
+        "cf913389-1dba-4c2b-ade6-7415a5cfbbd3",
+        "d725a27a-f7ba-49bb-badd-ea11d054fb76"
+      ],
+      "question_type": "comparative"
+    },
+    {
+      "id": "q15",
+      "query": "What were the resolution ranges, training steps, and learning rates used across the three phases of Stage 1 (Generation Pre-Training), and when was the LPIPS perceptual loss introduced? (2609.11929)",
+      "reference_answer": "Stage 1 has three phases. Phase I trains on text-to-image data from 256×256 to 1024×1024 resolution for 180K steps with a constant learning rate of 2×10⁻⁴ and sequence length 8,196. Phase II extends to higher-resolution data from 512×512 to 4096×4096 for 100K steps with a constant learning rate of 1×10⁻⁴ and sequence length 20,480. Phase III introduces image-editing and interleaved-generation tasks (60% text-to-image, 30% image-editing, 10% interleaved) for 185K steps with a cosine schedule decaying from 1×10⁻⁴ to 2×10⁻⁵, maintaining sequence length 20,480. The LPIPS-based perceptual loss (weighted 0.1) is introduced beginning in Phase III and is maintained throughout the subsequent unified mid-training and supervised fine-tuning stages.",
+      "required_chunk_ids": [
+        "283c9d12-a99c-4969-995e-e5902ecf4011",
+        "4676f857-df9d-4eb0-866d-d8ebb8b3caa2"
+      ],
+      "question_type": "methodological"
+    }
+  ]
+}

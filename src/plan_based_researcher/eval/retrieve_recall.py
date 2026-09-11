@@ -32,6 +32,7 @@ __all__ = [
     "paper_report_key",
     "qrel_atoms_from_chunks",
     "recall_at_k",
+    "resolve_dataset_path",
     "report_as_dict",
     "report_from_item_runs",
     "report_markdown",
@@ -370,6 +371,22 @@ def paper_ref_from_record(paper: PaperRecord) -> dict:
         "url": paper.url,
         "categories": list(paper.categories),
     }
+
+
+def resolve_dataset_path(raw: str, *, repo_root: Path) -> Path:
+    path = Path(raw)
+    if path.is_file():
+        return path
+    stem = path.stem if path.suffix.lower() == ".json" else path.name
+    candidates = (
+        repo_root / "eval" / "retrieve" / stem / f"{stem}.json",
+        repo_root / "eval" / "retrieve" / path.name,
+        repo_root / "eval" / "retrieve" / f"{stem}.json",
+    )
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    return path
 
 
 def load_dataset(path: Path) -> RetrieveDataset:

@@ -29,6 +29,7 @@ from plan_based_researcher.eval.retrieve_recall import (
     report_from_item_runs,
     report_markdown,
     report_output_paths,
+    resolve_dataset_path,
     run_e2e_item,
 )
 from plan_based_researcher.eval.strategies import (
@@ -40,7 +41,9 @@ from plan_based_researcher.graph.research_graph import ResearchGraph
 from plan_based_researcher.repo.chunks import PgChunkRepository
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
-_DEFAULT_DATASET = _REPO_ROOT / "eval" / "retrieve" / "2609.01617v1.json"
+_DEFAULT_DATASET = (
+    _REPO_ROOT / "eval" / "retrieve" / "2609.01617v1" / "2609.01617v1.json"
+)
 _DEFAULT_OUT_DIR = _REPO_ROOT / "reports" / "retrieve"
 
 
@@ -63,8 +66,9 @@ def _parse_args() -> argparse.Namespace:
         "--dataset",
         default=str(_DEFAULT_DATASET),
         help=(
-            "Qrel JSON path, or a filename under eval/retrieve/ "
-            f"(default: {_DEFAULT_DATASET})."
+            "Qrel JSON path, or a paper key / filename under "
+            "eval/retrieve/{id}v{ver}/ (default: "
+            f"{_DEFAULT_DATASET})."
         ),
     )
     parser.add_argument(
@@ -89,7 +93,7 @@ def _parse_args() -> argparse.Namespace:
 
 
 async def _run(args: argparse.Namespace) -> None:
-    dataset_path = _resolve_dataset_path(args.dataset)
+    dataset_path = resolve_dataset_path(args.dataset, repo_root=_REPO_ROOT)
     dataset = load_dataset(dataset_path)
     try:
         dataset = filter_dataset(dataset, args.item_id)
@@ -196,16 +200,6 @@ async def _run(args: argparse.Namespace) -> None:
     if item_id:
         payload["item_id"] = item_id
     _write_report(out_dir, payload, markdown)
-
-
-def _resolve_dataset_path(raw: str) -> Path:
-    path = Path(raw)
-    if path.is_file():
-        return path
-    named = _REPO_ROOT / "eval" / "retrieve" / path.name
-    if named.is_file():
-        return named
-    return path
 
 
 def _write_report(out_dir: Path, payload: dict, markdown: str) -> Path:

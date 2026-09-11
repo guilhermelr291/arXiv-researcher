@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -17,6 +18,7 @@ from plan_based_researcher.eval.retrieve_recall import (
     report_as_dict,
     report_from_item_runs,
     report_markdown,
+    resolve_dataset_path,
     score_question,
 )
 
@@ -248,6 +250,41 @@ class ReportOutputPathsTest(unittest.TestCase):
         self.assertEqual(
             json_path,
             Path("reports/retrieve/2609.01617v1/20260911T170000Z_q02.json"),
+        )
+
+
+class ResolveDatasetPathTest(unittest.TestCase):
+    def test_nested_eval_retrieve_folder(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            nested = root / "eval" / "retrieve" / "2609.11929v1"
+            nested.mkdir(parents=True)
+            qrel = nested / "2609.11929v1.json"
+            qrel.write_text("{}", encoding="utf-8")
+            self.assertEqual(
+                resolve_dataset_path("2609.11929v1.json", repo_root=root),
+                qrel,
+            )
+            self.assertEqual(
+                resolve_dataset_path("2609.11929v1", repo_root=root),
+                qrel,
+            )
+
+    def test_existing_path_wins(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            other = root / "other.json"
+            other.write_text("{}", encoding="utf-8")
+            self.assertEqual(
+                resolve_dataset_path(str(other), repo_root=root),
+                other,
+            )
+
+    def test_missing_keeps_given_path(self) -> None:
+        missing = Path("2609.11929v1.json")
+        self.assertEqual(
+            resolve_dataset_path(str(missing), repo_root=Path("/no-such-repo")),
+            missing,
         )
 
 
