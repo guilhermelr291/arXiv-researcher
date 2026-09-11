@@ -1,0 +1,152 @@
+{
+  "arxiv_id": "2609.01617",
+  "version": "1",
+  "title": "Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search",
+  "items": [
+    {
+      "id": "q01",
+      "query": "What three retrieval signals does DocuSearch combine in its hybrid retrieval architecture? (2609.01617)",
+      "reference_answer": "DocuSearch combines dense vector retrieval over a Qdrant vector store using BGE-Large embeddings, BM25 full-text search over an SQLite FTS5 index, and Knowledge Graph (KG) neighbour expansion from a structured edge table.",
+      "required_chunk_ids": [
+        "dfc801c9-ffe0-447f-8c9c-7e182fb8bfc3"
+      ],
+      "question_type": "factual"
+    },
+    {
+      "id": "q02",
+      "query": "What weight values and smoothing constant does DocuSearch's Reciprocal Rank Fusion use for the three retrieval signals? (2609.01617)",
+      "reference_answer": "The RRF fusion uses a vector signal weight of 0.50, a BM25 weight of 0.35, and a KG weight of 0.15, together with a smoothing constant k=60.",
+      "required_chunk_ids": [
+        "4cdbb16c-3817-4bf1-963f-e41eaebe8733"
+      ],
+      "question_type": "factual"
+    },
+    {
+      "id": "q03",
+      "query": "What four sequential checks does each candidate chunk pass through in DocuSearch's per-chunk agentic evaluation loop? (2609.01617)",
+      "reference_answer": "Each chunk passes through: (1) Context Need Detection, where an LLM decides if neighbouring chunks are needed to make a fragment coherent, fetching up to L=2 levels of neighbours if so; (2) Sufficiency Scoring, where the expanded chunk must score at least τ=7 on a 1-10 scale to proceed; (3) Answer Generation, where the LLM produces a candidate answer at temperature T=0.0; and (4) Groundedness Verification, a separate LLM call confirming the answer is fully supported by the chunk before the pipeline terminates with that answer.",
+      "required_chunk_ids": [
+        "69885bfe-b65f-4153-91c5-bd16eeb63057"
+      ],
+      "question_type": "methodological"
+    },
+    {
+      "id": "q04",
+      "query": "How much does the full DocuSearch system improve Precision@10 and Recall@10 relative to the dense-only retrieval baseline? (2609.01617)",
+      "reference_answer": "Dense-only retrieval achieves P@10=0.54 and R@10=0.63, while full DocuSearch achieves P@10=0.69 and R@10=0.79, improvements of 15 and 16 percentage points respectively. The paper attributes the largest gain to Recall@10, where KG expansion consistently recovers structurally related chunks that neither dense nor BM25 retrieval surfaces on its own, particularly for troubleshooting queries.",
+      "required_chunk_ids": [
+        "f65cbe13-d55f-4ce3-81c1-11a540296763",
+        "709a4be6-d86e-442e-a07e-77bf8014a69a"
+      ],
+      "question_type": "experimental"
+    },
+    {
+      "id": "q05",
+      "query": "What grounding and hallucination rates does DocuSearch achieve compared to a single-pass RAG baseline? (2609.01617)",
+      "reference_answer": "DocuSearch achieves a grounding rate of 89.6%, versus 71.2% for single-pass RAG, an 18.4 percentage point improvement. Correspondingly, its hallucination rate drops from 21.4% to 6.8%, with the remaining 3.6% of queries handled via a fallback merge path that still produces grounded answers.",
+      "required_chunk_ids": [
+        "51ed7f15-1f15-4f69-93f1-748e5ba8e8eb"
+      ],
+      "question_type": "experimental"
+    },
+    {
+      "id": "q06",
+      "query": "According to the ablation study, which component contributes most to DocuSearch's grounding rate when removed, and which contributes least? (2609.01617)",
+      "reference_answer": "Removing groundedness verification causes the largest drop, reducing the grounding rate from 89.6% to 74.3% (15.3 points), followed by sufficiency scoring, whose removal drops it to 78.1% (11.5 points). The smallest individual contributors are vendor scoping (removal drops grounding to 86.1%, a 3.5 point loss) and KG expansion (removal drops it to 85.2%, a 4.4 point loss), though the paper notes these smaller contributions still add up meaningfully.",
+      "required_chunk_ids": [
+        "7b32bea3-a51c-46f2-bf30-bd5cdbf55dde"
+      ],
+      "question_type": "experimental"
+    },
+    {
+      "id": "q07",
+      "query": "What four sub-problems does the paper identify as the core challenges that standard RAG pipelines fail to handle? (2609.01617)",
+      "reference_answer": "The paper identifies: (1) signal incompleteness, where no single retrieval function captures all relevant chunks across semantic, lexical, and structural relevance; (2) chunk fragmentation, where a retrieved chunk in isolation is incomplete because the relevant procedure spans neighbouring chunks; (3) redundancy in evidence, where naive top-k selection returns near-duplicate chunks that waste context capacity; and (4) unverified grounding, where standard RAG generates answers without checking whether they are actually supported by the retrieved evidence.",
+      "required_chunk_ids": [
+        "d5b1b8f1-1a3d-4963-8af7-3f5de0f99328"
+      ],
+      "question_type": "conceptual"
+    },
+    {
+      "id": "q08",
+      "query": "What chunk size and overlap does DocuSearch use for document ingestion, and why were these particular values chosen? (2609.01617)",
+      "reference_answer": "Documents are chunked with a chunk size of s=900 characters and an overlap of δ=140 characters. These values were settled on after experimenting with several chunk sizes: smaller chunks hurt sufficiency scoring, while larger chunks degraded retrieval precision.",
+      "required_chunk_ids": [
+        "c5222792-6a8d-47b7-9efe-da4c85caee8d"
+      ],
+      "question_type": "methodological"
+    },
+    {
+      "id": "q09",
+      "query": "How does DocuSearch's dynamic neighbour context expansion avoid the trade-offs of simply using larger fixed chunk sizes at indexing time? (2609.01617)",
+      "reference_answer": "Rather than enlarging chunks at indexing time (which would reduce retrieval precision), DocuSearch keeps chunks small and detects fragmentation at query time: an LLM-driven Context Need Detection step in the per-chunk evaluation loop assesses whether a retrieved chunk is a fragment requiring its previous or next neighbour, and if so fetches up to L=2 levels of neighbouring chunks from the metadata database on the fly. This recovers coherent multi-step procedures without sacrificing retrieval precision through larger pre-processing chunk sizes.",
+      "required_chunk_ids": [
+        "26684cad-6566-40b4-b020-ae6014e568cb"
+      ],
+      "question_type": "comparative"
+    },
+    {
+      "id": "q10",
+      "query": "What is DocuSearch's mean end-to-end latency, which phase dominates that latency, and what future work does the paper propose to reduce it? (2609.01617)",
+      "reference_answer": "Mean end-to-end latency across 200 queries is 12.6 seconds, of which the per-chunk evaluation phase accounts for 8.4 seconds, since retrieval itself finishes in under one second. The paper considers this acceptable given the need for reliable answers, but identifies reducing evaluation latency as future work, proposing parallelising the sequential chunk-evaluation LLM calls across inference threads as a natural first step.",
+      "required_chunk_ids": [
+        "5b151f18-830f-434b-93aa-01f4cbf9fea0",
+        "094fa9f2-0503-4e79-87f5-c757f45c4335"
+      ],
+      "question_type": "multi_hop"
+    },
+    {
+      "id": "q11",
+      "query": "How does the paper propose applying reinforcement learning to DocuSearch's retrieval pipeline, and what performance gains does it project from this approach? (2609.01617)",
+      "reference_answer": "The paper proposes modelling each query-answer interaction as an episode in a Markov Decision Process, with state encoding query intent, chunks retrieved so far, reranker confidence, KG expansion status, and evidence coverage, and actions including triggering BM25, expanding KG neighbours, tightening cross-encoder top-k, fetching neighbouring chunks, or terminating retrieval. It favors off-policy Q-Learning trained offline on logged production trajectories over on-policy SARSA, since retrieval is largely deterministic, with the learned policy shadow-tested before live deployment. Under this approach, the paper projects P@10 rising from 0.69 to about 0.76 (+7pp), R@10 from 0.79 to about 0.86 (+7pp), and grounding rate from 89.6% to about 94.5% (+4.9pp), lifting the composite accuracy metric Φ from about 80.2% to about 86.4% (+6.2pp overall).",
+      "required_chunk_ids": [
+        "f5f9e1d3-fdc2-40ad-97b2-61fde705a8a1",
+        "7cd01370-7e8d-4418-81f7-33250f7c8916",
+        "c7f0766c-4c95-4b0b-961c-c65e9adc39e4"
+      ],
+      "question_type": "multi_hop"
+    },
+    {
+      "id": "q12",
+      "query": "What core technologies does DocuSearch use for embeddings, vector storage, and LLM inference, and how does the paper connect this technology choice to data privacy in telecom operations? (2609.01617)",
+      "reference_answer": "DocuSearch uses BGE-Large-EN-v1.5 for embeddings, a self-hosted Qdrant vector store, and local REST or vLLM-served Mistral models for LLM inference, running entirely without external API calls. The paper highlights that this fully local deployment matters because it enables production-quality document intelligence without sensitive network configuration data ever leaving the organisation's infrastructure, which is important in telecom operations environments.",
+      "required_chunk_ids": [
+        "b30acfdb-1218-406c-93cc-32fa4c95a3be",
+        "0c65c42b-363f-4207-abc7-018af4cbe217"
+      ],
+      "question_type": "multi_hop"
+    },
+    {
+      "id": "q13",
+      "query": "What sufficiency score threshold must a chunk clear before DocuSearch attempts to generate an answer from it, and on what scale is it scored? (2609.01617)",
+      "reference_answer": "A chunk must receive an LLM-assigned sufficiency score of at least τ=7 on a 1-to-10 scale before DocuSearch proceeds to generate an answer from it; chunks scoring below this threshold are skipped immediately.",
+      "required_chunk_ids": [
+        "69885bfe-b65f-4153-91c5-bd16eeb63057"
+      ],
+      "question_type": "factual"
+    },
+    {
+      "id": "q14",
+      "query": "How do DocuSearch's Pre-MMR and Post-MMR phases differ in purpose? (2609.01617)",
+      "reference_answer": "The Pre-MMR phase handles retrieval and selection: it classifies the query into one of five answer templates, extracts BM25 keywords, optionally scopes retrieval to a detected vendor, runs dense vector search, BM25 search, and KG expansion in parallel, then fuses results via weighted RRF, reranks with a cross-encoder, and filters with MMR to produce an evidence set. The Post-MMR phase then evaluates that evidence: each selected chunk is individually checked for context sufficiency, scored, used to generate a candidate answer, and verified for groundedness, with the first chunk clearing all checks producing the final answer, falling back to a merged multi-chunk answer if none pass.",
+      "required_chunk_ids": [
+        "eac58ea0-a1c9-401b-b62c-64cb2b57e3d1"
+      ],
+      "question_type": "comparative"
+    },
+    {
+      "id": "q15",
+      "query": "Tracing the DocuSearch pipeline end to end, what happens to a query from initial analysis through to final answer selection, including how the three retrieval signals are combined and how the resulting evidence is evaluated? (2609.01617)",
+      "reference_answer": "A query first goes through query analysis, where a Template Selection agent classifies it into one of five answer templates and a BM25 Keyword agent extracts domain terms, with optional vendor scoping. Dense vector retrieval (cosine similarity over BGE-Large embeddings in Qdrant), BM25 sparse retrieval (over the SQLite FTS5 index), and KG neighbour expansion (traversing a structured edge table) then run in parallel to produce three ranked lists. These are fused via weighted Reciprocal Rank Fusion using weights wv=0.50, wb=0.35, wkg=0.15. The fused list is reranked by a cross-encoder that jointly encodes the query and each chunk, then filtered by Maximal Marginal Relevance (λ=0.65) down to a final evidence set of 10 chunks balancing relevance and diversity. Each evidence chunk is then evaluated individually in the per-chunk agentic loop: an LLM checks whether it needs neighbouring context, scores its sufficiency, generates a candidate answer, and verifies the answer is grounded in the chunk; the first chunk to pass all checks yields the final answer, with a fallback merge of all expanded contexts used if none succeed.",
+      "required_chunk_ids": [
+        "0f78a63a-5b1e-437c-94c5-aae927265a09",
+        "cff5d3f5-1a38-4b65-a2b1-d5db61550509",
+        "bf117c2c-d607-4122-97eb-9dfc15edb7f6",
+        "a46befae-aabc-4a11-bf4b-759c5889062b",
+        "97cbcf23-8c57-4e39-a047-b6a71085a060",
+        "69885bfe-b65f-4153-91c5-bd16eeb63057"
+      ],
+      "question_type": "multi_hop"
+    }
+  ]
+}
