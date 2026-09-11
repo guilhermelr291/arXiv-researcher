@@ -1,4 +1,4 @@
-# Plan-Based Researcher
+# arXiv Researcher
 
 **A plan-based multi-agent researcher that answers AI/ML questions from arXiv only — with a gated loop, per-step evaluation, and citations you can open.**
 
