@@ -14,3 +14,4 @@ build/
 _tmp_*
 .files/
 .tlc
+.playwright
