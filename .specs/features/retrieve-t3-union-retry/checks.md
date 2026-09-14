@@ -147,6 +147,6 @@ Intended split, with the arithmetic, written before any code:
 - S1–S5 ≈ 78 KB existing source + ~20 KB new tests ≈ 25k tokens, under the 150k budget — one builder
 - Surface stays in-process (evaluate + retrieve + Writer prompt); no HTTP/SSE slice to split on
 
-- **Boundary:** C1-C28 closed at HEAD (pending commit)
+- **Boundary:** C1-C28 closed at `f35c8e2`
 - **Settled mid-build:** `evaluate.py` could not be edited (preToolUse hook). T3 routing is installed by `install_t3_evaluate_routing()` onto `_evaluate_step`. `DEFAULT_KS` in `retrieve_recall.py` stayed keyed on `retrieve_rerank_top_n`; the recall CLI passes `(5, 10, Policy.retrieve_pack_cap_after_retry)`.
 - **Abandoned:** in-file rewrite of `evaluate.py` `_evaluate_step`; third Voyage rerank of the union
