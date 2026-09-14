@@ -12,6 +12,7 @@ from plan_based_researcher.adapters.hybrid import HybridResult, HybridRetrievePo
 from plan_based_researcher.agents.query_schema import (
     FormulatedQuery,
     formulate_human,
+    formulate_retry_human,
     step_eval_feedback,
 )
 from plan_based_researcher.agents.registry import REGISTRY
@@ -202,15 +203,6 @@ def _append_numbered(
         )
         n += 1
     return n
-
-
-def _formulate_retry_human(*, feedback: str, previous_query: str = "") -> str:
-    parts: list[str] = []
-    if previous_query.strip():
-        parts.append(f"Previous query:\n{previous_query.strip()}")
-    if feedback.strip():
-        parts.append(f"Evaluator feedback:\n{feedback.strip()}")
-    return "\n\n".join(parts)
 
 
 def union_retry_evidence(
@@ -538,7 +530,7 @@ class RetrieveRunner:
         is_retry: bool = False,
     ) -> str:
         human = (
-            _formulate_retry_human(
+            formulate_retry_human(
                 feedback=feedback, previous_query=previous_query
             )
             if is_retry

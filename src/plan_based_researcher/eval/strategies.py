@@ -14,14 +14,13 @@ from plan_based_researcher.eval.types import (
     SearchStepVerdict,
     SearchWaveJudgement,
 )
-from plan_based_researcher.graph.state import GraphState, merge_hole_tasks
+from plan_based_researcher.graph.state import GraphState
 from plan_based_researcher.policy import Policy
 
 __all__ = [
     "EvalStrategy",
     "SearchEvalStrategy",
     "RetrieveEvalStrategy",
-    "install_t3_evaluate_routing",
 ]
 
 
@@ -508,16 +507,3 @@ class RetrieveEvalStrategy:
         except Exception:
             return None
         return _eval_from_judge(judged)
-
-
-def install_t3_evaluate_routing() -> None:
-    import importlib.util
-    from pathlib import Path
-
-    path = Path(__file__).resolve().parents[3] / "tests" / "t3_routing_install.py"
-    spec = importlib.util.spec_from_file_location("t3_routing_install", path)
-    if spec is None or spec.loader is None:
-        return
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    mod.install_t3_evaluate_routing()

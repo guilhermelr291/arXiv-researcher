@@ -5,11 +5,8 @@ from __future__ import annotations
 import unittest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from plan_based_researcher.eval.strategies import install_t3_evaluate_routing
 from plan_based_researcher.eval.types import EvalResult
 from plan_based_researcher.graph.nodes.evaluate import make_evaluate_node
-
-install_t3_evaluate_routing()
 
 _WRITER_MODULE = "plan_based_researcher.graph.nodes.evaluate.get_stream_writer"
 

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from plan_based_researcher.eval.strategies import install_t3_evaluate_routing
 from plan_based_researcher.graph.build import GraphDeps, build_graph
 
 
@@ -16,7 +15,6 @@ class ResearchGraph:
         *,
         halt_before_writer: bool = False,
     ):
-        install_t3_evaluate_routing()
         self._compiled = build_graph(
             deps,
             checkpointer=checkpointer,

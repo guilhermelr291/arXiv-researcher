@@ -10,13 +10,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from plan_based_researcher.adapters.hybrid import HybridResult
 from plan_based_researcher.agents.query_schema import FormulatedQuery
 from plan_based_researcher.agents.retrieve import RetrieveRunner
-from plan_based_researcher.eval.strategies import install_t3_evaluate_routing
 from plan_based_researcher.eval.types import EvalResult
 from plan_based_researcher.graph.nodes.evaluate import make_evaluate_node
 from plan_based_researcher.policy import Policy
 from plan_based_researcher.ports.chunks import ChunkRecord
-
-install_t3_evaluate_routing()
 
 _CHAT = "plan_based_researcher.agents.retrieve.ChatOpenAI"
 _SCORE = "plan_based_researcher.agents.retrieve.score_chunks"
