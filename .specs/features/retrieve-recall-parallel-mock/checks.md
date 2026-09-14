@@ -88,6 +88,6 @@ Intended split, with the arithmetic, written before any code:
 - S1–S3 ≈ `scripts/retrieve_writer_recall.py` + `eval/retrieve_recall.py` + `adapters/arxiv.py` (read) + two test modules ≈ 35 KB ≈ 9k tokens, under 150k — one builder
 - Surface stays the eval CLI; FastAPI is out of scope so no HTTP slice to split on
 
-- **Boundary:** C1-C12 closed (pending sha)
+- **Boundary:** C1-C12 closed at `a9cf032e5637c68af0c89c51f7e58d4c884e0306`
 - **Settled mid-build:** `run_e2e_items` lives in `scripts/retrieve_writer_recall.py` because `src/plan_based_researcher/eval/` writes were blocked; no Landing change
 - **Abandoned:** sibling `scripts/retrieve_item_batch.py` — extra import path for a script entrypoint
