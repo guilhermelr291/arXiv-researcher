@@ -20,21 +20,31 @@ Needs Docker Postgres (`docker compose up -d`), `OPENAI_API_KEY`, and `VOYAGE_AP
 
 Live eval (not the unit gate): `uv run python scripts/retrieve_writer_recall.py` → `reports/retrieve/`; `uv run python scripts/ragas_writer_report.py` → `reports/ragas/`. After an embedding-width change: `uv run python scripts/wipe_paper_chunks.py --yes` then restart (schema is CREATE-only). Cached UAT: `MOCK_ARXIV_ID` in `.env`.
 
+
+## Git
+
+Branches: `feat/<slug>` (kebab-case). Match `.specs/features/<slug>` when the work has a feature folder. Do not use a bare slug (`retrieve-t3-union-retry`).
+
+Commits and push only after the user has reviewed the diff and asked. Finishing a task, a green test run, or tlc-spec-lean **build** does not authorize a commit — that skill's commit step is deferred here. When the user does ask, Conventional Commits (`type(scope): description`). Read-only git (`status`, `diff`, `log`) is always fine.
+
+
 ## Where to change what
 
-| Concern | Path |
-| --- | --- |
-| Graph compile, nodes, state | `src/plan_based_researcher/graph/` |
-| Agent prompts and runners | `src/plan_based_researcher/agents/` |
-| Caps, allowlist, grounding, hole rule | `policy.py` — do not copy into prompts |
-| arXiv, hybrid, Voyage | `adapters/` implementing `ports/` |
-| HTML parse, chunks, pack, expand, rerank cut | `ingest/` |
-| Search/retrieve eval, writer-pack recall | `eval/` |
-| SSE product API | `api/` — `ResearchExecutor` is the only production iterator |
-| Chainlit | `ui/` — HTTP only |
-| pgvector | `repo/` |
-| Feature specs | `.specs/features/<name>/{spec,design,tasks}.md` |
-| Quick tasks | `.specs/quick/` |
+
+| Concern                                      | Path                                                        |
+| -------------------------------------------- | ----------------------------------------------------------- |
+| Graph compile, nodes, state                  | `src/plan_based_researcher/graph/`                          |
+| Agent prompts and runners                    | `src/plan_based_researcher/agents/`                         |
+| Caps, allowlist, grounding, hole rule        | `policy.py` — do not copy into prompts                      |
+| arXiv, hybrid, Voyage                        | `adapters/` implementing `ports/`                           |
+| HTML parse, chunks, pack, expand, rerank cut | `ingest/`                                                   |
+| Search/retrieve eval, writer-pack recall     | `eval/`                                                     |
+| SSE product API                              | `api/` — `ResearchExecutor` is the only production iterator |
+| Chainlit                                     | `ui/` — HTTP only                                           |
+| pgvector                                     | `repo/`                                                     |
+| Feature specs                                | `.specs/features/<name>/{spec,design,tasks}.md`             |
+| Quick tasks                                  | `.specs/quick/`                                             |
+
 
 Python ≥ 3.12, package `plan_based_researcher` under `src/`. `from __future__ import annotations`. Records: frozen dataclasses with `slots=True`.
 
@@ -47,7 +57,7 @@ Python ≥ 3.12, package `plan_based_researcher` under `src/`. `from __future__ 
 5. **English internals.** Plan `task`/`reasoning`, eval `feedback`, and search/retrieve/rerank queries stay English even when the student asks in Portuguese. Writer (and gate `reason`) follow the query language. Locks: `tests/test_internal_english.py`.
 6. **Grounding.** Every technical claim needs a real `[n]` from packed chunks. Announce missing topics; never fill from model weights. Writer is one-shot: no Writer eval or retry.
 7. **Retrieve path.** HTML ingest on cache miss `(arxiv_id, version)` → hybrid first-stage per paper → Voyage `rerank-3` on the English retrieve task → `cut_reranked` → `pack_hits` → `expand_hits`. One usable paper per search topic. Tables and display equations stay atomic.
-8. **`halt_before_writer`** is eval-CLI only. FastAPI lifespan compiles with Writer on and a Postgres checkpointer. Do not DROP chunks on boot.
+8. `**halt_before_writer`** is eval-CLI only. FastAPI lifespan compiles with Writer on and a Postgres checkpointer. Do not DROP chunks on boot.
 9. **SSE.** Production consume path is `astream_events` v2 + `StreamDispatcher`. Routes do not call `astream(`.
 10. **Search ranking.** The search runner does not pick a paper. Consecutive search steps fan out with `Send`; the wave judge at eval ranks titles+abstracts.
 

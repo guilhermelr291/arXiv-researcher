@@ -7,8 +7,10 @@ import asyncio
 import json
 import sys
 import uuid
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 from psycopg.rows import dict_row
 from psycopg_pool import AsyncConnectionPool
@@ -20,9 +22,11 @@ from plan_based_researcher.agents.factory import AgentFactory
 from plan_based_researcher.config import Settings
 from plan_based_researcher.eval.retrieve_recall import (
     ItemRun,
+    RetrieveItem,
     filter_dataset,
     load_dataset,
     missing_qrel_ids,
+    paper_report_key,
     qrel_atoms_from_chunks,
     report_as_dict,
     report_from_item_runs,
@@ -45,6 +49,54 @@ _DEFAULT_DATASET = (
     _REPO_ROOT / "eval" / "retrieve" / "2609.01617v1" / "2609.01617v1.json"
 )
 _DEFAULT_OUT_DIR = _REPO_ROOT / "reports" / "retrieve"
+
+
+def _error_item_run(*, query: str, thread_id: str) -> ItemRun:
+    return ItemRun(
+        query=query,
+        thread_id=thread_id,
+        outcome="",
+        stop_reason="error",
+        evidence_chunks=[],
+        retrieve_query_used="",
+        retrieve_task="",
+        admitted_papers=(),
+        plan=[],
+    )
+
+
+async def run_e2e_items(
+    graph: Any,
+    items: Sequence[RetrieveItem],
+    *,
+    timeout_seconds: float,
+) -> list[ItemRun]:
+    semaphore = asyncio.Semaphore(5)
+
+    async def _run_one(item: RetrieveItem) -> ItemRun:
+        async with semaphore:
+            thread_id = str(uuid.uuid4())
+            try:
+                return await run_e2e_item(
+                    graph,
+                    query=item.query,
+                    thread_id=thread_id,
+                    timeout_seconds=timeout_seconds,
+                )
+            except Exception:
+                return _error_item_run(query=item.query, thread_id=thread_id)
+
+    gathered = await asyncio.gather(
+        *(_run_one(item) for item in items),
+        return_exceptions=True,
+    )
+    runs: list[ItemRun] = []
+    for item, result in zip(items, gathered, strict=True):
+        if isinstance(result, ItemRun):
+            runs.append(result)
+        else:
+            runs.append(_error_item_run(query=item.query, thread_id=""))
+    return runs
 
 
 def main() -> None:
@@ -104,6 +156,7 @@ async def _run(args: argparse.Namespace) -> None:
     pool = AsyncConnectionPool(
         conninfo=settings.database_url,
         kwargs={"autocommit": True, "row_factory": dict_row},
+        max_size=5,
         open=False,
     )
     await pool.open()
@@ -137,7 +190,9 @@ async def _run(args: argparse.Namespace) -> None:
             raise SystemExit(2)
 
         embeddings = VoyageEmbeddingAdapter(api_key=settings.voyage_api_key)
-        papers = ArxivPaperAdapter(mock_arxiv_id=settings.mock_arxiv_id or None)
+        papers = ArxivPaperAdapter(
+            mock_arxiv_id=paper_report_key(dataset.arxiv_id, dataset.version)
+        )
         hybrid = HybridRetrieveAdapter(repo, embeddings)
         factory = AgentFactory(
             papers,
@@ -153,32 +208,11 @@ async def _run(args: argparse.Namespace) -> None:
             retrieve_eval=RetrieveEvalStrategy(api_key=settings.openai_api_key),
         )
         graph = ResearchGraph(deps, checkpointer=None, halt_before_writer=True)
-        runs: list[ItemRun] = []
-        for item in dataset.items:
-            thread_id = str(uuid.uuid4())
-            try:
-                run = await run_e2e_item(
-                    graph,
-                    query=item.query,
-                    thread_id=thread_id,
-                    timeout_seconds=settings.research_timeout_seconds,
-                )
-            except Exception:
-                runs.append(
-                    ItemRun(
-                        query=item.query,
-                        thread_id=thread_id,
-                        outcome="",
-                        stop_reason="error",
-                        evidence_chunks=[],
-                        retrieve_query_used="",
-                        retrieve_task="",
-                        admitted_papers=(),
-                        plan=[],
-                    )
-                )
-            else:
-                runs.append(run)
+        runs = await run_e2e_items(
+            graph,
+            dataset.items,
+            timeout_seconds=settings.research_timeout_seconds,
+        )
         report = report_from_item_runs(
             dataset,
             runs,
