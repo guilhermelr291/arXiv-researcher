@@ -3,23 +3,25 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Protocol
+from typing import Literal, Protocol
 
 from langchain_openai import ChatOpenAI
 
 from plan_based_researcher.agents.registry import REGISTRY
 from plan_based_researcher.eval.types import (
     EvalResult,
+    RetrieveJudgeVerdict,
     SearchStepVerdict,
     SearchWaveJudgement,
 )
-from plan_based_researcher.graph.state import GraphState
+from plan_based_researcher.graph.state import GraphState, merge_hole_tasks
 from plan_based_researcher.policy import Policy
 
 __all__ = [
     "EvalStrategy",
     "SearchEvalStrategy",
     "RetrieveEvalStrategy",
+    "install_t3_evaluate_routing",
 ]
 
 
@@ -81,7 +83,7 @@ def _search_checklist() -> str:
         "Do not emit arxiv_id strings. Do not reuse another step's indexes.\n"
         f"Allowed categories: {categories}. "
         f"Recency: within Policy.recency_years={Policy.recency_years} unless the step is historical.\n"
-        "Set plan_inadequate if the task cannot succeed (e.g. no suitable papers for a named topic).\n"
+        "Set plan_inadequate=true if the task cannot succeed (e.g. no suitable papers for a named topic).\n"
         "Deterministic notes are facts: empty hits, none allowlisted, or none in recency "
         "means that step cannot pass."
     )
@@ -90,27 +92,42 @@ def _search_checklist() -> str:
 def _retrieve_checklist() -> str:
     return (
         "Evaluate retrieve evidence against the student query first, then the "
-        "retrieve task. Write feedback in English, even when the student query "
-        "is not English.\n"
+        "retrieve task. Write reasoning, likely_in_paper, and feedback in English, "
+        "even when the student query is not English.\n"
+        "Emit fields in this order: reasoning, likely_in_paper, feedback. "
+        "likely_in_paper must be exactly one of: na, yes, no, unknown. "
+        "Do not emit a field named gap_query.\n"
         "Chunks must be numbered [n] and come only from already-admitted papers.\n"
-        "Pass when the keep-set is enough to answer the student query's core "
-        "request (the method, pipeline, or comparison they asked for), even if a "
-        "long retrieve task lists extra facets (experimental protocol, prompt "
-        "templates, annotation procedure, every baseline, every limitation) that "
-        "are only sketched or missing from [n]. The writer will state holes.\n"
+        "likely_in_paper=na when the keep-set is enough to answer the student "
+        "query's core request (the method, pipeline, or comparison they asked for), "
+        "even if a long retrieve task lists extra facets. feedback is one short "
+        "English sentence that no gap remains. Do not retry.\n"
+        "likely_in_paper=yes when a listed facet is likely in the same admitted HTML "
+        "but missing from the keep-set and is needed for that core request. "
+        "feedback is the English subquery of that gap only. Do not recite [n] "
+        "labels, keep-set sizes, or numbers copied from current chunks.\n"
+        "likely_in_paper=no when a listed facet is absent from the admitted paper. "
+        "likely_in_paper=unknown when you cannot tell or will not hunt it. "
+        "For no and unknown, feedback is the English facet of the hole. The writer "
+        "will announce the hole. Do not flag the plan as inadequate because a listed "
+        "facet is not in the admitted paper.\n"
         "Do not retry the retrieve query to hunt extra subsections, metrics "
-        "tables, or caveats when that core is already evidenced with [n].\n"
-        "Retry only when the keep-set is off-topic for the student query "
-        "(wrong aspect or unrelated sections) or when chunks are empty/foreign "
-        "(deterministic checks).\n"
-        "Set plan_inadequate=true when a listed facet cannot be satisfied "
-        "because it is not in the admitted paper — not because the current [n] "
-        "list omitted a chunk that is likely in the same HTML. If unsure whether "
-        "the paper contains it, pass if the core student request is covered; "
-        "do not retry.\n"
-        "A T3 query miss is a retrieve query rewrite on the same papers, "
-        "not a new HTML walk.\n"
-        "Return status pass, retry, or fail with feedback."
+        "tables, or caveats when that core is already evidenced.\n"
+        "A T3 empty or foreign pack is a retrieve query rewrite on the same papers, "
+        "not a new HTML walk."
+    )
+
+
+def _eval_from_judge(judged: RetrieveJudgeVerdict) -> EvalResult:
+    status: Literal["pass", "retry", "fail"] = (
+        "retry" if judged.likely_in_paper == "yes" else "pass"
+    )
+    return EvalResult(
+        status=status,
+        reasoning=judged.reasoning,
+        likely_in_paper=judged.likely_in_paper,
+        feedback=judged.feedback,
+        plan_inadequate=False,
     )
 
 
@@ -388,7 +405,7 @@ class RetrieveEvalStrategy:
         if api_key is not None:
             self._judge = ChatOpenAI(
                 model=REGISTRY["planner"].model, api_key=api_key
-            ).with_structured_output(EvalResult, method="json_schema")
+            ).with_structured_output(RetrieveJudgeVerdict, method="json_schema")
 
     async def evaluate(self, state: GraphState | dict) -> EvalResult:
         data = _as_state(state)
@@ -470,7 +487,7 @@ class RetrieveEvalStrategy:
                     (
                         "system",
                         "You evaluate retrieved evidence chunks. "
-                        "Return status pass, retry, or fail with English feedback.\n"
+                        "Return reasoning, likely_in_paper, and English feedback.\n"
                         f"{_retrieve_checklist()}",
                     ),
                     (
@@ -484,9 +501,23 @@ class RetrieveEvalStrategy:
             )
         except Exception:
             return None
-        if isinstance(result, EvalResult):
-            return result
+        if isinstance(result, RetrieveJudgeVerdict):
+            return _eval_from_judge(result)
         try:
-            return EvalResult.model_validate(result)
+            judged = RetrieveJudgeVerdict.model_validate(result)
         except Exception:
             return None
+        return _eval_from_judge(judged)
+
+
+def install_t3_evaluate_routing() -> None:
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[3] / "tests" / "t3_routing_install.py"
+    spec = importlib.util.spec_from_file_location("t3_routing_install", path)
+    if spec is None or spec.loader is None:
+        return
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    mod.install_t3_evaluate_routing()

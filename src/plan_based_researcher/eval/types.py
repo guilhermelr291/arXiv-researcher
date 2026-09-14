@@ -9,8 +9,23 @@ HitIndex = Annotated[int, Field(ge=0, le=Policy.search_max_results - 1)]
 
 class EvalResult(BaseModel):
     status: Literal["pass", "retry", "fail"]
+    reasoning: str = Field(default="", description="English evaluator reasoning.")
+    likely_in_paper: str = Field(
+        default="",
+        description=(
+            "Retrieve T3: na, yes, no, or unknown. Empty is resolved from status."
+        ),
+    )
     feedback: str = Field(description="English evaluator feedback.")
     plan_inadequate: bool = False
+
+
+class RetrieveJudgeVerdict(BaseModel):
+    reasoning: str = Field(description="English reasoning.")
+    likely_in_paper: Literal["na", "yes", "no", "unknown"] = Field(
+        description="na, yes, no, or unknown."
+    )
+    feedback: str = Field(description="English evaluator feedback.")
 
 
 class PaperKey(BaseModel):

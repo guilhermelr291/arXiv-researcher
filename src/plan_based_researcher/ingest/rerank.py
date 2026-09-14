@@ -34,7 +34,7 @@ def build_rerank_query(task: str, feedback: str) -> str:
     task = task.strip()
     feedback = feedback.strip()
     if feedback:
-        return f"{task}\n\n{feedback}"
+        return feedback
     return task
 
 

@@ -19,7 +19,6 @@ from plan_based_researcher.adapters.voyage_embeddings import VoyageEmbeddingAdap
 from plan_based_researcher.agents.factory import AgentFactory
 from plan_based_researcher.config import Settings
 from plan_based_researcher.eval.retrieve_recall import (
-    DEFAULT_KS,
     ItemRun,
     filter_dataset,
     load_dataset,
@@ -38,6 +37,7 @@ from plan_based_researcher.eval.strategies import (
 )
 from plan_based_researcher.graph.build import GraphDeps
 from plan_based_researcher.graph.research_graph import ResearchGraph
+from plan_based_researcher.policy import Policy
 from plan_based_researcher.repo.chunks import PgChunkRepository
 
 _REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -182,7 +182,7 @@ async def _run(args: argparse.Namespace) -> None:
         report = report_from_item_runs(
             dataset,
             runs,
-            ks=DEFAULT_KS,
+            ks=(5, 10, Policy.retrieve_pack_cap_after_retry),
             qrel_atoms=qrel_atoms_from_chunks(stored),
         )
     finally:

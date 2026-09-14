@@ -49,7 +49,20 @@ class InternalEnglishLocksTest(unittest.TestCase):
         self.assertIn("in English", _retrieve_checklist())
         self.assertIn("student query first", _retrieve_checklist())
         self.assertIn("Do not retry the retrieve query", _retrieve_checklist())
-        self.assertIn("plan_inadequate=true", _retrieve_checklist())
+        self.assertIn("plan_inadequate=true", _search_checklist())
+
+    def test_retrieve_checklist_no_plan_inadequate_for_paper_facet(self) -> None:
+        self.assertNotIn("plan_inadequate", _retrieve_checklist())
+
+    def test_retrieve_checklist_yes_feedback_is_subquery(self) -> None:
+        text = _retrieve_checklist()
+        self.assertIn("English subquery", text)
+        self.assertIn("Do not recite [n]", text)
+        self.assertIn("keep-set sizes", text)
+        self.assertIn("numbers copied from current chunks", text)
+
+    def test_retrieve_checklist_hole_feedback_is_facet(self) -> None:
+        self.assertIn("English facet of the hole", _retrieve_checklist())
 
 
 if __name__ == "__main__":
