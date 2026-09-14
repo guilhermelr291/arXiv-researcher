@@ -12,6 +12,7 @@ from plan_based_researcher.adapters.hybrid import HybridResult, HybridRetrievePo
 from plan_based_researcher.agents.query_schema import (
     FormulatedQuery,
     formulate_human,
+    formulate_retry_human,
     step_eval_feedback,
 )
 from plan_based_researcher.agents.registry import REGISTRY
@@ -204,6 +205,33 @@ def _append_numbered(
     return n
 
 
+def union_retry_evidence(
+    first_pack: list[dict],
+    retry_numbered: list[dict],
+    *,
+    add_cap: int,
+    pack_cap: int,
+) -> list[dict]:
+    pinned = [dict(row) for row in first_pack]
+    seen = {str(row.get("chunk_id") or "") for row in pinned}
+    seen.discard("")
+    added = 0
+    n = len(pinned) + 1
+    for row in retry_numbered:
+        if added >= add_cap or len(pinned) >= pack_cap:
+            break
+        cid = str(row.get("chunk_id") or "")
+        if not cid or cid in seen:
+            continue
+        seen.add(cid)
+        extra = dict(row)
+        extra["n"] = n
+        pinned.append(extra)
+        n += 1
+        added += 1
+    return pinned
+
+
 class RetrieveRunner:
     def __init__(
         self,
@@ -235,6 +263,7 @@ class RetrieveRunner:
         previous_query = str(state.get("retrieve_query_used") or "").strip()
 
         retry = _retry_count(state, retrieve_index)
+        is_retry = retry > 0
         passed_search_indices = _passed_search_indices(state)
 
         newly_admitted: list[dict] = []
@@ -341,18 +370,36 @@ class RetrieveRunner:
             return result
 
         query = await self._formulate_query(
-            task, feedback=feedback, previous_query=previous_query
+            task,
+            feedback=feedback,
+            previous_query=previous_query,
+            is_retry=is_retry,
         )
-        rerank_query = build_rerank_query(task, feedback)
+        hybrid_query = feedback.strip() if is_retry else query
+        rerank_query = (
+            build_rerank_query("", feedback)
+            if is_retry
+            else build_rerank_query(task, feedback)
+        )
+        first_stage_k = (
+            Policy.retrieve_retry_first_stage_k
+            if is_retry
+            else Policy.retrieve_first_stage_k
+        )
+        top_n = (
+            Policy.retrieve_retry_add_cap
+            if is_retry
+            else Policy.retrieve_rerank_top_n
+        )
         per_paper: list[HybridResult] = []
         for paper in merged:
             if not isinstance(paper, dict):
                 continue
             per_paper.append(
                 await self._hybrid.retrieve(
-                    query,
+                    hybrid_query,
                     [(paper["arxiv_id"], paper["version"])],
-                    k=Policy.retrieve_first_stage_k,
+                    k=first_stage_k,
                 )
             )
 
@@ -403,7 +450,7 @@ class RetrieveRunner:
                     error_msg = str(exc)
                     for result_i in per_paper:
                         packed = pack_hits(
-                            result_i.ranked, k=Policy.retrieve_rerank_top_n
+                            result_i.ranked, k=top_n
                         )
                         if not packed:
                             continue
@@ -419,7 +466,7 @@ class RetrieveRunner:
                         pairs.sort(key=lambda item: item[1], reverse=True)
                         cut = cut_reranked(
                             pairs,
-                            top_n=Policy.retrieve_rerank_top_n,
+                            top_n=top_n,
                             margin=Policy.retrieve_rerank_margin,
                             floor=Policy.retrieve_rerank_floor,
                         )
@@ -449,6 +496,14 @@ class RetrieveRunner:
                     outputs["error"] = error_msg
                 rerank_run.end(outputs=outputs)
 
+        if is_retry:
+            numbered = union_retry_evidence(
+                list(state.get("evidence_chunks") or []),
+                numbered,
+                add_cap=Policy.retrieve_retry_add_cap,
+                pack_cap=Policy.retrieve_pack_cap_after_retry,
+            )
+
         if walked and gap_step_indices:
             case = "t2a"
         else:
@@ -456,7 +511,7 @@ class RetrieveRunner:
 
         result = {
             "evidence_chunks": numbered,
-            "retrieve_query_used": query,
+            "retrieve_query_used": hybrid_query,
             "last_agent": "retrieve",
             "pgvector": "miss" if any_miss else "hit",
             "retrieve_ingest": {**ingest, "case": case},
@@ -472,17 +527,25 @@ class RetrieveRunner:
         *,
         feedback: str,
         previous_query: str,
+        is_retry: bool = False,
     ) -> str:
+        human = (
+            formulate_retry_human(
+                feedback=feedback, previous_query=previous_query
+            )
+            if is_retry
+            else formulate_human(
+                task=task,
+                feedback=feedback,
+                previous_query=previous_query,
+            )
+        )
         formulated = await self._formulate.ainvoke(
             [
                 ("system", _FORMULATE_SYSTEM),
                 (
                     "human",
-                    formulate_human(
-                        task=task,
-                        feedback=feedback,
-                        previous_query=previous_query,
-                    ),
+                    human,
                 ),
             ]
         )

@@ -4,7 +4,12 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-__all__ = ["FormulatedQuery", "formulate_human", "step_eval_feedback"]
+__all__ = [
+    "FormulatedQuery",
+    "formulate_human",
+    "formulate_retry_human",
+    "step_eval_feedback",
+]
 
 
 class FormulatedQuery(BaseModel):
@@ -52,4 +57,13 @@ def formulate_human(
         parts.append(f"Previous query:\n{previous_query}")
     if feedback:
         parts.append(f"Evaluator feedback:\n{feedback}")
+    return "\n\n".join(parts)
+
+
+def formulate_retry_human(*, feedback: str, previous_query: str = "") -> str:
+    parts: list[str] = []
+    if previous_query.strip():
+        parts.append(f"Previous query:\n{previous_query.strip()}")
+    if feedback.strip():
+        parts.append(f"Evaluator feedback:\n{feedback.strip()}")
     return "\n\n".join(parts)

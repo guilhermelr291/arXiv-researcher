@@ -1,5 +1,3 @@
-"""Evaluate node: wave vs step eval, admit, retry, replan (LOOP-01–05, SEARCH-01–02, CAP-02, WRITE-01, RETR-04)."""
-
 from __future__ import annotations
 
 from typing import Literal
@@ -13,12 +11,13 @@ from plan_based_researcher.eval.strategies import (
 )
 from plan_based_researcher.eval.types import EvalResult
 from plan_based_researcher.graph.nodes.dispatch import search_wave_indices
-from plan_based_researcher.graph.state import GraphState
+from plan_based_researcher.graph.state import GraphState, merge_hole_tasks
 from plan_based_researcher.policy import Policy
 
 __all__ = ["make_evaluate_node"]
 
 _Status = Literal["pass", "retry", "fail"]
+_LIKELY = frozenset({"na", "yes", "no", "unknown"})
 
 
 def _step_index(state: GraphState) -> int:
@@ -105,11 +104,16 @@ def _last_eval(
     feedback: str,
     plan_inadequate: bool,
     step_index: int,
+    *,
+    likely_in_paper: str = "",
+    reasoning: str = "",
 ) -> dict:
     dump = EvalResult(
         status=status,
         feedback=feedback,
         plan_inadequate=plan_inadequate,
+        likely_in_paper=likely_in_paper,
+        reasoning=reasoning,
     ).model_dump()
     dump["step_index"] = step_index
     return dump
@@ -158,7 +162,6 @@ def _apply_max_steps(state: GraphState, update: dict) -> dict:
 
 
 def _retry_status(retry_counts: dict, index: int) -> tuple[_Status, bool, bool]:
-    """Increment-then-`>` cap. Returns status, need_replan, need_retry."""
     key = str(index)
     new_count = int(retry_counts.get(key, 0) or 0) + 1
     retry_counts[key] = new_count
@@ -182,8 +185,7 @@ def _chunk_key(chunk: dict) -> tuple[str, str] | None:
     return (str(aid), str(version if version is not None else ""))
 
 
-def _t3_query_miss(state: GraphState, result: EvalResult) -> bool:
-    """Empty chunks, foreign chunk, or off-task (not paper-set inadequate)."""
+def _t3_unusable_chunks(state: GraphState) -> bool:
     chunks = state.get("evidence_chunks") or []
     if not isinstance(chunks, list) or not chunks:
         return True
@@ -194,7 +196,10 @@ def _t3_query_miss(state: GraphState, result: EvalResult) -> bool:
             if isinstance(paper, dict) and paper.get("arxiv_id"):
                 version = paper.get("version")
                 admitted.add(
-                    (str(paper["arxiv_id"]), str(version if version is not None else ""))
+                    (
+                        str(paper["arxiv_id"]),
+                        str(version if version is not None else ""),
+                    )
                 )
     for chunk in chunks:
         if not isinstance(chunk, dict):
@@ -202,9 +207,26 @@ def _t3_query_miss(state: GraphState, result: EvalResult) -> bool:
         key = _chunk_key(chunk)
         if key is None or key not in admitted:
             return True
-    if result.plan_inadequate:
-        return False
-    return True
+    return False
+
+
+def _resolve_likely_in_paper(result: EvalResult) -> str:
+    raw = str(result.likely_in_paper or "").strip().lower()
+    if raw in _LIKELY:
+        return raw
+    if result.status == "pass":
+        return "na"
+    return "unknown"
+
+
+def _t3_retry_or_hole(
+    retry_counts: dict, idx: int
+) -> tuple[_Status, bool, bool, bool]:
+    used = int(retry_counts.get(str(idx), 0) or 0)
+    if used >= Policy.max_retries_per_step:
+        return "pass", False, False, True
+    retry_counts[str(idx)] = used + 1
+    return "retry", False, True, False
 
 
 def make_evaluate_node(
@@ -343,19 +365,33 @@ def _evaluate_step(
     need_replan = False
     need_retry = False
     writer_just_passed = False
+    append_gap_hole = False
+    t3 = agent == "retrieve" and _retrieve_case(state) == "t3"
+    plan_inadequate = False if t3 else bool(result.plan_inadequate)
+    likely_in_paper = _resolve_likely_in_paper(result) if t3 else ""
 
-    if result.status == "pass":
-        status: _Status = "pass"
+    if t3:
+        if _t3_unusable_chunks(state):
+            status, need_replan, need_retry, append_gap_hole = _t3_retry_or_hole(
+                retry_counts, idx
+            )
+        elif likely_in_paper == "na":
+            status = "pass"
+        elif likely_in_paper == "yes":
+            status, need_replan, need_retry, append_gap_hole = _t3_retry_or_hole(
+                retry_counts, idx
+            )
+        else:
+            status = "pass"
+            append_gap_hole = True
+        if status == "pass" and idx not in passed_steps:
+            passed_steps.append(idx)
+    elif result.status == "pass":
+        status = "pass"
         if idx not in passed_steps:
             passed_steps.append(idx)
         if agent == "writer":
             writer_just_passed = True
-    elif agent == "retrieve" and _retrieve_case(state) == "t3":
-        if _t3_query_miss(state, result):
-            status, need_replan, need_retry = _retry_status(retry_counts, idx)
-        else:
-            status = "fail"
-            need_replan = True
     elif result.plan_inadequate:
         status = "fail"
         need_replan = True
@@ -368,17 +404,21 @@ def _evaluate_step(
         feedback=result.feedback,
         agent=agent,
         step_index=idx,
-        plan_inadequate=result.plan_inadequate,
+        plan_inadequate=plan_inadequate,
     )
 
     plan = state.get("plan") or []
     step_index = _first_unpassed(plan, passed_steps)
-    retry_count = 0 if result.status == "pass" else int(
-        retry_counts.get(str(step_index), 0) or 0
+    retry_count = (
+        int(retry_counts.get(str(idx), 0) or 0) if need_retry else 0
     )
-
     record = _last_eval(
-        status, result.feedback, result.plan_inadequate, idx
+        status,
+        result.feedback,
+        plan_inadequate,
+        idx,
+        likely_in_paper=likely_in_paper,
+        reasoning=str(result.reasoning or ""),
     )
     update: dict = {
         "last_eval": record,
@@ -388,6 +428,11 @@ def _evaluate_step(
         "retry_count": retry_count,
         "step_index": step_index,
     }
+    if append_gap_hole:
+        update["hole_tasks"] = merge_hole_tasks(
+            state.get("hole_tasks"),
+            [{"task": result.feedback, "reason": "gap"}],
+        )
     _apply_route(
         update,
         need_replan=need_replan,

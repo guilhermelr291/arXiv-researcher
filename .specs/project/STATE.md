@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-09-11
-**Current Work:** Quick 024 — dump ingested chunks to `eval/retrieve/` for recall qrels. Feature `retrieve-writer-recall` Independent Test still UAT.
+**Last Updated:** 2026-09-13
+**Current Work:** Feature `retrieve-t3-union-retry` — T3 union pack + gap-only retry (ARX-9).
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-027: T3 routes on likely_in_paper; first pack is monotonic (2026-09-13)
+
+**Decision:** Retrieve T3 semantic eval routes on `likely_in_paper` (`na` → pass, `yes` → one query retry, `no`/`unknown` → pass + `hole_tasks` reason=gap). The field commands over `status`. A paper-absent facet is pass+hole, not `plan_inadequate` remaining replan. Empty/foreign packs still retry once (R2). After `max_retries_per_step`, a remaining gap is pass+hole, not replan. First-pass `cut_reranked` `top_n=10`; retry unions by `chunk_id` (add cap 5, pack cap 15); Voyage `rerank-3` at most twice per step. Retry hybrid/Voyage query is eval `feedback` only.
+**Reason:** q11 gold `b87b59a7` was evicted on a “total size” retry; Quick 018 spent the remaining replan hunting unpublished N. Grill-me 2026-09-13.
+**Trade-off:** `EvalResult.status` remains for T1/T2a and empty-field fallbacks. Retry first-stage `k=10` is an unfrozen placement int.
+**Impact:** Supersedes AD-014/AD-015 T3 “attempt 1 always retries” for semantic misses only, and Quick 018’s `plan_inadequate` use for a paper-absent facet. Search S8a and T1/T2a unchanged. Feature `.specs/features/retrieve-t3-union-retry/`.
 
 ### AD-026: Writer-visible recall counts expanded table/equation (2026-09-11)
 

@@ -90,11 +90,11 @@ class TestBuildRerankQuery(unittest.TestCase):
     def test_nonempty_feedback_concatenates(self) -> None:
         self.assertEqual(
             build_rerank_query("explain RRF", "missing architecture"),
-            "explain RRF\n\nmissing architecture",
+            "missing architecture",
         )
         self.assertEqual(
             build_rerank_query("  explain RRF  ", "  missing architecture  "),
-            "explain RRF\n\nmissing architecture",
+            "missing architecture",
         )
 
 
@@ -188,7 +188,7 @@ class TestScoreChunks(unittest.TestCase):
         self.assertIs(kwargs["truncation"], True)
         self.assertEqual(kwargs["top_k"], len(chunks))
         self.assertNotEqual(kwargs["top_k"], Policy.retrieve_rerank_top_n)
-        self.assertEqual(Policy.retrieve_rerank_top_n, 15)
+        self.assertEqual(Policy.retrieve_rerank_top_n, 10)
 
     def test_missing_input_index_raises(self) -> None:
         chunks = [_chunk(chunk_id="c0"), _chunk(chunk_id="c1")]
