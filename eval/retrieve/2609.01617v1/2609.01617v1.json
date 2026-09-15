@@ -136,15 +136,12 @@
     },
     {
       "id": "q15",
-      "query": "Tracing the DocuSearch pipeline end to end, what happens to a query from initial analysis through to final answer selection, including how the three retrieval signals are combined and how the resulting evidence is evaluated? (2609.01617)",
-      "reference_answer": "A query first goes through query analysis, where a Template Selection agent classifies it into one of five answer templates and a BM25 Keyword agent extracts domain terms, with optional vendor scoping. Dense vector retrieval (cosine similarity over BGE-Large embeddings in Qdrant), BM25 sparse retrieval (over the SQLite FTS5 index), and KG neighbour expansion (traversing a structured edge table) then run in parallel to produce three ranked lists. These are fused via weighted Reciprocal Rank Fusion using weights wv=0.50, wb=0.35, wkg=0.15. The fused list is reranked by a cross-encoder that jointly encodes the query and each chunk, then filtered by Maximal Marginal Relevance (λ=0.65) down to a final evidence set of 10 chunks balancing relevance and diversity. Each evidence chunk is then evaluated individually in the per-chunk agentic loop: an LLM checks whether it needs neighbouring context, scores its sufficiency, generates a candidate answer, and verifies the answer is grounded in the chunk; the first chunk to pass all checks yields the final answer, with a fallback merge of all expanded contexts used if none succeed.",
+      "query": "Which five answer templates can DocuSearch's Template Selection agent assign before retrieval, what BM25 k1 and b does sparse retrieval use, and why does the cross-encoder still keep an RRF term after fusion? (2609.01617)",
+      "reference_answer": "Template Selection maps each query to one of five types: procedure_sop, concept_explanation, comparison_decision, parameter_lookup, and troubleshooting_rca (LLM, with a deterministic heuristic fallback). Sparse retrieval is standard BM25 over SQLite FTS5 with k1=1.2 and b=0.75, returning the top kb=40 chunks. After fusion, the top kr=12 chunks are reranked by a cross-encoder that jointly encodes the query and each chunk; the RRF component is retained so the cross-encoder cannot discard evidence that multiple retrieval signals already agreed on.",
       "required_chunk_ids": [
         "0f78a63a-5b1e-437c-94c5-aae927265a09",
         "cff5d3f5-1a38-4b65-a2b1-d5db61550509",
-        "bf117c2c-d607-4122-97eb-9dfc15edb7f6",
-        "a46befae-aabc-4a11-bf4b-759c5889062b",
-        "97cbcf23-8c57-4e39-a047-b6a71085a060",
-        "69885bfe-b65f-4153-91c5-bd16eeb63057"
+        "a46befae-aabc-4a11-bf4b-759c5889062b"
       ],
       "question_type": "multi_hop"
     }

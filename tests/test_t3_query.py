@@ -16,6 +16,7 @@ from plan_based_researcher.ports.chunks import ChunkRecord
 _TASK = "Retrieve generation, editing, and interleaved corpus sizes and composition"
 _FEEDBACK = "total corpus size of generation editing interleaved mix"
 _PREV = "generation editing interleaved percentages"
+_STUDENT = "Quais tamanhos do corpus de geração, edição e interleaved?"
 _PAPER = {
     "arxiv_id": "2609.11929",
     "version": "1",
@@ -89,6 +90,7 @@ def _retry_state() -> dict:
         "eval_by_step": {"1": {"feedback": _FEEDBACK, "step_index": 1}},
         "hole_tasks": [],
         "search_artifacts": {},
+        "query": _STUDENT,
     }
 
 
@@ -161,6 +163,25 @@ class T3QueryTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn(_FEEDBACK, human)
         self.assertIn(_PREV, human)
         self.assertNotIn(f"Task:\n{_TASK}", human)
+        self.assertNotIn(_STUDENT, human)
+
+    async def test_first_pass_formulate_includes_student_query(self) -> None:
+        hybrid = _Hybrid()
+        runner, formulate = _runner(hybrid)
+        state = _retry_state()
+        state["retry_counts"] = {}
+        state["eval_by_step"] = {}
+        state["passed_steps"] = []
+
+        def _score(chunks, query, api_key=""):
+            return [0.9] * len(chunks)
+
+        with patch(_SCORE, _score), patch(_TRACE, _fake_trace):
+            await runner.run(state)
+        formulate.ainvoke.assert_awaited()
+        human = formulate.ainvoke.call_args.args[0][1][1]
+        self.assertIn(f"Task:\n{_TASK}", human)
+        self.assertIn(f"Student query:\n{_STUDENT}", human)
 
 
 if __name__ == "__main__":

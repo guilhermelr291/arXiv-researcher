@@ -374,6 +374,7 @@ class RetrieveRunner:
             feedback=feedback,
             previous_query=previous_query,
             is_retry=is_retry,
+            student_query=str(state.get("query") or ""),
         )
         hybrid_query = feedback.strip() if is_retry else query
         rerank_query = (
@@ -528,6 +529,7 @@ class RetrieveRunner:
         feedback: str,
         previous_query: str,
         is_retry: bool = False,
+        student_query: str = "",
     ) -> str:
         human = (
             formulate_retry_human(
@@ -538,6 +540,7 @@ class RetrieveRunner:
                 task=task,
                 feedback=feedback,
                 previous_query=previous_query,
+                student_query=student_query,
             )
         )
         formulated = await self._formulate.ainvoke(
