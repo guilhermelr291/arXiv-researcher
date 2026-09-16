@@ -27,8 +27,8 @@
       "delivered_ids": [
         "28e63840-7e04-46cb-a9e6-43dade95418e"
       ],
-      "retrieve_query_used": "SenseNova-U1.5 architectural configuration patch size number of layers attention heads total parameters model architecture exact values vision encoder",
-      "retrieve_task": "Extract the authoritative architectural configuration of SenseNova-U1.5 from the paper, including patch size, number of layers, number of attention heads, and total parameter count, preserving the exact values and any relevant distinctions or caveats.",
+      "retrieve_query_used": "SenseNova-U1.5 architectural specifications patch size number of layers attention heads total parameters model configuration table",
+      "retrieve_task": "Extract the paper’s explicit architectural specifications for SenseNova-U1.5, including patch size, layer count, attention-head count, and total parameter count, preserving the exact terminology, values, and any relevant table or section context.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -36,7 +36,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "7deab5a2-d7d2-49e5-9b75-0cbe18d3c3d6",
+      "thread_id": "ec43f9cd-ef07-498a-a5d9-0c9241cdde90",
       "scores": [
         {
           "k": 5,
@@ -77,14 +77,13 @@
         "edb6b50a-2ab3-4e2f-92ad-6031558b3bda"
       ],
       "delivered_ids": [
-        "e692844d-fbf9-4ed4-9991-cbd9ff7725e8",
         "2b7ef204-1275-4d31-b6d8-2256d082e692",
+        "e692844d-fbf9-4ed4-9991-cbd9ff7725e8",
         "04af4013-53fb-4082-8691-d94d83c96ae6",
-        "edb6b50a-2ab3-4e2f-92ad-6031558b3bda",
-        "2a9b137e-31d7-406b-a4cf-0f2b212f102e"
+        "edb6b50a-2ab3-4e2f-92ad-6031558b3bda"
       ],
-      "retrieve_query_used": "SenseNova-U1.5 SenseNova-U1 visual interface limitation decoder architecture interface behavior visual token decoder structure functional benefits",
-      "retrieve_task": "Gather evidence from the paper explaining what limitation in SenseNova-U1's visual interface motivated SenseNova-U1.5, and how the new decoder architecture addresses that limitation, including the interface behavior, decoder structure, and claimed functional benefits.",
+      "retrieve_query_used": "SenseNova-U1 visual interface limitation SenseNova-U1.5 architectural change new decoder design visual tokens image understanding generation cross-modal alignment decoder mechanism",
+      "retrieve_task": "Gather evidence from the selected paper on the limitation of SenseNova-U1's visual interface, the motivation for changing the architecture in SenseNova-U1.5, and the specific mechanisms by which the new decoder design addresses that limitation.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -92,7 +91,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "023c4e29-978b-4b22-bedf-0a5d82ce1c5b",
+      "thread_id": "c83613b3-85e7-420b-ba66-617168b4de5d",
       "scores": [
         {
           "k": 5,
@@ -138,11 +137,10 @@
       ],
       "delivered_ids": [
         "e692844d-fbf9-4ed4-9991-cbd9ff7725e8",
-        "04af4013-53fb-4082-8691-d94d83c96ae6",
-        "2b7ef204-1275-4d31-b6d8-2256d082e692"
+        "04af4013-53fb-4082-8691-d94d83c96ae6"
       ],
-      "retrieve_query_used": "SenseNova-U1.5 raw image preprocessing visual encoder image tokenizer patch tokens token sequence compression reconstruction fidelity loss objective sequence organization",
-      "retrieve_task": "Gather evidence from the SenseNova-U1.5 paper explaining the complete raw-image-to-token-sequence pipeline, including image preprocessing, visual encoding, token formation, compression or reconstruction mechanisms, sequence organization, and any stated loss or fidelity guarantees.",
+      "retrieve_query_used": "SenseNova-U1.5 near-lossless visual interface raw image preprocessing visual encoder tokenizer image compression token sequence sequence construction spatial resolution information preservation token dimensions downsampling compression ratio training details",
+      "retrieve_task": "Gather evidence from the SenseNova-U1.5 paper explaining the complete raw-image-to-token-sequence pipeline, including image preprocessing, visual encoding, tokenization or compression operations, sequence construction, resolution or information-preservation mechanisms, and any relevant dimensions, rates, or training details.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -150,7 +148,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "93cfbe08-15a8-4ec1-865f-a8d00ea0e627",
+      "thread_id": "6661ebd9-7290-4da8-9763-ec92392ec5fc",
       "scores": [
         {
           "k": 5,
@@ -193,8 +191,8 @@
         "04af4013-53fb-4082-8691-d94d83c96ae6",
         "0c4971ff-b51f-49f0-9720-0be692ed1220"
       ],
-      "retrieve_query_used": "SenseNova-U1.5 resolution-dependent noise scale conditioning SenseNova-U1 comparison mathematical formulation resolution input conditioning procedure rationale consequences",
-      "retrieve_task": "Gather directly supported evidence from the SenseNova-U1.5 paper about the resolution-dependent noise-scale conditioning in SenseNova-U1.5 and its differences from SenseNova-U1, including the mathematical or procedural change, how resolution enters the conditioning, and any reported rationale or consequences.",
+      "retrieve_query_used": "SenseNova-U1.5 resolution-dependent noise scale conditioning SenseNova-U1 noise scale image resolution conditioning changes extension",
+      "retrieve_task": "Gather evidence from the SenseNova-U1.5 paper describing the resolution-dependent noise-scale conditioning in SenseNova-U1.5, the corresponding approach in SenseNova-U1, and the concrete changes between them.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -202,7 +200,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "d2112dd6-7cf9-451c-9110-a9ed5bd2c21a",
+      "thread_id": "3861eb33-b731-40ba-9f51-d02f32a3794e",
       "scores": [
         {
           "k": 5,
@@ -247,15 +245,15 @@
         "4002ef92-6608-4a3a-ad01-72384460596f",
         "09e8390c-fa3d-40e6-a3e4-bf1747e1914e",
         "62a86737-34e9-4f86-a916-c34f2b526589",
-        "2b7ef204-1275-4d31-b6d8-2256d082e692",
-        "002ede1b-eee4-412e-83d8-552b9f61fe0d",
         "516eff92-e1e3-4d22-9303-38f19ca5ac91",
+        "2b7ef204-1275-4d31-b6d8-2256d082e692",
         "283c9d12-a99c-4969-995e-e5902ecf4011",
         "4dc75d48-ffe6-4f0c-918e-01e9462a0258",
+        "002ede1b-eee4-412e-83d8-552b9f61fe0d",
         "2a9b137e-31d7-406b-a4cf-0f2b212f102e"
       ],
-      "retrieve_query_used": "SenseNova-U1.5 joint reinforcement learning optimization instability interference specialized experts training stages objectives data tasks unified model capability consolidation model merging integration procedure",
-      "retrieve_task": "Gather evidence from the SenseNova-U1.5 paper on why joint reinforcement-learning optimization is problematic, how each specialized expert is trained, and how the experts' capabilities are consolidated into the final unified model, including the training stages, objectives, data or tasks, and model-merging or integration procedure.",
+      "retrieve_query_used": "SenseNova-U1.5 specialize-then-unify joint reinforcement learning optimization conflicting objectives specialized experts training task-specific data allocation expert capability consolidation unified model integration training stages",
+      "retrieve_task": "Gather evidence from the SenseNova-U1.5 paper on why joint reinforcement-learning optimization is problematic, how the specialized experts are trained, and how their capabilities are consolidated into the final unified model, including the training stages, objectives, data or task allocation, and integration procedure.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -263,7 +261,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "7e2cb0de-4087-4de7-984c-29c081dbafd8",
+      "thread_id": "294741e8-fc54-496d-b1ed-59d5c1428c19",
       "scores": [
         {
           "k": 5,
@@ -309,10 +307,11 @@
       ],
       "delivered_ids": [
         "62a86737-34e9-4f86-a916-c34f2b526589",
-        "f71b7d24-e59d-4a97-b188-6463ab6e1645"
+        "516eff92-e1e3-4d22-9303-38f19ca5ac91",
+        "002ede1b-eee4-412e-83d8-552b9f61fe0d"
       ],
-      "retrieve_query_used": "aesthetic reinforcement learning expert training sample construction preference data optimization loss hyperparameters text legibility preservation degradation evaluation procedure",
-      "retrieve_task": "Gather evidence from the identified paper on how training samples were selected or constructed for the aesthetic reinforcement-learning expert, the key optimization and loss hyperparameters, and the mechanisms or evaluation procedures used to prevent degradation of text legibility.",
+      "retrieve_query_used": "aesthetic reinforcement learning expert training prompt sampling data distribution reward optimization batch size samples per prompt learning rate update steps iterations training duration text legibility preservation OCR text rendering readability degradation prevention trade-offs limitations",
+      "retrieve_task": "Extract evidence from the selected paper about how the aesthetic reinforcement-learning expert was trained: the data or prompt sampling strategy, reward and optimization setup, batch or sampling parameters, learning-rate and update settings, training duration or iteration details, and every mechanism used to prevent degradation of text legibility. Preserve exact numerical values and note any reported trade-offs or limitations.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -320,7 +319,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "a247ccbd-98b2-468b-8feb-99059bb3e87d",
+      "thread_id": "721e23f1-9012-48db-8564-31ad51f1fc71",
       "scores": [
         {
           "k": 5,
@@ -362,8 +361,8 @@
         "87060535-eaf7-44d1-94ad-c82d93f76af1",
         "516eff92-e1e3-4d22-9303-38f19ca5ac91"
       ],
-      "retrieve_query_used": "editing reward five dimensions reward components formula weighting normalization aggregation scalar reward exact procedure",
-      "retrieve_task": "Extract evidence from the identified paper on all five editing-reward dimensions and the exact procedure, formula, weighting, normalization, or aggregation used to combine them into one scalar reward.",
+      "retrieve_query_used": "editing reward five dimensions reward components scalar aggregation weighted sum equation normalization weights ordering implementation details",
+      "retrieve_task": "Gather evidence from the located paper defining all five editing-reward dimensions and explaining their scalar aggregation, including any equations, weights, normalization, ordering, or implementation details needed to reconstruct the complete reward calculation.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -371,7 +370,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "af7b2408-98bf-401e-abb9-16e2005d658e",
+      "thread_id": "f0757d0b-2cf6-4bc5-8c4e-7caf433b6364",
       "scores": [
         {
           "k": 5,
@@ -414,16 +413,15 @@
         "26e886f4-2547-4049-be01-caa20c13ddd7",
         "9d06eb7e-d839-4af6-969e-65de0dbc2c5f",
         "fedc2d41-eaee-44b6-8d01-68668ea280d1",
-        "dfad6467-d92b-41ab-ab74-5eb56eecb522",
         "66fc0448-75da-4f8e-baea-7da8407b9ad6",
-        "2bee9f54-d2dd-465b-9336-4c9c1ec8155b",
         "2efd3e29-be0a-4539-b733-83a8aac91cbe",
-        "f191f8d7-529a-4679-aaf8-bb096ebd7fcf",
-        "559f7044-6986-41dd-8cf0-d7f3f93b2126",
+        "2bee9f54-d2dd-465b-9336-4c9c1ec8155b",
+        "1c849fd7-4810-42fa-baee-e991f90a9d24",
+        "f80117f6-82de-4f05-b82d-629b1e4be414",
         "cf913389-1dba-4c2b-ade6-7415a5cfbbd3"
       ],
-      "retrieve_query_used": "SenseNova-U1.5 SenseNova-U1 GenEval overall score category scores sub-category improvement notable gains image generation evaluation",
-      "retrieve_task": "Extract authoritative evidence from the selected paper comparing SenseNova-U1.5 with SenseNova-U1 on GenEval, including the overall scores, each sub-category score or reported improvement, and any statements identifying the most notable gains.",
+      "retrieve_query_used": "SenseNova-U1.5 SenseNova-U1 GenEval overall performance score improvement sub-category scores improved most object color counting position attribute spatial relationship",
+      "retrieve_task": "Extract the GenEval results comparing SenseNova-U1.5 with SenseNova-U1, including the overall performance difference, every reported sub-category score or improvement, and the evidence identifying which sub-categories improved most.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -431,7 +429,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "076ccf23-fbb6-4134-b251-6046a8b6c3fb",
+      "thread_id": "499f5116-036a-4767-b74c-57b65c0998a0",
       "scores": [
         {
           "k": 5,
@@ -474,18 +472,19 @@
         "2167f629-c770-4b13-80be-a3049729e027"
       ],
       "delivered_ids": [
-        "2167f629-c770-4b13-80be-a3049729e027",
         "f191f8d7-529a-4679-aaf8-bb096ebd7fcf",
+        "2167f629-c770-4b13-80be-a3049729e027",
+        "2bee9f54-d2dd-465b-9336-4c9c1ec8155b",
         "dfad6467-d92b-41ab-ab74-5eb56eecb522",
         "66fc0448-75da-4f8e-baea-7da8407b9ad6",
         "2efd3e29-be0a-4539-b733-83a8aac91cbe",
         "1c849fd7-4810-42fa-baee-e991f90a9d24",
+        "9d06eb7e-d839-4af6-969e-65de0dbc2c5f",
         "b8f22319-f29b-4c5d-a2f3-fef23e5c2242",
-        "2bee9f54-d2dd-465b-9336-4c9c1ec8155b",
-        "f80117f6-82de-4f05-b82d-629b1e4be414"
+        "fedc2d41-eaee-44b6-8d01-68668ea280d1"
       ],
-      "retrieve_query_used": "DPG-Bench overall score SenseNova-U1.5 SenseNova-U1 table score definition comparison results",
-      "retrieve_task": "Extract the DPG-Bench overall scores for SenseNova-U1.5 and SenseNova-U1 from the specified paper, preserving the table context, score definitions, and any relevant comparison notes.",
+      "retrieve_query_used": "DPG-Bench results table SenseNova-U1.5 overall score SenseNova-U1 overall score comparison score difference",
+      "retrieve_task": "Extract the DPG-Bench results table or surrounding text, including SenseNova-U1.5's overall score, SenseNova-U1's overall score, and any stated comparison or score difference between them.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -493,7 +492,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "a457c2da-e920-43d9-9b2c-b7cee40f0f8b",
+      "thread_id": "072188ea-c45e-49c6-9e4d-22e13645f2bf",
       "scores": [
         {
           "k": 5,
@@ -537,18 +536,18 @@
       ],
       "delivered_ids": [
         "b8f22319-f29b-4c5d-a2f3-fef23e5c2242",
-        "1d2ac445-2c99-4c74-b921-f304915d6802",
-        "1c849fd7-4810-42fa-baee-e991f90a9d24",
-        "2efd3e29-be0a-4539-b733-83a8aac91cbe",
         "1c1ae597-c84f-4f0a-85b6-86dab6d05c41",
+        "1d2ac445-2c99-4c74-b921-f304915d6802",
+        "2efd3e29-be0a-4539-b733-83a8aac91cbe",
+        "1c849fd7-4810-42fa-baee-e991f90a9d24",
         "f80117f6-82de-4f05-b82d-629b1e4be414",
-        "dfad6467-d92b-41ab-ab74-5eb56eecb522",
+        "fedc2d41-eaee-44b6-8d01-68668ea280d1",
         "66fc0448-75da-4f8e-baea-7da8407b9ad6",
-        "9d06eb7e-d839-4af6-969e-65de0dbc2c5f",
-        "f69f6071-61e5-43a7-8c7e-2c4e91b39bac"
+        "dfad6467-d92b-41ab-ab74-5eb56eecb522",
+        "b0fa9a01-fce8-41ac-bbe0-958889650be5"
       ],
-      "retrieve_query_used": "ImgEdit benchmark overall score SenseNova-U1.5 SenseNova-U1 leading closed-source image editing models ranking evaluation results table",
-      "retrieve_task": "Extract the ImgEdit benchmark results table or text comparing SenseNova-U1.5's overall score with SenseNova-U1 and the leading closed-source editing models, preserving model names, scores, ranking, and any relevant evaluation context.",
+      "retrieve_query_used": "ImgEdit benchmark SenseNova-U1.5 SenseNova-U1 overall score leading closed-source image editing models ranking evaluation conditions table",
+      "retrieve_task": "Extract the ImgEdit benchmark table or discussion comparing SenseNova-U1.5 with SenseNova-U1 and leading closed-source editing models, preserving the exact overall scores, model names, ranking context, and any caveats about evaluation conditions.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -556,7 +555,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "dcfec81c-8fb9-4004-9705-05efae92bb66",
+      "thread_id": "ec80932c-0e8d-49b8-9ce4-db6690f87510",
       "scores": [
         {
           "k": 5,
@@ -605,15 +604,15 @@
       "delivered_ids": [
         "f71b7d24-e59d-4a97-b188-6463ab6e1645",
         "033f160f-56a5-40ed-b3d0-aee8812c61e4",
-        "637a6c38-50f8-4d96-99fc-2199b803636d",
         "d74fe23d-3f48-483e-b444-1001a4b593d3",
+        "637a6c38-50f8-4d96-99fc-2199b803636d",
         "283c9d12-a99c-4969-995e-e5902ecf4011",
+        "96674650-eba4-446e-b7d8-b4b4be82f0b0",
         "4676f857-df9d-4eb0-866d-d8ebb8b3caa2",
-        "b87b59a7-ee39-4d9e-9f10-9515b6cca7a4",
-        "96674650-eba4-446e-b7d8-b4b4be82f0b0"
+        "b87b59a7-ee39-4d9e-9f10-9515b6cca7a4"
       ],
-      "retrieve_query_used": "What are the exact total sizes of the image-generation and interleaved-training corpora, including their units and any stated qualifications?",
-      "retrieve_task": "Gather evidence from the SenseNova-U1.5 paper on the dataset sizes and principal composition categories for the image-generation corpus, image-editing corpus, and interleaved-training corpus, preserving exact quantities, units, and any breakdowns or qualifications stated by the authors.",
+      "retrieve_query_used": "Provide the explicit total sizes of the image-generation and interleaved training corpora, together with the corresponding category breakdowns.",
+      "retrieve_task": "Extract the paper’s explicit dataset counts or sizes and category breakdowns for the image generation corpus, image editing corpus, and interleaved training corpus, preserving the authors’ terminology and distinguishing corpus composition from training procedures.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -621,7 +620,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "12ca5e13-9473-49db-bb30-9912d55c36e7",
+      "thread_id": "60cbbb9b-c48f-4bae-ac62-af25a1e55db4",
       "scores": [
         {
           "k": 5,
@@ -670,10 +669,11 @@
       "delivered_ids": [
         "f480bd0d-0938-441b-93cc-f6de61e0d0c4",
         "1c1ae597-c84f-4f0a-85b6-86dab6d05c41",
-        "b3dcdb5e-1fcc-405c-9836-f0c9139d8b30"
+        "b3dcdb5e-1fcc-405c-9836-f0c9139d8b30",
+        "896504b4-41a0-4b1f-a525-e04158c0cdf1"
       ],
-      "retrieve_query_used": "SenseNova-U1.5 RISEBench chain-of-thought reasoning comparison overall score per edit type gains losses most least beneficial edit types",
-      "retrieve_task": "Gather evidence from the identified paper on the experimental comparison of SenseNova-U1.5 with and without chain-of-thought reasoning on RISEBench, including overall scores, per-edit-type results, reported gains or losses, and which edit types benefit most and least.",
+      "retrieve_query_used": "SenseNova-U1.5 RISEBench chain-of-thought CoT reasoning ablation with without CoT overall performance edit types per-edit results table improvement largest smallest gains qualifications contradictory findings",
+      "retrieve_task": "Gather evidence from the paper on the experimental comparison of SenseNova-U1.5 with and without chain-of-thought reasoning on RISEBench, including overall performance changes, per-edit-type results, and which edit types improve most and least. Capture the relevant metrics, tables, and any qualifications or contradictions in the authors’ findings.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -681,7 +681,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "3924eeac-91e3-4bef-99e3-44ccf298dcd5",
+      "thread_id": "5a48aa1d-4224-4984-bc8b-23b8bcae214d",
       "scores": [
         {
           "k": 5,
@@ -725,8 +725,8 @@
       "delivered_ids": [
         "edb6b50a-2ab3-4e2f-92ad-6031558b3bda"
       ],
-      "retrieve_query_used": "Native Mixture-of-Transformers attention modality-specific masks causal text tokens bidirectional visual tokens cross-modal information flow unified sequence training objective architecture",
-      "retrieve_task": "Gather evidence from the paper on the Native Mixture-of-Transformers attention design, including the modality-specific attention masks, causal treatment of text tokens, bidirectional treatment of visual tokens, cross-modal information flow, training objective, and how these components coexist in a single sequence or architecture.",
+      "retrieve_query_used": "native Mixture-of-Transformers attention pattern language tokens visual tokens causal mask bidirectional visual attention cross-modal information flow autoregressive language modeling visual context integration",
+      "retrieve_task": "Gather evidence from the paper on the native Mixture-of-Transformers attention pattern, including the token types and attention masks, the causal treatment of language tokens, the bidirectional treatment of visual tokens, cross-modal information flow, and the rationale for preserving autoregressive language modeling while enabling visual context integration.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -734,7 +734,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "2f90c8c4-f408-4a1c-8c62-87c6f73e778d",
+      "thread_id": "b29383a5-d057-47c9-a98f-79b5a28d9d3a",
       "scores": [
         {
           "k": 5,
@@ -774,15 +774,12 @@
         "d725a27a-f7ba-49bb-badd-ea11d054fb76"
       ],
       "delivered_ids": [
-        "d725a27a-f7ba-49bb-badd-ea11d054fb76",
         "cf913389-1dba-4c2b-ade6-7415a5cfbbd3",
         "2efd3e29-be0a-4539-b733-83a8aac91cbe",
-        "2bee9f54-d2dd-465b-9336-4c9c1ec8155b",
-        "3e05f70c-0082-4471-b2e1-8b488276c65f",
-        "f191f8d7-529a-4679-aaf8-bb096ebd7fcf"
+        "ffaf6dbb-8a83-497f-979d-018ef7c196e2"
       ],
-      "retrieve_query_used": "SenseNova-U1.5 SenseNova-U1 IFEval IFBench benchmark results scores evaluation settings aggregate category-level performance comparison authors interpretation differences",
-      "retrieve_task": "Extract the paper's reported IFEval and IFBench results for SenseNova-U1.5 and SenseNova-U1, including scores, evaluation settings, any aggregate or category-level results, and the authors' interpretation of the performance differences.",
+      "retrieve_query_used": "SenseNova-U1.5 SenseNova-U1 IFEval IFBench instruction following evaluation results scores benchmark comparison settings authors analysis",
+      "retrieve_task": "Gather the reported IFEval and IFBench instruction-following results for SenseNova-U1.5 and SenseNova-U1, including the evaluation settings, scores, and any comparison or interpretation stated by the authors.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -790,7 +787,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "bdec5f28-c58a-4b13-89f7-27f61b018d91",
+      "thread_id": "b5b51b79-780f-4962-886b-5970ae3db14a",
       "scores": [
         {
           "k": 5,
@@ -800,7 +797,13 @@
             "d725a27a-f7ba-49bb-badd-ea11d054fb76"
           ],
           "misses": [],
-          "injected": []
+          "injected": [
+            {
+              "chunk_id": "d725a27a-f7ba-49bb-badd-ea11d054fb76",
+              "host_chunk_id": "cf913389-1dba-4c2b-ade6-7415a5cfbbd3",
+              "kind": "table"
+            }
+          ]
         },
         {
           "k": 10,
@@ -810,7 +813,13 @@
             "d725a27a-f7ba-49bb-badd-ea11d054fb76"
           ],
           "misses": [],
-          "injected": []
+          "injected": [
+            {
+              "chunk_id": "d725a27a-f7ba-49bb-badd-ea11d054fb76",
+              "host_chunk_id": "cf913389-1dba-4c2b-ade6-7415a5cfbbd3",
+              "kind": "table"
+            }
+          ]
         },
         {
           "k": 15,
@@ -820,7 +829,13 @@
             "d725a27a-f7ba-49bb-badd-ea11d054fb76"
           ],
           "misses": [],
-          "injected": []
+          "injected": [
+            {
+              "chunk_id": "d725a27a-f7ba-49bb-badd-ea11d054fb76",
+              "host_chunk_id": "cf913389-1dba-4c2b-ade6-7415a5cfbbd3",
+              "kind": "table"
+            }
+          ]
         }
       ]
     },
@@ -836,8 +851,8 @@
         "283c9d12-a99c-4969-995e-e5902ecf4011",
         "4676f857-df9d-4eb0-866d-d8ebb8b3caa2"
       ],
-      "retrieve_query_used": "Stage 1 generation pre-training three phases resolution range training steps learning rate LPIPS perceptual loss added transition",
-      "retrieve_task": "Extract authoritative evidence from the paper for all three Stage 1 generation pre-training phases, including each phase's resolution range, number of training steps, learning rate, and the phase or transition where LPIPS perceptual loss was added.",
+      "retrieve_query_used": "Stage 1 Generation Pre-Training three phases resolution range training steps learning rate LPIPS perceptual loss introduced phase",
+      "retrieve_task": "Gather directly cited evidence from the paper for all three phases of Stage 1 (Generation Pre-Training), including each phase's resolution range, number of training steps, learning rate, and the point at which LPIPS perceptual loss was introduced. Preserve phase labels and any relevant distinctions or caveats.",
       "admitted_papers": [
         {
           "arxiv_id": "2609.11929",
@@ -845,7 +860,7 @@
         }
       ],
       "stop_reason": "writer_skipped",
-      "thread_id": "61280045-4759-488b-8907-74e2c668e24e",
+      "thread_id": "374800c0-2d65-4e3e-8c23-84f7bd067e4f",
       "scores": [
         {
           "k": 5,
@@ -880,6 +895,6 @@
       ]
     }
   ],
-  "scored_at": "2026-09-14T16:09:53Z",
+  "scored_at": "2026-09-15T18:10:45Z",
   "dataset": "D:\\Cursos\\TI\\Projetos\\plan-based-researcher\\eval\\retrieve\\2609.11929v1\\2609.11929v1.json"
 }
