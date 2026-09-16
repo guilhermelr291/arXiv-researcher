@@ -11,6 +11,7 @@ from plan_based_researcher.adapters.hybrid import HybridResult
 from plan_based_researcher.agents.query_schema import FormulatedQuery
 from plan_based_researcher.agents.retrieve import RetrieveRunner
 from plan_based_researcher.eval.types import RetrieveJudgeVerdict
+from plan_based_researcher.policy import Policy
 from plan_based_researcher.ports.chunks import ChunkRecord
 
 _TASK = "Retrieve generation, editing, and interleaved corpus sizes and composition"
@@ -147,6 +148,27 @@ class T3QueryTest(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn(_TASK, hybrid_query)
         self.assertEqual(voyage_queries, [_FEEDBACK])
         self.assertNotIn(_TASK, voyage_queries[0])
+
+    async def test_retry_hybrid_and_voyage_use_feedback_only(self) -> None:
+        hybrid = _Hybrid()
+        runner, _formulate = _runner(hybrid)
+        voyage_queries: list[str] = []
+
+        def _score(chunks, query, api_key=""):
+            voyage_queries.append(query)
+            return [0.9] * len(chunks)
+
+        with patch(_SCORE, _score), patch(_TRACE, _fake_trace):
+            out = await runner.run(_retry_state())
+        self.assertEqual(hybrid.calls[0][0], _FEEDBACK)
+        self.assertEqual(hybrid.calls[0][2], Policy.retrieve_retry_first_stage_k)
+        self.assertEqual(voyage_queries, [_FEEDBACK])
+        self.assertEqual(Policy.retrieve_retry_add_cap, 5)
+        self.assertEqual(Policy.retrieve_pack_cap_after_retry, 15)
+        self.assertLessEqual(len(out["evidence_chunks"]), 15)
+        keep_ids = {row["chunk_id"] for row in _retry_state()["evidence_chunks"]}
+        packed_ids = {row["chunk_id"] for row in out["evidence_chunks"]}
+        self.assertTrue(keep_ids.issubset(packed_ids))
 
     async def test_retry_formulate_omits_full_task(self) -> None:
         hybrid = _Hybrid()

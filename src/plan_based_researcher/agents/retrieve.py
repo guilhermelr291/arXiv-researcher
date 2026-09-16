@@ -10,7 +10,7 @@ from langsmith import trace
 
 from plan_based_researcher.adapters.hybrid import HybridResult, HybridRetrievePort
 from plan_based_researcher.agents.query_schema import (
-    FormulatedQuery,
+    FormulatedRetrieveQuery,
     formulate_human,
     formulate_retry_human,
     step_eval_feedback,
@@ -38,14 +38,15 @@ from plan_based_researcher.ports.chunks import (
 from plan_based_researcher.ports.embeddings import EmbeddingPort
 from plan_based_researcher.ports.papers import PaperPort
 
-__all__ = ["RetrieveRunner"]
+__all__ = ["RetrieveRunner", "fuse_hop_cuts", "normalize_retrieve_hops"]
 
 logger = logging.getLogger(__name__)
 
 _FORMULATE_SYSTEM = """\
 You write a English retrieval query for hybrid search (vector + BM25) over \
 chunks from papers already admitted for this thread. The runtime uses your query \
-field as the retriever input. This is not an arXiv API search.
+field as the retriever input when hops are empty or length 1. This is not an \
+arXiv API search.
 
 Rules:
 - Put the query in the structured `query` field. Do not narrate.
@@ -53,12 +54,18 @@ Rules:
 - Write terms that should appear in paper chunks. Do not use arXiv syntax \
 (ti:, abs:, AND, OR, ANDNOT, cat:).
 - Do not copy the task prose as the query.
+- hops are English chunk terms, not sentences. Do not copy the full retrieve \
+task prose as a hop.
+- Emit hops with length at least 2 only when the task asks for distinct \
+coverages (separate facts or section-like requests that one chunk cannot cover).
+- Emit empty hops when one chunk can cover the task.
 - When Previous query or Evaluator feedback is present, honor the feedback and \
 emit a different query from Previous query.
 
 Example:
 - Task: Retrieve passages that explain how LoRA updates weights
   query: LoRA low-rank adaptation weight update adapter matrices
+  hops: []
 """
 
 
@@ -205,6 +212,94 @@ def _append_numbered(
     return n
 
 
+def normalize_retrieve_hops(raw: list[str], *, cap: int | None = None) -> list[str]:
+    limit = Policy.retrieve_hop_cap if cap is None else cap
+    hops: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        hop = item.strip()
+        if not hop or hop in seen:
+            continue
+        seen.add(hop)
+        hops.append(hop)
+        if len(hops) >= limit:
+            break
+    return hops
+
+
+def fuse_hop_cuts(
+    hop_cuts: list[list[ChunkRecord]],
+    *,
+    pack_cap: int = 10,
+    rrf_k: int = 60,
+) -> list[ChunkRecord]:
+    packed: list[ChunkRecord] = []
+    seen: set[str] = set()
+    hop_taken: list[int] = [0] * len(hop_cuts)
+
+    def take(chunk: ChunkRecord, hop_i: int | None) -> None:
+        if chunk.chunk_id in seen or len(packed) >= pack_cap:
+            return
+        seen.add(chunk.chunk_id)
+        packed.append(chunk)
+        if hop_i is not None:
+            hop_taken[hop_i] += 1
+
+    for hop_i, cut in enumerate(hop_cuts):
+        for chunk in cut:
+            if chunk.chunk_id not in seen:
+                take(chunk, hop_i)
+                break
+
+    if len(packed) < pack_cap:
+        candidates: dict[str, tuple[ChunkRecord, float, int]] = {}
+        for hop_i, cut in enumerate(hop_cuts):
+            if hop_taken[hop_i] >= 2:
+                continue
+            for rank, chunk in enumerate(cut, start=1):
+                if chunk.chunk_id in seen:
+                    continue
+                score = 1.0 / (rrf_k + rank)
+                prior = candidates.get(chunk.chunk_id)
+                if prior is None:
+                    candidates[chunk.chunk_id] = (chunk, score, hop_i)
+                else:
+                    candidates[chunk.chunk_id] = (
+                        chunk,
+                        prior[1] + score,
+                        prior[2],
+                    )
+                break
+        ordered = sorted(
+            candidates.values(),
+            key=lambda item: (-item[1], item[0].chunk_id),
+        )
+        for chunk, _score, hop_i in ordered:
+            if len(packed) >= pack_cap:
+                break
+            if hop_taken[hop_i] >= 2:
+                continue
+            take(chunk, hop_i)
+
+    if len(packed) < pack_cap:
+        leftover: dict[str, float] = {}
+        leftover_chunks: dict[str, ChunkRecord] = {}
+        for cut in hop_cuts:
+            for rank, chunk in enumerate(cut, start=1):
+                if chunk.chunk_id in seen:
+                    continue
+                leftover[chunk.chunk_id] = leftover.get(chunk.chunk_id, 0.0) + (
+                    1.0 / (rrf_k + rank)
+                )
+                leftover_chunks[chunk.chunk_id] = chunk
+        for cid in sorted(leftover, key=lambda key: (-leftover[key], key)):
+            if len(packed) >= pack_cap:
+                break
+            take(leftover_chunks[cid], None)
+
+    return packed
+
+
 def union_retry_evidence(
     first_pack: list[dict],
     retry_numbered: list[dict],
@@ -252,7 +347,7 @@ class RetrieveRunner:
         if api_key is not None:
             kwargs["api_key"] = api_key
         self._formulate = ChatOpenAI(**kwargs).with_structured_output(
-            FormulatedQuery, method="json_schema"
+            FormulatedRetrieveQuery, method="json_schema"
         )
 
     async def run(self, state: dict) -> dict:
@@ -369,13 +464,16 @@ class RetrieveRunner:
                 result["papers"] = newly_admitted
             return result
 
-        query = await self._formulate_query(
+        formulated = await self._formulate_retrieve(
             task,
             feedback=feedback,
             previous_query=previous_query,
             is_retry=is_retry,
             student_query=str(state.get("query") or ""),
         )
+        hops = normalize_retrieve_hops(list(formulated.hops))
+        query = formulated.query
+        use_multi = (not is_retry) and len(hops) >= 2
         hybrid_query = feedback.strip() if is_retry else query
         rerank_query = (
             build_rerank_query("", feedback)
@@ -392,110 +490,17 @@ class RetrieveRunner:
             if is_retry
             else Policy.retrieve_rerank_top_n
         )
-        per_paper: list[HybridResult] = []
-        for paper in merged:
-            if not isinstance(paper, dict):
-                continue
-            per_paper.append(
-                await self._hybrid.retrieve(
-                    hybrid_query,
-                    [(paper["arxiv_id"], paper["version"])],
-                    k=first_stage_k,
-                )
+        if use_multi:
+            numbered = await self._multi_first_pass(merged, hops)
+            hybrid_query = " ".join(hops)
+        else:
+            numbered = await self._one_facet_pass(
+                merged,
+                hybrid_query=hybrid_query,
+                rerank_query=rerank_query,
+                first_stage_k=first_stage_k,
+                top_n=top_n,
             )
-
-        unique: list[ChunkRecord] = []
-        seen_ids: set[str] = set()
-        for result_i in per_paper:
-            for chunk in result_i.ranked:
-                if chunk.chunk_id in seen_ids:
-                    continue
-                seen_ids.add(chunk.chunk_id)
-                unique.append(chunk)
-
-        numbered: list[dict] = []
-        if unique:
-            async with trace(
-                "rerank",
-                run_type="chain",
-                inputs={
-                    "query": rerank_query,
-                    "n_docs": len(unique),
-                    "model": RERANK_MODEL_ID,
-                    "chunks": chunks_for_trace(unique),
-                },
-                tags=["rerank"],
-                metadata={"model": RERANK_MODEL_ID},
-            ) as rerank_run:
-                strategy = "voyage"
-                error_type: str | None = None
-                error_msg: str | None = None
-                by_id: dict[str, float] = {}
-                packed_chunks: list[ChunkRecord] = []
-                n = 1
-                try:
-                    scores = await asyncio.to_thread(
-                        score_chunks,
-                        unique,
-                        rerank_query,
-                        api_key=self._voyage_api_key,
-                    )
-                    chunk_ids = [chunk.chunk_id for chunk in unique]
-                    by_id = dict(zip(chunk_ids, scores))
-                except Exception as exc:
-                    logger.exception(
-                        "voyage rerank failed; packing ensemble order"
-                    )
-                    strategy = "ensemble_order"
-                    error_type = type(exc).__name__
-                    error_msg = str(exc)
-                    for result_i in per_paper:
-                        packed = pack_hits(
-                            result_i.ranked, k=top_n
-                        )
-                        if not packed:
-                            continue
-                        packed_chunks.extend(packed)
-                        excerpts = expand_hits(packed, result_i.corpus)
-                        n = _append_numbered(numbered, packed, excerpts, n)
-                else:
-                    for result_i in per_paper:
-                        pairs = [
-                            (chunk, by_id[chunk.chunk_id])
-                            for chunk in result_i.ranked
-                        ]
-                        pairs.sort(key=lambda item: item[1], reverse=True)
-                        cut = cut_reranked(
-                            pairs,
-                            top_n=top_n,
-                            margin=Policy.retrieve_rerank_margin,
-                            floor=Policy.retrieve_rerank_floor,
-                        )
-                        packed = pack_hits(cut, k=len(cut))
-                        if not packed:
-                            continue
-                        packed_chunks.extend(packed)
-                        excerpts = expand_hits(packed, result_i.corpus)
-                        n = _append_numbered(numbered, packed, excerpts, n)
-                score_map = by_id or None
-                outputs: dict = {
-                    "strategy": strategy,
-                    "n_packed": n - 1,
-                    "chunks": chunks_for_trace(packed_chunks, scores=score_map),
-                }
-                if by_id:
-                    scored = sorted(
-                        unique,
-                        key=lambda chunk: by_id[chunk.chunk_id],
-                        reverse=True,
-                    )
-                    outputs["chunks_scored"] = chunks_for_trace(
-                        scored, scores=by_id
-                    )
-                if error_type is not None:
-                    outputs["error_type"] = error_type
-                    outputs["error"] = error_msg
-                rerank_run.end(outputs=outputs)
 
         if is_retry:
             numbered = union_retry_evidence(
@@ -522,7 +527,214 @@ class RetrieveRunner:
             result["papers"] = newly_admitted
         return result
 
-    async def _formulate_query(
+    async def _one_facet_pass(
+        self,
+        merged: list[dict],
+        *,
+        hybrid_query: str,
+        rerank_query: str,
+        first_stage_k: int,
+        top_n: int,
+    ) -> list[dict]:
+        per_paper: list[HybridResult] = []
+        for paper in merged:
+            if not isinstance(paper, dict):
+                continue
+            per_paper.append(
+                await self._hybrid.retrieve(
+                    hybrid_query,
+                    [(paper["arxiv_id"], paper["version"])],
+                    k=first_stage_k,
+                )
+            )
+
+        unique: list[ChunkRecord] = []
+        seen_ids: set[str] = set()
+        for result_i in per_paper:
+            for chunk in result_i.ranked:
+                if chunk.chunk_id in seen_ids:
+                    continue
+                seen_ids.add(chunk.chunk_id)
+                unique.append(chunk)
+
+        numbered: list[dict] = []
+        if not unique:
+            return numbered
+        async with trace(
+            "rerank",
+            run_type="chain",
+            inputs={
+                "query": rerank_query,
+                "n_docs": len(unique),
+                "model": RERANK_MODEL_ID,
+                "chunks": chunks_for_trace(unique),
+            },
+            tags=["rerank"],
+            metadata={"model": RERANK_MODEL_ID},
+        ) as rerank_run:
+            strategy = "voyage"
+            error_type: str | None = None
+            error_msg: str | None = None
+            by_id: dict[str, float] = {}
+            packed_chunks: list[ChunkRecord] = []
+            n = 1
+            try:
+                scores = await asyncio.to_thread(
+                    score_chunks,
+                    unique,
+                    rerank_query,
+                    api_key=self._voyage_api_key,
+                )
+                chunk_ids = [chunk.chunk_id for chunk in unique]
+                by_id = dict(zip(chunk_ids, scores))
+            except Exception as exc:
+                logger.exception("voyage rerank failed; packing ensemble order")
+                strategy = "ensemble_order"
+                error_type = type(exc).__name__
+                error_msg = str(exc)
+                for result_i in per_paper:
+                    packed = pack_hits(result_i.ranked, k=top_n)
+                    if not packed:
+                        continue
+                    packed_chunks.extend(packed)
+                    excerpts = expand_hits(packed, result_i.corpus)
+                    n = _append_numbered(numbered, packed, excerpts, n)
+            else:
+                for result_i in per_paper:
+                    pairs = [
+                        (chunk, by_id[chunk.chunk_id])
+                        for chunk in result_i.ranked
+                    ]
+                    pairs.sort(key=lambda item: item[1], reverse=True)
+                    cut = cut_reranked(
+                        pairs,
+                        top_n=top_n,
+                        margin=Policy.retrieve_rerank_margin,
+                        floor=Policy.retrieve_rerank_floor,
+                    )
+                    packed = pack_hits(cut, k=len(cut))
+                    if not packed:
+                        continue
+                    packed_chunks.extend(packed)
+                    excerpts = expand_hits(packed, result_i.corpus)
+                    n = _append_numbered(numbered, packed, excerpts, n)
+            score_map = by_id or None
+            outputs: dict = {
+                "strategy": strategy,
+                "n_packed": n - 1,
+                "chunks": chunks_for_trace(packed_chunks, scores=score_map),
+            }
+            if by_id:
+                scored = sorted(
+                    unique,
+                    key=lambda chunk: by_id[chunk.chunk_id],
+                    reverse=True,
+                )
+                outputs["chunks_scored"] = chunks_for_trace(scored, scores=by_id)
+            if error_type is not None:
+                outputs["error_type"] = error_type
+                outputs["error"] = error_msg
+            rerank_run.end(outputs=outputs)
+        return numbered
+
+    async def _hop_leg(
+        self, paper: dict, hop: str
+    ) -> tuple[HybridResult | None, list[ChunkRecord]]:
+        try:
+            result = await self._hybrid.retrieve(
+                hop,
+                [(paper["arxiv_id"], paper["version"])],
+                k=Policy.retrieve_first_stage_k,
+            )
+        except Exception as exc:
+            logger.warning("hop hybrid failed; 0 slots (%s)", exc)
+            return None, []
+        if not result.ranked:
+            return result, []
+        prefix = result.ranked[: Policy.retrieve_hop_voyage_docs]
+        try:
+            scores = await asyncio.to_thread(
+                score_chunks,
+                prefix,
+                hop,
+                api_key=self._voyage_api_key,
+            )
+        except Exception as exc:
+            logger.warning("hop voyage failed; 0 slots (%s)", exc)
+            return result, []
+        pairs = list(zip(prefix, scores))
+        pairs.sort(key=lambda item: item[1], reverse=True)
+        cut = cut_reranked(
+            pairs,
+            top_n=Policy.retrieve_hop_voyage_docs,
+            margin=Policy.retrieve_rerank_margin,
+            floor=Policy.retrieve_rerank_floor,
+        )
+        return result, cut
+
+    async def _multi_first_pass(
+        self, merged: list[dict], hops: list[str]
+    ) -> list[dict]:
+        numbered: list[dict] = []
+        n = 1
+        packed_chunks: list[ChunkRecord] = []
+        async with trace(
+            "rerank",
+            run_type="chain",
+            inputs={
+                "query": " ".join(hops),
+                "hop_count": len(hops),
+                "used_hops": True,
+                "hops": hops,
+                "model": RERANK_MODEL_ID,
+            },
+            tags=["rerank"],
+            metadata={
+                "model": RERANK_MODEL_ID,
+                "hop_count": len(hops),
+                "used_hops": True,
+            },
+        ) as rerank_run:
+            for paper in merged:
+                if not isinstance(paper, dict):
+                    continue
+                legs = await asyncio.gather(
+                    *[self._hop_leg(paper, hop) for hop in hops]
+                )
+                cuts: list[list[ChunkRecord]] = []
+                corpus: list[ChunkRecord] = []
+                seen_corpus: set[str] = set()
+                for result_i, cut in legs:
+                    cuts.append(cut)
+                    if result_i is None:
+                        continue
+                    for chunk in result_i.corpus:
+                        if chunk.chunk_id in seen_corpus:
+                            continue
+                        seen_corpus.add(chunk.chunk_id)
+                        corpus.append(chunk)
+                fused = fuse_hop_cuts(
+                    cuts,
+                    pack_cap=Policy.retrieve_rerank_top_n,
+                    rrf_k=Policy.retrieve_hop_rrf_k,
+                )
+                packed = pack_hits(fused, k=len(fused))
+                if not packed:
+                    continue
+                packed_chunks.extend(packed)
+                excerpts = expand_hits(packed, corpus)
+                n = _append_numbered(numbered, packed, excerpts, n)
+            rerank_run.end(
+                outputs={
+                    "strategy": "voyage_hops",
+                    "n_packed": n - 1,
+                    "hop_count": len(hops),
+                    "chunks": chunks_for_trace(packed_chunks),
+                }
+            )
+        return numbered
+
+    async def _formulate_retrieve(
         self,
         task: str,
         *,
@@ -530,7 +742,7 @@ class RetrieveRunner:
         previous_query: str,
         is_retry: bool = False,
         student_query: str = "",
-    ) -> str:
+    ) -> FormulatedRetrieveQuery:
         human = (
             formulate_retry_human(
                 feedback=feedback, previous_query=previous_query
@@ -552,7 +764,12 @@ class RetrieveRunner:
                 ),
             ]
         )
-        if not isinstance(formulated, FormulatedQuery):
-            formulated = FormulatedQuery.model_validate(formulated)
-        query = formulated.query.strip()
-        return query or task
+        if not isinstance(formulated, FormulatedRetrieveQuery):
+            payload = (
+                formulated.model_dump()
+                if hasattr(formulated, "model_dump")
+                else formulated
+            )
+            formulated = FormulatedRetrieveQuery.model_validate(payload)
+        query = formulated.query.strip() or task
+        return FormulatedRetrieveQuery(query=query, hops=list(formulated.hops))

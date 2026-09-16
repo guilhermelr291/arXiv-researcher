@@ -12,6 +12,7 @@ from plan_based_researcher.eval.retrieve_recall import (
     RetrieveDataset,
     RetrieveItem,
     filter_dataset,
+    load_dataset,
     paper_report_key,
     recall_at_k,
     report_output_paths,
@@ -21,6 +22,13 @@ from plan_based_researcher.eval.retrieve_recall import (
     resolve_dataset_path,
     score_question,
 )
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_DOCUSEARCH_QREL = (
+    _REPO_ROOT / "eval" / "retrieve" / "2609.01617v1" / "2609.01617v1.json"
+)
+_Q16_TABLE_II = "4cdbb16c-3817-4bf1-963f-e41eaebe8733"
+_Q16_TABLE_I = "b30acfdb-1218-406c-93cc-32fa4c95a3be"
 
 _TABLE_BODY = (
     "TABLE V: Ablation Study: Grounding Rate\n"
@@ -286,6 +294,36 @@ class ResolveDatasetPathTest(unittest.TestCase):
             resolve_dataset_path(str(missing), repo_root=Path("/no-such-repo")),
             missing,
         )
+
+
+class CombinedAtomicQ16QrelTest(unittest.TestCase):
+    def test_q16_locks_table_ii_and_table_i_for_four_facts(self) -> None:
+        dataset = load_dataset(_DOCUSEARCH_QREL)
+        item = next(row for row in dataset.items if row.id == "q16")
+        self.assertIn("2609.01617", item.query)
+        self.assertEqual(item.question_type, "combined_atomic")
+        self.assertEqual(
+            item.required_chunk_ids,
+            (_Q16_TABLE_II, _Q16_TABLE_I),
+        )
+        answer = item.reference_answer
+        self.assertIn("0.35", answer)
+        self.assertIn("k=60", answer)
+        self.assertIn("BGE-Large-EN-v1.5", answer)
+        self.assertIn("Qdrant", answer)
+        self.assertIn("SQLite FTS5", answer)
+
+    def test_q16_table_ii_only_is_half_recall_at_ten(self) -> None:
+        row = score_question(
+            question_id="q16",
+            query="combined facts (2609.01617)",
+            required_chunk_ids=(_Q16_TABLE_II, _Q16_TABLE_I),
+            evidence_chunks=[{"chunk_id": _Q16_TABLE_II, "excerpt": "w_b=0.35 k=60"}],
+            ks=(10,),
+        )
+        self.assertEqual(row.scores[0].recall, 0.5)
+        self.assertEqual(row.scores[0].hits, (_Q16_TABLE_II,))
+        self.assertEqual(row.scores[0].misses, (_Q16_TABLE_I,))
 
 
 if __name__ == "__main__":

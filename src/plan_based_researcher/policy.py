@@ -40,6 +40,9 @@ class Policy:
     retrieve_retry_first_stage_k: int = 10
     retrieve_rerank_margin: float = 0.20
     retrieve_rerank_floor: float | None = 0.30
+    retrieve_hop_cap: int = 6
+    retrieve_hop_voyage_docs: int = 15
+    retrieve_hop_rrf_k: int = 60
     GROUNDING_RULE: str = (
         "every technical claim has a real [n] citation from the provided chunk list"
     )

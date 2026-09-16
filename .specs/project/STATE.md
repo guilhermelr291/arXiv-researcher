@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-09-13
-**Current Work:** Feature `retrieve-t3-union-retry` — T3 union pack + gap-only retry (ARX-9).
+**Last Updated:** 2026-09-16
+**Current Work:** Feature `retrieve-multi-facet-hops` — per-topic retrieve first pass (HOP-01–06).
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-028: Retrieve hops gate the multi first pass (2026-09-16)
+
+**Decision:** Retrieve formulate structured output is `query` plus `hops` (`list[str]`). After drop-empty and first-occurrence dedup, `len(hops) >= 2` on a first pass runs per-hop hybrid `k=40` and Voyage `rerank-3` on prefix 15 with the hop as query, then walk-firsts + 2nd RRF + overflow RRF (`k=60`) to pack ≤10. `len` 0 or 1 stays AD-018 1-facet (Voyage query = `task`). T3 retry ignores hops and stays one extra `rerank-3` on eval `feedback` (AD-027). Search `FormulatedQuery` stays `{query}` only. Cap `Policy.retrieve_hop_cap=6`.
+**Reason:** Union Voyage on the retrieve `task` ranks overviews above hop passages (q15 11 Sep). N plan retrieve steps last-write `evidence_chunks` and spend N evals.
+**Trade-off:** Multi first pass may call `rerank-3` up to 6 times (amends AD-027 “at most two per step” for that pass only). False-negative hops keep the 1-facet miss; false positives cost Voyage calls.
+**Impact:** Amends AD-018 (one Voyage on `task`) for `len(hops)>=2` first pass only. Amends AD-027 voyage budget for that first pass. Feature `.specs/features/retrieve-multi-facet-hops/`.
 
 ### AD-027: T3 routes on likely_in_paper; first pack is monotonic (2026-09-13)
 

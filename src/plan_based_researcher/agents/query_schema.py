@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 __all__ = [
     "FormulatedQuery",
+    "FormulatedRetrieveQuery",
     "formulate_human",
     "formulate_retry_human",
     "step_eval_feedback",
@@ -14,6 +15,16 @@ __all__ = [
 
 class FormulatedQuery(BaseModel):
     query: str = Field(description="The search or retrieval query string to execute")
+
+
+class FormulatedRetrieveQuery(BaseModel):
+    query: str = Field(
+        description="English hybrid query when hops length is 0 or 1"
+    )
+    hops: list[str] = Field(
+        default_factory=list,
+        description="English chunk-term queries for distinct coverages",
+    )
 
 
 def step_eval_feedback(state: dict, step_index: int) -> str:
