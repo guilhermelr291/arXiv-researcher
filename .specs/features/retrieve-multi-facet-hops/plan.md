@@ -57,7 +57,7 @@ When this ships, a first-pass retrieve whose formulate emits two or more topic s
 | T3 retry | Ignore `hops`; hybrid + Voyage = eval `feedback` only; union pin AD-027 | One retry remains one extra `rerank-3` | n |
 | `retrieve_query_used` on multi first pass | Executed hop strings joined by one ASCII space, not unused `query` | Eval reports store one string | n |
 | Live Independent Test | `scripts/retrieve_writer_recall.py --item-id q15` Recall@10 stays ≥ last `reports/retrieve/2609.01617v1/index.jsonl` for that item; 1-gold items keep their last Recall@10 floor | Current q15 is 3/3 at k=10; does not prove hops fired. Unit stubs prove the multi path | n |
-| Combined-atomic item q16 | Dataset item `q16` is the category-6 query (four independent facts, one paper). Qrel is Table II (`4cdbb16c-3817-4bf1-963f-e41eaebe8733`: \(w_b=0.35\), RRF \(k=60\)) and Table I (`b30acfdb-1218-406c-93cc-32fa4c95a3be`: BGE-Large-EN-v1.5, Qdrant, SQLite FTS5). Recall@10 SHALL be 1.0 (2/2). Packing only one table is 0.5 — the informative partial miss. Abstract is not a gold: it can cover all four facts in one chunk and hide the miss | User named this the primary live case for a single formulated retrieve query on a broad turn | y |
+| Combined eval items q17 and q18 | Dataset has no `q16`. Item `q17` is `combined_homogeneous` with Table II (`4cdbb16c-3817-4bf1-963f-e41eaebe8733`), chunking (`c5222792-6a8d-47b7-9efe-da4c85caee8d`), and sufficiency (`69885bfe-b65f-4153-91c5-bd16eeb63057`). Item `q18` is `combined_heterogeneous` with sub-problems (`d5b1b8f1-1a3d-4963-8af7-3f5de0f99328`) then those three ids. Live Recall@10 SHALL be 1.0 on each. Packing only Table II on q17 is 1/3 | User dropped q16; q17/q18 are the combined items in the qrel JSON | y |
 | tlc-spec-lean profile | `light` | No pin in `AGENTS.md`; no UI | n |
 
 **Open questions:** none - all resolved or logged above.
@@ -137,9 +137,9 @@ Grouped by slice — one observable outcome each. Numbering runs across the whol
 
 31. WHEN `scripts/retrieve_writer_recall.py` runs item `q15` of `eval/retrieve/2609.01617v1/2609.01617v1.json` on cached `2609.01617` v1 THEN Recall@10 SHALL be at least the Recall@10 last recorded for `q15` in `reports/retrieve/2609.01617v1/index.jsonl`
 32. WHEN the same CLI runs 1-gold items of that dataset (length of `required_chunk_ids` is 1) THEN each item’s Recall@10 SHALL be at least the Recall@10 last recorded for that `item_id` in `reports/retrieve/2609.01617v1/index.jsonl`
-33. WHEN `scripts/retrieve_writer_recall.py` runs item `q16` of that dataset on cached `2609.01617` v1 THEN Recall@10 SHALL equal 1.0 (both required `chunk_id`s in the writer pack: Table II `4cdbb16c-3817-4bf1-963f-e41eaebe8733` and Table I `b30acfdb-1218-406c-93cc-32fa4c95a3be`)
+33. WHEN `scripts/retrieve_writer_recall.py` runs items `q17` and `q18` of that dataset on cached `2609.01617` v1 THEN each item’s Recall@10 SHALL equal 1.0 (q17: Table II `4cdbb16c-3817-4bf1-963f-e41eaebe8733`, chunking `c5222792-6a8d-47b7-9efe-da4c85caee8d`, sufficiency `69885bfe-b65f-4153-91c5-bd16eeb63057`; q18: those three plus sub-problems `d5b1b8f1-1a3d-4963-8af7-3f5de0f99328`)
 
-**Independent test:** live UAT after unit proofs; not the unittest discover gate. No live OpenAI/Voyage from `tests/`. Dataset lock for `q16` is a unittest that loads the JSON (no live APIs).
+**Independent test:** live UAT after unit proofs; not the unittest discover gate. No live OpenAI/Voyage from `tests/`. Dataset lock for `q17`/`q18` is a unittest that loads the JSON (no live APIs).
 
 ## Traceability
 
@@ -171,8 +171,8 @@ Grouped by slice — one observable outcome each. Numbering runs across the whol
 | API `POST /research` | who may call it | existing - no auth in v1 |
 | API `POST /research` | versioning | n/a - single unversioned route |
 | API `POST /research` | rate limit | n/a - this feature does not add API throttling; Voyage fan-out is AC 11, 13, 23 |
-| command `scripts/retrieve_writer_recall.py` | flags / output | n/a - CLI unchanged; q15, 1-gold floors, and q16 2/2 are live Independent Tests AC 31, 32, 33 |
-| collection eval item `q16` | grouping, gold ids, four-fact reference | AC 33 |
+| command `scripts/retrieve_writer_recall.py` | flags / output | n/a - CLI unchanged; q15, 1-gold floors, and q17/q18 full recall are live Independent Tests AC 31, 32, 33 |
+| collection eval items `q17` and `q18` | grouping, gold ids, combined reference | AC 33 |
 
 ## Flow
 

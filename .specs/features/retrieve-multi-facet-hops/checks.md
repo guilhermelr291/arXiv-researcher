@@ -121,12 +121,14 @@ Proof: `uv run python scripts/retrieve_writer_recall.py --item-id q15 # q15 Reca
 **C32** - `scripts/retrieve_writer_recall.py` (full `2609.01617v1` dataset) yields Recall@10 for every item whose `required_chunk_ids` length is 1 at least the last recorded value for that `item_id` in `reports/retrieve/2609.01617v1/index.jsonl` (HOP-06, AC 32)
 Proof: `uv run python scripts/retrieve_writer_recall.py # 1-gold Recall@10 floor vs index.jsonl`
 
-**C33** - `scripts/retrieve_writer_recall.py --item-id q16` on cached `2609.01617` v1 yields Recall@10 equal to 1.0: both `4cdbb16c-3817-4bf1-963f-e41eaebe8733` (Table II: w_b=0.35, RRF k=60) and `b30acfdb-1218-406c-93cc-32fa4c95a3be` (Table I: BGE-Large-EN-v1.5, Qdrant, SQLite FTS5) are in the writer pack. Packing only one of those ids is Recall@10 = 0.5 (HOP-06, AC 33)
-Proof: `uv run python scripts/retrieve_writer_recall.py --item-id q16 # q16 Recall@10==1.0`
+**C33** - `scripts/retrieve_writer_recall.py --item-id q17` and `--item-id q18` on cached `2609.01617` v1 each yield Recall@10 equal to 1.0: q17 packs Table II `4cdbb16c-3817-4bf1-963f-e41eaebe8733`, chunking `c5222792-6a8d-47b7-9efe-da4c85caee8d`, and sufficiency `69885bfe-b65f-4153-91c5-bd16eeb63057`; q18 also packs sub-problems `d5b1b8f1-1a3d-4963-8af7-3f5de0f99328` (HOP-06, AC 33)
+Proof: `uv run python scripts/retrieve_writer_recall.py --item-id q17 # q17 Recall@10==1.0`
+Proof: `uv run python scripts/retrieve_writer_recall.py --item-id q18 # q18 Recall@10==1.0`
 
-**C34** - Dataset item `q16` is the category-6 combined-atomic query (Portuguese, arXiv pin `2609.01617`), `question_type` is `combined_atomic`, required ids are exactly Table II then Table I, and `reference_answer` names `0.35`, `k=60`, `BGE-Large-EN-v1.5`, `Qdrant`, and `SQLite FTS5`. Scoring that qrel with only Table II packed is Recall@10 = 0.5 (HOP-06, AC 33)
-Proof: `uv run python -m unittest tests.test_retrieve_recall -k test_q16_locks_table_ii_and_table_i_for_four_facts`
-Proof: `uv run python -m unittest tests.test_retrieve_recall -k test_q16_table_ii_only_is_half_recall_at_ten`
+**C34** - Dataset item `q17` is `combined_homogeneous` with those three required ids (arXiv pin `2609.01617`) and `reference_answer` names `0.35`, `k=60`, `900`, `140`, and `7`. Item `q18` is `combined_heterogeneous` with sub-problems then the q17 ids, and names signal incompleteness plus the same numeric facts. Scoring q17 with only Table II packed is Recall@10 = 1/3 (HOP-06, AC 33)
+Proof: `uv run python -m unittest tests.test_retrieve_recall -k test_q17_locks_homogeneous_three_golds`
+Proof: `uv run python -m unittest tests.test_retrieve_recall -k test_q18_locks_heterogeneous_four_golds`
+Proof: `uv run python -m unittest tests.test_retrieve_recall -k test_q17_table_ii_only_is_one_third_recall_at_ten`
 
 ## Coverage
 
@@ -136,10 +138,10 @@ Proof: `uv run python -m unittest tests.test_retrieve_recall -k test_q16_table_i
 | hops length gate (3) | `0` C7 · `1` C8 · `>=2` C9 | - |
 | hops normalize (3) | empty C4 · duplicates C5 · cap-6 C6 | - |
 | hop failure (3) | Voyage raise C23 · hybrid raise C24 · all-empty C26 | - |
-| q16 golds (2) | Table II C34 · Table I C34 | - |
-| S6 live items (3) | q15 C31 · 1-gold floor C32 · q16 C33 | - |
+| q17/q18 golds (2) | homogeneous C34 · heterogeneous C34 | - |
+| S6 live items (3) | q15 C31 · 1-gold floor C32 · q17/q18 C33 | - |
 
-- Claims naming a CLI item id or Recall@10: C31, C32, C33 - each names `--item-id` or the 1-gold floor command
+- Claims naming a CLI item id or Recall@10: C31, C32, C33 - each names `--item-id` or the 1-gold floor command (C33 names q17 and q18)
 - No other check claims more than the single case its proof exercises
 - `POST /research` is not a Surface route in the plan (`None - nothing consumed outside`)
 
