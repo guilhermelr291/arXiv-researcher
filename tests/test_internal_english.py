@@ -7,6 +7,7 @@ import unittest
 
 from plan_based_researcher.agents.gate import _SYSTEM_PROMPT as GATE_SYSTEM
 from plan_based_researcher.agents import planner as planner_mod
+from plan_based_researcher.agents.retrieve import _FORMULATE_SYSTEM as RETRIEVE_FORMULATE
 from plan_based_researcher.agents.registry import REGISTRY
 from plan_based_researcher.agents.writer import _system_prompt as writer_system
 from plan_based_researcher.api.schemas import GateDecision, PlanStep
@@ -63,6 +64,17 @@ class InternalEnglishLocksTest(unittest.TestCase):
 
     def test_retrieve_checklist_hole_feedback_is_facet(self) -> None:
         self.assertIn("English facet of the hole", _retrieve_checklist())
+
+    def test_retrieve_formulate_hops_are_english_chunk_terms(self) -> None:
+        self.assertIn("English chunk terms", RETRIEVE_FORMULATE)
+        self.assertIn("Do not copy the full retrieve task prose as a hop", RETRIEVE_FORMULATE)
+
+    def test_retrieve_formulate_when_to_emit_hops(self) -> None:
+        self.assertIn("length at least 2", RETRIEVE_FORMULATE)
+        self.assertIn("distinct coverages", RETRIEVE_FORMULATE)
+        self.assertIn("one chunk cannot cover", RETRIEVE_FORMULATE)
+        self.assertIn("empty hops", RETRIEVE_FORMULATE)
+        self.assertIn("one chunk can cover the task", RETRIEVE_FORMULATE)
 
 
 if __name__ == "__main__":

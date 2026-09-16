@@ -24,10 +24,12 @@ from plan_based_researcher.eval.strategies import (
 from plan_based_researcher.graph.build import GraphDeps
 from plan_based_researcher.graph.research_graph import ResearchGraph
 from plan_based_researcher.repo.chunks import PgChunkRepository
+from plan_based_researcher.selector_loop import require_psycopg_compatible_loop
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    require_psycopg_compatible_loop()
     settings = Settings()
     pool = AsyncConnectionPool(
         conninfo=settings.database_url,

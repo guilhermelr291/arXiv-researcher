@@ -121,8 +121,8 @@ cp .env.example .env   # fill keys
 docker compose up -d
 uv sync
 
-# API — http://127.0.0.1:8001
-uv run uvicorn plan_based_researcher.main:app --host 127.0.0.1 --port 8001
+# API — http://127.0.0.1:8001  (SelectorEventLoop; required on Windows for psycopg)
+uv run python -m plan_based_researcher --host 127.0.0.1 --port 8001
 
 # UI — http://127.0.0.1:8000  (separate terminal; do not share DATABASE_URL with Chainlit)
 uv run chainlit run src/plan_based_researcher/ui/app.py --port 8000

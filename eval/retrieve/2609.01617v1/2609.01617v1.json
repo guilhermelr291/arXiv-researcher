@@ -144,6 +144,29 @@
         "a46befae-aabc-4a11-bf4b-759c5889062b"
       ],
       "question_type": "multi_hop"
+    },
+    {
+      "id": "q17",
+      "query": "What BM25 weight and smoothing constant does DocuSearch's RRF fusion use, what chunk size and overlap does it use for document ingestion, and what sufficiency score threshold must a chunk clear before answer generation? (2609.01617)",
+      "reference_answer": "The RRF BM25 signal weight is w_b=0.35 and the smoothing constant is k=60. Documents are chunked with a chunk size of s=900 characters and an overlap of δ=140 characters. A chunk must receive a sufficiency score of at least τ=7 on a 1-10 scale before answer generation proceeds.",
+      "required_chunk_ids": [
+        "4cdbb16c-3817-4bf1-963f-e41eaebe8733",
+        "c5222792-6a8d-47b7-9efe-da4c85caee8d",
+        "69885bfe-b65f-4153-91c5-bd16eeb63057"
+      ],
+      "question_type": "combined_homogeneous"
+    }, 
+    {
+      "id": "q18",
+      "query": "What four core sub-problems does the paper identify as challenges standard RAG pipelines fail to handle, what BM25 weight and smoothing constant does DocuSearch's RRF fusion use, what chunk size and overlap does it use for ingestion, and what sufficiency score threshold must a chunk clear before answer generation? (2609.01617)",
+      "reference_answer": "The paper identifies signal incompleteness, chunk fragmentation, redundancy in evidence, and unverified grounding as the four core sub-problems. The RRF BM25 signal weight is w_b=0.35 and the smoothing constant is k=60. Documents are chunked with a chunk size of s=900 characters and an overlap of δ=140 characters. A chunk must receive a sufficiency score of at least τ=7 before answer generation proceeds.",
+      "required_chunk_ids": [
+        "d5b1b8f1-1a3d-4963-8af7-3f5de0f99328",
+        "4cdbb16c-3817-4bf1-963f-e41eaebe8733",
+        "c5222792-6a8d-47b7-9efe-da4c85caee8d",
+        "69885bfe-b65f-4153-91c5-bd16eeb63057"
+      ],
+      "question_type": "combined_heterogeneous"
     }
   ]
 }

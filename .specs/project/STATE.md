@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-09-13
-**Current Work:** Feature `retrieve-t3-union-retry` — T3 union pack + gap-only retry (ARX-9).
+**Last Updated:** 2026-09-16
+**Current Work:** Feature `retrieve-multi-facet-hops` — per-topic retrieve first pass (HOP-01–06).
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-028: Retrieve hops gate the multi first pass (2026-09-16)
+
+**Decision:** Retrieve formulate structured output is `query` plus `hops` (`list[str]`). After drop-empty and first-occurrence dedup, `len(hops) >= 2` on a first pass runs per-hop hybrid `k=40` and Voyage `rerank-3` on prefix 15 with the hop as query, then walk-firsts + 2nd RRF + overflow RRF (`k=60`) to pack ≤10. `len` 0 or 1 stays AD-018 1-facet (Voyage query = `task`). T3 retry ignores hops and stays one extra `rerank-3` on eval `feedback` (AD-027). Search `FormulatedQuery` stays `{query}` only. Cap `Policy.retrieve_hop_cap=6`.
+**Reason:** Union Voyage on the retrieve `task` ranks overviews above hop passages (q15 11 Sep). N plan retrieve steps last-write `evidence_chunks` and spend N evals.
+**Trade-off:** Multi first pass may call `rerank-3` up to 6 times (amends AD-027 “at most two per step” for that pass only). False-negative hops keep the 1-facet miss; false positives cost Voyage calls.
+**Impact:** Amends AD-018 (one Voyage on `task`) for `len(hops)>=2` first pass only. Amends AD-027 voyage budget for that first pass. Feature `.specs/features/retrieve-multi-facet-hops/`.
 
 ### AD-027: T3 routes on likely_in_paper; first pack is monotonic (2026-09-13)
 
@@ -215,7 +222,7 @@
 - `ChatOpenAI` validates `OPENAI_API_KEY` at construct time. Agent factory must pass `api_key` into Gate, Planner, and Writer runners; relying on env alone fails when Settings reads `.env` without exporting it.
 - Parallel `[P]` tasks cannot each `git commit` safely; implement in parallel, then serialize atomic commits on the orchestrator.
 - Sharing one psycopg pool with `AsyncPostgresSaver` (`dict_row`) means app SQL must read rows by column name (or set `tuple_row` on those cursors). Indexing `row[0]` crashes on cache hit and on RAG `fetchall`.
-- On Windows, psycopg async cannot use the default `ProactorEventLoop`; smoke/scripts need `WindowsSelectorEventLoopPolicy` (uvicorn typically already uses a compatible loop).
+- On Windows, psycopg async cannot use `ProactorEventLoop`. Scripts set `WindowsSelectorEventLoopPolicy` before `asyncio.run`. Uvicorn 0.36+ **selects Proactor on Win32** (`uvicorn.loops.asyncio`), so `uvicorn plan_based_researcher.main:app` hangs in `AsyncConnectionPool` until `PoolTimeout`. Boot with `python -m plan_based_researcher` (passes `--loop plan_based_researcher.selector_loop:new_selector_event_loop`). Lifespan calls `require_psycopg_compatible_loop()` so a Proactor boot fails immediately instead of retrying for 30s.
 - LangChain `ArxivRetriever` / `Search.results()` builds a new `arxiv.Client` per call (`page_size=100`). Parallel `Send("search")` then bursts `export.arxiv.org` and 429s. A shared Client (`page_size=8`, `delay_seconds=3`) plus an adapter lock keeps the graph fan-out and serializes HTTP.
 - LangGraph last-value channels reject more than one write per superstep. Parallel `Send("search")` all set `last_agent`; that key needs a last-write reducer (`Annotated[str, last_write]`), same class of issue as `search_artifacts` already had.
 - LangGraph 1.x compiled graphs only persist keys declared on `GraphState`. A routing field such as `eval_next` must be on the TypedDict or evaluate→replan is dropped and the loop always dispatches.

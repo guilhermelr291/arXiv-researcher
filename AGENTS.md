@@ -12,7 +12,7 @@ FastAPI SSE `POST /research` runs a LangGraph loop: gate → planner → dispatc
 uv sync
 uv run python -m unittest discover -s tests
 uv run python -m unittest tests.test_<module>
-uv run uvicorn plan_based_researcher.main:app --host 127.0.0.1 --port 8001
+uv run python -m plan_based_researcher --host 127.0.0.1 --port 8001
 uv run chainlit run src/plan_based_researcher/ui/app.py --port 8000
 ```
 

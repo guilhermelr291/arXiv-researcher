@@ -12,6 +12,7 @@ from plan_based_researcher.eval.retrieve_recall import (
     RetrieveDataset,
     RetrieveItem,
     filter_dataset,
+    load_dataset,
     paper_report_key,
     recall_at_k,
     report_output_paths,
@@ -21,6 +22,17 @@ from plan_based_researcher.eval.retrieve_recall import (
     resolve_dataset_path,
     score_question,
 )
+
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_DOCUSEARCH_QREL = (
+    _REPO_ROOT / "eval" / "retrieve" / "2609.01617v1" / "2609.01617v1.json"
+)
+_Q17_TABLE_II = "4cdbb16c-3817-4bf1-963f-e41eaebe8733"
+_Q17_CHUNK = "c5222792-6a8d-47b7-9efe-da4c85caee8d"
+_Q17_SUFFICIENCY = "69885bfe-b65f-4153-91c5-bd16eeb63057"
+_Q18_SUBPROBLEMS = "d5b1b8f1-1a3d-4963-8af7-3f5de0f99328"
+_Q17_IDS = (_Q17_TABLE_II, _Q17_CHUNK, _Q17_SUFFICIENCY)
+_Q18_IDS = (_Q18_SUBPROBLEMS, *_Q17_IDS)
 
 _TABLE_BODY = (
     "TABLE V: Ablation Study: Grounding Rate\n"
@@ -286,6 +298,46 @@ class ResolveDatasetPathTest(unittest.TestCase):
             resolve_dataset_path(str(missing), repo_root=Path("/no-such-repo")),
             missing,
         )
+
+
+class CombinedQrelLockTest(unittest.TestCase):
+    def test_q17_locks_homogeneous_three_golds(self) -> None:
+        dataset = load_dataset(_DOCUSEARCH_QREL)
+        item = next(row for row in dataset.items if row.id == "q17")
+        self.assertIn("2609.01617", item.query)
+        self.assertEqual(item.question_type, "combined_homogeneous")
+        self.assertEqual(item.required_chunk_ids, _Q17_IDS)
+        answer = item.reference_answer
+        self.assertIn("0.35", answer)
+        self.assertIn("k=60", answer)
+        self.assertIn("900", answer)
+        self.assertIn("140", answer)
+        self.assertIn("7", answer)
+
+    def test_q18_locks_heterogeneous_four_golds(self) -> None:
+        dataset = load_dataset(_DOCUSEARCH_QREL)
+        item = next(row for row in dataset.items if row.id == "q18")
+        self.assertIn("2609.01617", item.query)
+        self.assertEqual(item.question_type, "combined_heterogeneous")
+        self.assertEqual(item.required_chunk_ids, _Q18_IDS)
+        answer = item.reference_answer
+        self.assertIn("signal incompleteness", answer)
+        self.assertIn("0.35", answer)
+        self.assertIn("k=60", answer)
+        self.assertIn("900", answer)
+        self.assertIn("7", answer)
+
+    def test_q17_table_ii_only_is_one_third_recall_at_ten(self) -> None:
+        row = score_question(
+            question_id="q17",
+            query="combined facts (2609.01617)",
+            required_chunk_ids=_Q17_IDS,
+            evidence_chunks=[{"chunk_id": _Q17_TABLE_II, "excerpt": "w_b=0.35 k=60"}],
+            ks=(10,),
+        )
+        self.assertEqual(row.scores[0].recall, 1 / 3)
+        self.assertEqual(row.scores[0].hits, (_Q17_TABLE_II,))
+        self.assertEqual(row.scores[0].misses, (_Q17_CHUNK, _Q17_SUFFICIENCY))
 
 
 if __name__ == "__main__":
