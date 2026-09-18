@@ -44,6 +44,12 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: C65 web/lib/desk.test.tsx:374 (web)
 - last seen: 2026-09-17T18:53:55Z
 
+### L-006 - Keep each check's named vitest -t title in a living test file; deleting the only file that holds those titles leaves every check unproven even when vitest exits 0.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `web` · harmful: 0
+- features: web-markdown-katex
+- evidence: verification.md C1-C20 no evidence (web)
+- last seen: 2026-09-18T18:49:02Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

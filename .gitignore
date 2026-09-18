@@ -6,6 +6,8 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 .env
+.config
+.worktreeinclude
 dist/
 build/
 /graph.png
@@ -19,3 +21,4 @@ web/.next/
 *.tsbuildinfo
 
 node_modules/
+

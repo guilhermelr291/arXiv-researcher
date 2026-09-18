@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-09-17
-**Current Work:** Feature `agui-frontend` — AG-UI `POST /agent` + Next.js `web/` desk (build, uncommitted).
+**Last Updated:** 2026-09-18
+**Current Work:** Feature `web-markdown-katex` — desk `react-markdown` + GFM + KaTeX (build, uncommitted).
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-030: Desk assistant markdown is react-markdown + GFM + optional KaTeX (2026-09-18)
+
+**Decision:** Desk assistant markdown is `react-markdown` + `remark-gfm` + optional `remark-math`/`rehype-katex`. Numeric shortcut `[n]` is a post-GFM `linkReference` plugin; unknown n is text; destination links stay `a`. No `rehype-raw`. KaTeX CSS is `import "katex/dist/katex.min.css"` in the Markdown module. `math` defaults true; the desk passes `false` while the assistant block is streaming.
+**Reason:** Homemade `parseBlocks` had no TeX engine and forked GFM. Evidence already emits `$` / `$$`. Grill-me + `.specs/features/web-markdown-katex/plan.md`.
+**Trade-off:** Streaming tokens skip KaTeX so a half-open `$` cannot swallow the paragraph. Invalid TeX uses `rehype-katex` built-in handling (do not pass `throwOnError`).
+**Impact:** Amends AD-029's desk rendering of `[n]` (still thread-scoped SOURCES). Homemade `web/lib/markdown.tsx` / `renderCitedMarkdown` are gone. Feature `.specs/features/web-markdown-katex/`.
 
 ### AD-029: AG-UI wire, astream consume path, transcript in messages (2026-09-17)
 

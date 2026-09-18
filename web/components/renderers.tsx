@@ -3,9 +3,9 @@
 import type { ReactNode } from "react"
 
 import type { Block } from "../lib/blocks"
-import { renderMarkdown } from "../lib/markdown"
 import type { SourceItem } from "../lib/types"
 import { Citation } from "./Citation"
+import { Markdown } from "./Markdown"
 import { PlanBlock } from "./PlanBlock"
 import { StepRail } from "./StepRail"
 
@@ -47,9 +47,13 @@ function renderBlock(block: Block, sources: SourceItem[], onOpenSource: Props["o
     case "assistant":
       return (
         <div key={block.id} className="assistant-text">
-          {renderMarkdown(block.content, sources, (n, key) => (
-            <Citation key={key} sources={sources} n={n} onOpen={onOpenSource} />
-          ))}
+          <Markdown
+            source={block.content}
+            math={!block.streaming}
+            cite={(n, key) => (
+              <Citation key={key} sources={sources} n={n} onOpen={onOpenSource} />
+            )}
+          />
           {block.streaming ? <span className="cursor" aria-hidden="true" /> : null}
         </div>
       )
