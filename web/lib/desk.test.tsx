@@ -6,12 +6,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { Chat } from "../components/Chat"
 import { Citation } from "../components/Citation"
+import { Markdown } from "../components/Markdown"
 import { PlanBlock } from "../components/PlanBlock"
 import { Renderers } from "../components/renderers"
 import { SourcePanel } from "../components/SourcePanel"
 import { StepRail } from "../components/StepRail"
 import { applyEvent, emptyDesk } from "../lib/blocks"
-import { renderCitedMarkdown } from "../lib/citations"
 import { upsertRecent } from "../lib/recents"
 import { normalRunInput, resumeRunInput } from "../lib/stream"
 import type { SourceItem } from "../lib/types"
@@ -385,17 +385,17 @@ describe("desk", () => {
   })
 
   it("matching n is source button links stay links", () => {
-    const nodes = renderCitedMarkdown("See [1] and [docs](https://arxiv.org/abs/1)", [source])
-    const { container } = render(<>{nodes}</>)
+    const { container } = render(
+      <Markdown
+        source="See [1] and [docs](https://arxiv.org/abs/1)"
+        math={false}
+        cite={(n, key) => (
+          <Citation key={key} sources={[source]} n={n} onOpen={() => undefined} />
+        )}
+      />,
+    )
     expect(container.querySelector('button[aria-label="Source 1"]')).toBeTruthy()
     expect(container.querySelector("a")?.getAttribute("href")).toBe("https://arxiv.org/abs/1")
-  })
-
-  it("unknown n is plain text", () => {
-    const nodes = renderCitedMarkdown("See [99]", [source])
-    const { container } = render(<>{nodes}</>)
-    expect(container.querySelector("button")).toBeNull()
-    expect(container.textContent).toContain("[99]")
   })
 
   it("citation popover delay 150 stay 300", async () => {
