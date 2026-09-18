@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 6,
+  "next_id": 7,
   "lessons": [
     {
       "id": "L-001",
@@ -94,6 +94,24 @@
       ],
       "created": "2026-09-17T18:53:55Z",
       "last_seen": "2026-09-17T18:53:55Z"
+    },
+    {
+      "id": "L-006",
+      "key": "ac_gap::keep each check s named vitest t title in a living test file deleting the only file that holds those titles leaves every check unproven even when vitest exits 0",
+      "text": "Keep each check's named vitest -t title in a living test file; deleting the only file that holds those titles leaves every check unproven even when vitest exits 0.",
+      "signal": "ac_gap",
+      "scope": "web",
+      "status": "candidate",
+      "features": [
+        "web-markdown-katex"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "verification.md C1-C20 no evidence (web)"
+      ],
+      "created": "2026-09-18T18:49:02Z",
+      "last_seen": "2026-09-18T18:49:02Z"
     }
   ]
 }
