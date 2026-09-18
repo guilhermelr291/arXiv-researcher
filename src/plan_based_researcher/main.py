@@ -1,4 +1,4 @@
-"""FastAPI process: compile the graph once, ping Postgres (PAT-07, PAT-12, THR-01)."""
+"""FastAPI process: compile the graph once, ping Postgres."""
 
 from __future__ import annotations
 
@@ -13,10 +13,9 @@ from plan_based_researcher.adapters.arxiv import ArxivPaperAdapter
 from plan_based_researcher.adapters.hybrid import HybridRetrieveAdapter
 from plan_based_researcher.adapters.voyage_embeddings import VoyageEmbeddingAdapter
 from plan_based_researcher.agents.factory import AgentFactory
-from plan_based_researcher.api.executor import ResearchExecutor
+from plan_based_researcher.api.cors import install_cors
 from plan_based_researcher.api.routes import router
-from plan_based_researcher.api.stream_dispatcher import StreamDispatcher
-from plan_based_researcher.config import Settings
+from plan_based_researcher.config import Settings, web_origin
 from plan_based_researcher.eval.strategies import (
     RetrieveEvalStrategy,
     SearchEvalStrategy,
@@ -59,16 +58,14 @@ async def lifespan(app: FastAPI):
     )
     app.state.settings = settings
     app.state.pool = pool
-    app.state.executor = ResearchExecutor(
-        ResearchGraph(deps, checkpointer=checkpointer),
-        StreamDispatcher.default(),
-    )
+    app.state.graph = ResearchGraph(deps, checkpointer=checkpointer)
     yield
     await pool.close()
 
 
 def create_app() -> FastAPI:
     app = FastAPI(lifespan=lifespan)
+    install_cors(app, web_origin())
     app.include_router(router)
 
     @app.get("/health")

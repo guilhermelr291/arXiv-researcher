@@ -1,0 +1,80 @@
+{
+  "scored_at": "2026-09-16T21:59:29Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abd7-0a12-7a02-aa5c-a38d02153beb",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "What chunk size and overlap does DocuSearch use for document ingestion, and why were these particular values chosen? (2609.01617)",
+  "retrieved_contexts": [
+    "DocuSearch is implemented entirely in Python3 and served\nfrom a single application.\nTable[I](#S7.T1 \"TABLE I ‣ VII Implementation Details ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") summarises the core technology stack.  \nTABLE I: DocuSearch Core Technology Stack\n| Component | Technology |\n| --- | --- |\n| Vector Store | Qdrant (self-hosted) |\n| Embedding | BGE-Large-EN-v1.5 ($d{=}1024$, CUDA) |\n| Reranker | Cross-Encoder (CUDA) |\n| FTS Index | SQLite FTS5 |\n| Metadata Store | SQLite |\n| LLM Inference | Local REST or vLLM |\n| LLM Model | Mistral [10] |\n| Pipeline Graph | LangGraph |\n| UI Framework | Plotly Dash |\n| Doc Parsing | Docling, PyMuPDF, python-docx, openpyxl |\n| Auto Ingest | watchdog directory monitor |\n  \nDocuments reach the system through three paths: server-side\npath submission, browser upload via Dash dcc.Upload,\nor automatic detection through a watchdog directory\nmonitor. All formats are parsed and chunked with $s=900$\ncharacters and $\\delta=140$ characters overlap. These values were\nsettled on after experimenting with several chunk sizes;\nsmaller chunks hurt sufficiency scoring while larger ones\ndegraded retrieval precision. Table[II](#S7.T2 \"TABLE II ‣ VII Implementation Details ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\")\nsummarises the full retrieval configuration used across\nall experiments.  \nTABLE II: Default Retrieval and Ranking Configuration\n| Parameter | Symbol | Value |\n| --- | --- | --- |\n| Vector top-$k$ | $k_{v}$ | 40 |\n| BM25 top-$k$ | $k_{b}$ | 40 |\n| KG top-$k$ | $k_{kg}$ | 15 |\n| Rerank top-$k$ | $k_{r}$ | 12 |\n| Final evidence | $|\\mathcal{E}|$ | 10 |\n| RRF smoothing | $k$ | 60 |\n| RRF vector weight | $w_{v}$ | 0.50 |\n| RRF BM25 weight | $w_{b}$ | 0.35 |\n| RRF KG weight | $w_{kg}$ | 0.15 |\n| MMR lambda | $\\lambda$ | 0.65 |\n| Sufficiency thresh. | $\\tau$ | 7 |\n| Max neighbour loops | $L$ | 2 |\n| Chunk size | $s$ | 900 chars |\n| Chunk overlap | $\\delta$ | 140 chars |\n| LLM temperature | $T$ | 0.0 |\n  \nSession-only uploads are also supported: documents uploaded\nduring a session are embedded in memory using a local NumPy\narray (max $90{,}000$ chars, top-$k_{u}=8$) without being\nwritten to the persistent knowledge base. All LLM calls use\n$T=0.0$ to keep outputs deterministic across repeated\nqueries, which is important for reproducibility in an\noperational setting."
+  ],
+  "response": "## DocuSearch ingestion settings\n\nDocuSearch uses:\n\n- **Chunk size:** **900 characters**\n- **Chunk overlap:** **140 characters**\n\nThese are the default values used across the retrieval configuration. [1]\n\n## Why these values were chosen\n\nThe authors state that they tested several chunk sizes before settling on these values:\n\n- **Smaller chunks** reduced **sufficiency scores**, meaning individual chunks were less likely to contain enough information.\n- **Larger chunks** reduced **retrieval precision**, meaning retrieval became less focused.\n\nThus, **900 characters with a 140-character overlap** was selected as a practical balance between providing sufficient context and maintaining precise retrieval. The paper does not provide more detailed experimental results or a separate justification specifically for the 140-character overlap. [1]",
+  "metrics": {
+    "faithfulness": {
+      "value": 0.875,
+      "reason": "[supported] DocuSearch uses a chunk size of 900 characters. — The context explicitly states that documents are chunked with s=900 characters.\n[supported] DocuSearch uses a chunk overlap of 140 characters. — The context explicitly states that documents are chunked with δ=140 characters overlap.\n[unsupported] The values of 900 characters for chunk size and 140 characters for chunk overlap are the default values used across the retrieval configuration. — The context mentions that these values were settled on after experimentation, but does not explicitly state they are the default values used across the retrieval configuration.\n[supported] The authors tested several chunk sizes before settling on the values of 900 characters for chunk size and 140 characters for chunk overlap. — The context states that smaller and larger chunks were tested before settling on the values of 900 characters and 140 characters overlap.\n[supported] Smaller chunks reduced sufficiency scores, meaning individual chunks were less likely to contain enough information. — The context states that smaller chunks hurt sufficiency scoring, indicating that they were less effective.\n[supported] Larger chunks reduced retrieval precision, meaning retrieval became less focused. — The context states that larger chunks degraded retrieval precision, indicating a loss of focus.\n[supported] The selection of 900 characters with a 140-character overlap was made as a practical balance between providing sufficient context and maintaining precise retrieval. — The context discusses the trade-offs involved in selecting these values, indicating a practical balance was considered.\n[supported] The paper does not provide more detailed experimental results or a separate justification specifically for the 140-character overlap. — The context does not mention any detailed experimental results or justifications for the overlap, implying that such information is not provided.",
+      "statements": [
+        {
+          "statement": "DocuSearch uses a chunk size of 900 characters.",
+          "reason": "The context explicitly states that documents are chunked with s=900 characters.",
+          "verdict": 1
+        },
+        {
+          "statement": "DocuSearch uses a chunk overlap of 140 characters.",
+          "reason": "The context explicitly states that documents are chunked with δ=140 characters overlap.",
+          "verdict": 1
+        },
+        {
+          "statement": "The values of 900 characters for chunk size and 140 characters for chunk overlap are the default values used across the retrieval configuration.",
+          "reason": "The context mentions that these values were settled on after experimentation, but does not explicitly state they are the default values used across the retrieval configuration.",
+          "verdict": 0
+        },
+        {
+          "statement": "The authors tested several chunk sizes before settling on the values of 900 characters for chunk size and 140 characters for chunk overlap.",
+          "reason": "The context states that smaller and larger chunks were tested before settling on the values of 900 characters and 140 characters overlap.",
+          "verdict": 1
+        },
+        {
+          "statement": "Smaller chunks reduced sufficiency scores, meaning individual chunks were less likely to contain enough information.",
+          "reason": "The context states that smaller chunks hurt sufficiency scoring, indicating that they were less effective.",
+          "verdict": 1
+        },
+        {
+          "statement": "Larger chunks reduced retrieval precision, meaning retrieval became less focused.",
+          "reason": "The context states that larger chunks degraded retrieval precision, indicating a loss of focus.",
+          "verdict": 1
+        },
+        {
+          "statement": "The selection of 900 characters with a 140-character overlap was made as a practical balance between providing sufficient context and maintaining precise retrieval.",
+          "reason": "The context discusses the trade-offs involved in selecting these values, indicating a practical balance was considered.",
+          "verdict": 1
+        },
+        {
+          "statement": "The paper does not provide more detailed experimental results or a separate justification specifically for the 140-character overlap.",
+          "reason": "The context does not mention any detailed experimental results or justifications for the overlap, implying that such information is not provided.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.8661554651417339,
+      "reason": "generated='What are the chunk size and chunk overlap settings used by DocuSearch?' similarity=0.8662 noncommittal=0; generated='What are the chunk size and chunk overlap settings used by DocuSearch?' similarity=0.8662 noncommittal=0; generated='What are the chunk size and chunk overlap settings used by DocuSearch?' similarity=0.8662 noncommittal=0",
+      "generated_questions": [
+        "What are the chunk size and chunk overlap settings used by DocuSearch?",
+        "What are the chunk size and chunk overlap settings used by DocuSearch?",
+        "What are the chunk size and chunk overlap settings used by DocuSearch?"
+      ],
+      "noncommittal": [
+        0,
+        0,
+        0
+      ],
+      "similarities": [
+        0.8661554651417339,
+        0.8661554651417339,
+        0.8661554651417339
+      ],
+      "all_noncommittal": false
+    }
+  }
+}

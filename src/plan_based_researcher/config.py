@@ -1,8 +1,18 @@
+from __future__ import annotations
+
+import os
+
 from dotenv import load_dotenv
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 load_dotenv()
+
+DEFAULT_WEB_ORIGIN = "http://localhost:3000"
+
+
+def web_origin() -> str:
+    return os.environ.get("WEB_ORIGIN", DEFAULT_WEB_ORIGIN)
 
 
 class Settings(BaseSettings):
@@ -15,3 +25,4 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = 8001
     research_timeout_seconds: int = 120
+    web_origin: str = DEFAULT_WEB_ORIGIN

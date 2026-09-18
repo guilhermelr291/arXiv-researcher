@@ -152,6 +152,8 @@ class GraphState(TypedDict):
     hole_tasks: list[dict]
     evidence_chunks: list[EvidenceChunk]
     writer_markdown: str
+    writer_message_id: str
+    started_at_ms: int
     citations: list[dict]
     outcome: Literal["pending", "refused", "done", "insufficient", "error"]
     # SPEC_DEVIATION: eval_next is not in the design TypedDict.

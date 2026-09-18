@@ -1,0 +1,197 @@
+{
+  "scored_at": "2026-09-16T22:01:11Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abd8-8c12-7813-8530-6e50e18e113c",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "How does the paper propose applying reinforcement learning to DocuSearch's retrieval pipeline, and what performance gains does it project from this approach? (2609.01617)",
+  "retrieved_contexts": [
+    "The sequential LLM calls in the per-chunk evaluation phase\nare the main latency bottleneck, currently averaging $8.4$\nseconds. Parallelising chunk evaluation across inference\nthreads is a natural first step. The RRF signal weights\nwere determined empirically on telecom documentation and\nmay not transfer well to other domains; learning them from\nquery-relevance feedback via a differentiable ranking\nobjective would make the system more broadly applicable.\nThere is also potential in using named entity recognition\nto populate the KG with typed entity-relation triples,\nwhich would strengthen multi-hop query handling. Finally,\nextending DocuSearch to multimodal retrieval — covering\nembedded diagrams and specification tables that are\npervasive in vendor documentation — is a compelling\ndirection worth pursuing.\nReinforcement Learning for Adaptive Retrieval.\nOne promising future direction is treating\nDocuSearch’s multi-step retrieval workflow as a sequential\ndecision problem. The intuition comes from Karpathy’s\ninteractive GridWorld temporal-difference learning\ndemo[11], where an agent learns to\nnavigate a grid by trial-and-error using TD updates —\nwithout any hard-coded path rules. The analogy to the\npipeline is direct: just as that agent discovers which\nmoves lead to reward by accumulating Q-values over many\nepisodes, a retrieval agent in DocuSearch could learn\nwhen to invoke BM25, when to expand KG\nneighbours, and when to stop — adapting\ndynamically to each incoming query rather than applying\nthe same fixed configuration every time.\nFormally, each query-answer interaction can be modelled as\nan episode in a Markov Decision Process\n$\\mathcal{M}=(\\mathcal{S},\\mathcal{A},\\mathcal{P},\\mathcal{R},\\gamma)$.\nThe state $s\\in\\mathcal{S}$ encodes the current query\nintent, the set of chunks retrieved so far, reranker\nconfidence scores, KG expansion status, and evidence\ncoverage. The action space $\\mathcal{A}$ includes\ndiscrete choices such as triggering a BM25 search,\nexpanding KG neighbours by one hop, tightening the\ncross-encoder top-$k$, fetching a neighbouring chunk,\nor terminating retrieval and proceeding to answer\ngeneration. The reward $\\mathcal{R}$ is shaped by\nanswer groundedness (which is already measured at inference\ntime), engineer satisfaction feedback collected through",
+    "Getting accurate, grounded answers out of large enterprise document\nrepositories is a difficult problem. Dense vector retrieval alone\nfrequently performs poorly on queries that mix technical\nterminology, vendor-specific acronyms, or require reasoning\nacross several non-adjacent sections. DocuSearch was built\nto address exactly this gap — an offline, multi-agent document\nintelligence system developed and evaluated in a production\ntelecom network operations environment. Rather than relying on a\nsingle retrieval signal, DocuSearch pulls together three\ncomplementary sources of evidence: semantic search over a Qdrant\nvector store using BGE-Large embeddings, BM25 full-text search\nover an SQLite FTS5 index, and Knowledge Graph neighbour expansion\nfrom a structured edge table. These three ranked lists are merged\nthrough Reciprocal Rank Fusion (RRF) with signal weights\n$w_{v}=0.50$, $w_{b}=0.35$, and $w_{kg}=0.15$, giving:  \nEquation\n$$\ns_{\\mathrm{RRF}}(d)\\;=\\;\\sum_{i\\in\\{v,\\,b,\\,kg\\}}\\frac{w_{i}}{k+r_{i}(d)},\\quad k=60\n$$  \nwhere $r_{i}(d)$ is the rank of chunk $d$ in signal list $i$.\nA cross-encoder then reranks the fused list, and Maximal\nMarginal Relevance (MMR) with $\\lambda=0.65$ prunes it\nfor both relevance and diversity. What makes DocuSearch\ndistinctive is a per-chunk evaluation loop that\ntreats each selected chunk as its own mini-retrieval problem:\nan LLM decides whether the chunk needs additional neighbouring\ncontext, whether it is actually sufficient to answer the query,\nand whether the answer it generates is genuinely grounded in\nthe retrieved text. Ungrounded answers are not returned; the\nsystem falls back to a multi-chunk merge instead. On an\ninternal telecom document corpus, DocuSearch reaches\nPrecision@10 of $0.69$, Recall@10 of $0.79$, and a grounding\nrate of $89.6\\%$ — gains of $15$, $16$, and $18.4$ percentage\npoints over a dense-only RAG baseline.",
+    "or terminating retrieval and proceeding to answer\ngeneration. The reward $\\mathcal{R}$ is shaped by\nanswer groundedness (which is already measured at inference\ntime), engineer satisfaction feedback collected through\nthe Dash UI, citation accuracy, and a latency penalty to\ndiscourage unnecessarily long retrieval chains:  \nEquation\n$$\n\\mathcal{R}=\\alpha\\cdot\\text{Groundedness}+\\beta\\cdot\\text{Feedback}-\\gamma_{l}\\cdot\\text{Latency}\n$$  \nTo give this direction a concrete anchor, a\ncomposite system accuracy $\\Phi$ is introduced that jointly captures\nretrieval quality and answer fidelity:  \nEquation\n$$\n\\Phi=0.30\\cdot P@10\\;+\\;0.30\\cdot R@10\\;+\\;0.40\\cdot\\text{Grounding}\n$$  \nUnder the current rule-based configuration, plugging in\nthe reported numbers gives:  \nEquation\n$$\n\\Phi_{\\text{current}}=0.30\\times 0.69+0.30\\times 0.79+0.40\\times 0.896\\approx 80.2\\%\n$$  \nAn offline-trained Q-Learning policy,\noptimised on logged production trajectories, is projected to lift\n$P@10$ to approximately $0.76$ ($+7$pp),\n$R@10$ to approximately $0.86$ ($+7$pp),\nand the grounding rate to approximately $94.5\\%$\n($+4.9$pp). These are deliberately conservative\nestimates: because DocuSearch already incorporates\ncross-encoder reranking, MMR selection, and a per-chunk\nsufficiency gate, the remaining headroom for any\nsingle optimisation layer is bounded. What the RL agent\nwould learn to do differently from the current fixed\npolicy is route precision-heavy queries through BM25\nrather than relying solely on dense retrieval, expand\nKG neighbours more aggressively on recall-sensitive\ntroubleshooting queries, and halt retrieval earlier\nwhen accumulated evidence already clears the sufficiency\nthreshold — decisions that are currently hard-coded but\ncould be learned from query-level feedback. Under these\nassumptions:  \nEquation\n$$\n\\Phi_{\\text{RL}}=0.30\\times 0.76+0.30\\times 0.86+0.40\\times 0.945\\approx 86.4\\%\n$$  \nThis represents an overall improvement of approximately\n$\\mathbf{6.2}$ percentage points, lifting composite\naccuracy from $\\approx 80\\%$ to $\\approx 86\\%$.\nTable[VI](#S9.T6 \"TABLE VI ‣ IX-A Limitations and Future Work ‣ IX Conclusion ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") summarises the projected\ngains per metric.  \nTABLE VI: Projected Performance Gains with RL-Based Adaptive Retrieval\n| Metric | Current | Projected (RL) | Gain |\n| --- | --- | --- | --- |\n| $P@10$ | 0.69 | 0.76 | $+7$ pp |\n| $R@10$ | 0.79 | 0.86 | $+7$ pp |\n| Grounding | 89.6% | 94.5% | $+4.9$ pp |\n| $\\Phi$ (composite) | 80.2% | 86.4% | $\\mathbf{+6.2}$ pp |\n  \nOff-policy Q-Learning is a natural fit here. Document\nretrieval is largely deterministic — the same action",
+    "gains per metric.  \nTABLE VI: Projected Performance Gains with RL-Based Adaptive Retrieval  \nOff-policy Q-Learning is a natural fit here. Document\nretrieval is largely deterministic — the same action\nin the same state reliably produces the same next chunk\nset — so off-policy updates converge faster than\non-policy SARSA in this setting, mirroring the behaviour\nKarpathy’s demo exhibits in deterministic grid\nenvironments. In practice, this involves logging\nstate-action-reward trajectories from production\ninteractions, training an offline policy on these traces,\nand shadow-testing it against the current rule-based\npipeline before any live deployment. Over time, this\nwould allow DocuSearch to move from hand-tuned\nhyperparameters towards a system that continuously\nimproves from operational feedback — a meaningful step\ntoward truly adaptive enterprise document intelligence.",
+    "Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search > VIII Results and Analysis > VIII-A Retrieval Quality\nTABLE III: Retrieval Quality Comparison\n| Configuration | P@5 | R@5 | P@10 | R@10 |\n| --- | --- | --- | --- | --- |\n| Dense only | 0.61 | 0.48 | 0.54 | 0.63 |\n| Dense + BM25 | 0.68 | 0.56 | 0.61 | 0.71 |\n| DocuSearch (full) | 0.76 | 0.64 | 0.69 | 0.79 |\n",
+    "Table[IV](#S8.T4 \"TABLE IV ‣ VIII-B Answer Grounding ‣ VIII Results and Analysis ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") compares the per-chunk evaluation\nloop against a conventional single-pass RAG baseline.  \nTABLE IV: Answer Grounding and Hallucination Rates\n| System | Grounded | Hallucinated | Fallback |\n| --- | --- | --- | --- |\n| Single-pass RAG | 71.2% | 21.4% | — |\n| DocuSearch | 89.6% | 6.8% | 3.6% |\n  \nDocuSearch achieves a grounding rate of $89.6\\%$, an\n$18.4$ percentage point improvement over single-pass RAG,\nand cuts the hallucination rate from $21.4\\%$ to $6.8\\%$.\nThe remaining $3.6\\%$ of queries hit the fallback path,\nwhere all expanded contexts are merged — these still\nproduce grounded answers, just through the consolidated\nroute rather than the per-chunk route.",
+    "This paper presented DocuSearch, a hybrid multi-agent RAG system\nbuilt for enterprise document intelligence in multi-vendor\ntelecom environments. The system was designed around three\nfailure modes observed in production: signal\nincompleteness, context fragmentation, and unverified answer\ngrounding. The two-phase pipeline — hybrid retrieval\nfusion followed by per-chunk agentic evaluation — directly\naddresses all three. Results show Precision@10 of $0.69$,\nRecall@10 of $0.79$, and a grounding rate of $89.6\\%$, with\nhallucinations dropping to $6.8\\%$. The ablation confirms\nthat groundedness verification and sufficiency scoring drive\nthe largest improvements, though no single component is\nredundant.\nA key practical finding is that\nproduction-quality document intelligence is achievable\nentirely on locally hosted models. DocuSearch requires no\nexternal API calls, which matters a great deal in telecom\noperations environments where sensitive network configuration\ndata cannot leave the organisation’s infrastructure.",
+    "Table[III](#S8.T3 \"TABLE III ‣ VIII-A Retrieval Quality ‣ VIII Results and Analysis ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") compares Precision@$k$ and\nRecall@$k$ across three configurations on $120$ manually\nannotated queries spanning all five template categories.  \nTABLE III: Retrieval Quality Comparison  \nThe full three-signal system outperforms both baselines\nacross every metric. The most pronounced gain is in\nRecall@10, where KG expansion consistently recovers\nstructurally related chunks that neither dense nor BM25\nretrieval surfaces on its own — particularly for\ntroubleshooting queries where the relevant fix appears\nin a section referenced by, but not adjacent to, the\ninitial symptom description."
+  ],
+  "response": "## Propuesta de aplicación del aprendizaje por refuerzo\n\nEl artículo propone intervenir en la **etapa de recuperación**, no reemplazar todo DocuSearch. Actualmente, DocuSearch combina búsqueda semántica densa, BM25 y expansión mediante vecinos del grafo de conocimiento; después fusiona los resultados con RRF y los reranquea con un cross-encoder y MMR [2]. La idea es convertir este flujo de varios pasos en un problema de decisión secuencial: para cada consulta, un agente aprendería qué acciones ejecutar y cuándo detenerse [1].\n\nEl estado del agente incluiría, entre otros elementos, la intención de la consulta, los fragmentos recuperados hasta el momento, la confianza del reranker, el estado de la expansión del grafo y la cobertura de la evidencia [1]. Sus acciones podrían ser:\n\n- activar BM25;\n- expandir vecinos del grafo de conocimiento un salto;\n- modificar el número de resultados conservados por el cross-encoder;\n- recuperar un fragmento vecino; o\n- terminar la recuperación y pasar a la generación de la respuesta [1].\n\nEl premio combinaría la calidad de la respuesta y el coste operativo: groundedness, retroalimentación de los ingenieros y una penalización por latencia [3]. El artículo propone entrenar una política de **Q-Learning offline** usando trayectorias registradas de interacciones de producción y probarla primero en modo “shadow” frente al sistema actual basado en reglas [4].\n\nEn términos prácticos, el agente aprendería a dirigir consultas orientadas a la precisión hacia BM25, expandir más el grafo en consultas de troubleshooting sensibles al recall y detener antes la recuperación cuando la evidencia ya supere el umbral de suficiencia [3].\n\n## Resultados actuales frente a proyecciones\n\nLos resultados medidos corresponden al DocuSearch actual, no a una política de RL. En el corpus interno de telecomunicaciones, el sistema obtiene:\n\n| Métrica | DocuSearch actual |\n|---|---:|\n| Precision@10 | 0.69 |\n| Recall@10 | 0.79 |\n| Grounding | 89.6% |\n\nEstos valores representan mejoras de 15, 16 y 18.4 puntos porcentuales, respectivamente, frente a un baseline RAG basado solamente en recuperación densa [2]. La tabla de ablación también muestra que DocuSearch supera a las configuraciones “Dense only” y “Dense + BM25”; por ejemplo, en P@10 y R@10 alcanza 0.69 y 0.79, frente a 0.54 y 0.63 del sistema denso [5].\n\nPara la evaluación de grounding, el baseline es un RAG de una sola pasada: obtiene 71.2% de respuestas grounded y 21.4% de respuestas alucinadas, mientras que DocuSearch obtiene 89.6% y 6.8%, respectivamente [6].\n\n## Ganancias que el artículo proyecta para RL\n\nEl artículo define una métrica compuesta:\n\n\\[\n\\Phi=0.30P@10+0.30R@10+0.40\\,Grounding\n\\]\n\nCon las cifras actuales, calcula aproximadamente \\(\\Phi_{\\text{current}}=80.2\\%\\) [3]. Para una política de Q-Learning offline, proyecta:\n\n| Métrica | Actual | Proyectada con RL | Mejora |\n|---|---:|---:|---:|\n| P@10 | 0.69 | 0.76 | +7 pp |\n| R@10 | 0.79 | 0.86 | +7 pp |\n| Grounding | 89.6% | 94.5% | +4.9 pp |\n| \\(\\Phi\\) | 80.2% | 86.4% | +6.2 pp |\n\nPor tanto, la predicción global es una mejora de aproximadamente **6.2 puntos porcentuales** en la métrica compuesta, desde cerca de 80.2% hasta 86.4% [3].\n\n## Limitaciones y contradicciones\n\nLa evidencia presenta estas cifras como **proyecciones conservadoras**, no como resultados obtenidos mediante un experimento de RL desplegado: el entrenamiento offline y la prueba en shadow aparecen descritos como pasos futuros [3][4]. Por ello, el artículo no establece que el agente haya conseguido realmente P@10 de 0.76, Recall@10 de 0.86 o grounding de 94.5%.\n\nTambién hay una pequeña inconsistencia en la descripción de la recompensa. Un fragmento dice que la recompensa incorpora groundedness, feedback de ingenieros, **exactitud de las citas** y latencia [1], pero la fórmula presentada después solo incluye groundedness, feedback y penalización por latencia [3]. El artículo no explica cómo se incorpora finalmente la exactitud de las citas en la función matemática.\n\nEn resumen, DocuSearch ya demuestra mejoras con su pipeline híbrido actual, mientras que las ganancias atribuidas a RL son estimaciones sobre una futura política adaptativa y todavía no resultados experimentales demostrados [2][3].",
+  "metrics": {
+    "faithfulness": {
+      "value": 1.0,
+      "reason": "[supported] The article proposes to intervene in the retrieval stage of DocuSearch without replacing the entire system. — The context discusses enhancing the retrieval process without a complete system overhaul.\n[supported] Currently, DocuSearch combines dense semantic search, BM25, and expansion using knowledge graph neighbors. — The context explicitly states that DocuSearch uses these three methods for retrieval.\n[supported] DocuSearch then merges results with RRF and re-ranks them using a cross-encoder and MMR. — The context describes the merging of results with RRF and the use of a cross-encoder for re-ranking.\n[supported] The idea is to convert this multi-step flow into a sequential decision problem. — The context mentions treating DocuSearch’s retrieval workflow as a sequential decision problem.\n[supported] For each query, an agent would learn which actions to execute and when to stop. — The context describes an agent learning to make decisions based on query interactions.\n[supported] The state of the agent would include the query intention, the fragments retrieved so far, the confidence of the re-ranker, the state of the graph expansion, and the coverage of the evidence. — The context outlines the components of the agent's state in detail.\n[supported] The actions of the agent could include activating BM25, expanding knowledge graph neighbors by one hop, modifying the number of results retained by the cross-encoder, retrieving a neighboring fragment, or ending the retrieval and moving to response generation. — The context lists the possible actions the agent can take during retrieval.\n[supported] The reward would combine the quality of the response and the operational cost, including groundedness, feedback from engineers, and a penalty for latency. — The context describes how the reward is shaped by various factors including groundedness and feedback.\n[supported] The article proposes to train an offline Q-Learning policy using recorded trajectories of production interactions and to test it first in shadow mode against the current rule-based system. — The context discusses training an offline Q-Learning policy and testing it against the current system.\n[supported] In practical terms, the agent would learn to direct precision-oriented queries towards BM25, expand the graph more in recall-sensitive troubleshooting queries, and stop retrieval earlier when the evidence exceeds the sufficiency threshold. — The context explains how the agent would adapt its actions based on query types.\n[supported] The measured results correspond to the current DocuSearch, not to a reinforcement learning policy. — The context clarifies that the results mentioned are from the current system, not from an RL policy.\n[supported] In the internal telecommunications corpus, the system achieves specific precision and recall metrics. — The context provides specific precision and recall metrics achieved by DocuSearch.\n[supported] These values represent improvements of 15, 16, and 18.4 percentage points, respectively, compared to a baseline RAG based solely on dense retrieval. — The context states the improvements in metrics compared to a baseline.\n[supported] The ablation table also shows that DocuSearch outperforms the configurations 'Dense only' and 'Dense + BM25'. — The context mentions that DocuSearch outperforms these configurations.\n[supported] For example, in P@10 and R@10, DocuSearch achieves 0.69 and 0.79, compared to 0.54 and 0.63 of the dense system. — The context provides specific performance metrics for DocuSearch compared to the dense system.\n[supported] For grounding evaluation, the baseline is a single-pass RAG, which achieves 71.2% grounded responses and 21.4% hallucinated responses. — The context states the grounding evaluation metrics for the baseline system.\n[supported] In contrast, DocuSearch achieves 89.6% grounded responses and 6.8% hallucinated responses. — The context provides the grounding and hallucination rates for DocuSearch.\n[supported] The article defines a composite metric that combines precision, recall, and grounding. — The context describes the composite metric that includes these elements.\n[supported] With the current figures, the article calculates approximately 80.2% for the current composite metric. — The context provides a calculation for the current composite metric.\n[supported] For an offline Q-Learning policy, the article projects specific improvements in precision, recall, grounding, and the composite metric. — The context discusses projected improvements for the offline Q-Learning policy.\n[supported] The overall prediction is an improvement of approximately 6.2 percentage points in the composite metric, from about 80.2% to 86.4%. — The context provides a specific prediction for improvement in the composite metric.\n[supported] The evidence presents these figures as conservative projections, not as results obtained from a deployed RL experiment. — The context clarifies that the figures are projections and not actual results.\n[supported] The offline training and shadow testing are described as future steps. — The context mentions offline training and shadow testing as future plans.\n[supported] The article does not claim that the agent has actually achieved P@10 of 0.76, Recall@10 of 0.86, or grounding of 94.5%. — The context explicitly states that these achievements are not claimed yet.\n[supported] There is a small inconsistency in the description of the reward. — The context mentions a discrepancy in how the reward is described.\n[supported] One fragment states that the reward incorporates groundedness, feedback from engineers, accuracy of citations, and latency. — The context provides details on what the reward should include.\n[supported] However, the formula presented later only includes groundedness, feedback, and penalty for latency. — The context points out that the formula does not include accuracy of citations.\n[supported] The article does not explain how the accuracy of citations is ultimately incorporated into the mathematical function. — The context indicates a lack of explanation regarding citation accuracy in the reward function.\n[supported] In summary, DocuSearch already demonstrates improvements with its current hybrid pipeline. — The context summarizes the improvements achieved by DocuSearch.\n[supported] The gains attributed to reinforcement learning are estimates of a future adaptive policy and not yet demonstrated experimental results. — The context clarifies that the gains are projections for future improvements.",
+      "statements": [
+        {
+          "statement": "The article proposes to intervene in the retrieval stage of DocuSearch without replacing the entire system.",
+          "reason": "The context discusses enhancing the retrieval process without a complete system overhaul.",
+          "verdict": 1
+        },
+        {
+          "statement": "Currently, DocuSearch combines dense semantic search, BM25, and expansion using knowledge graph neighbors.",
+          "reason": "The context explicitly states that DocuSearch uses these three methods for retrieval.",
+          "verdict": 1
+        },
+        {
+          "statement": "DocuSearch then merges results with RRF and re-ranks them using a cross-encoder and MMR.",
+          "reason": "The context describes the merging of results with RRF and the use of a cross-encoder for re-ranking.",
+          "verdict": 1
+        },
+        {
+          "statement": "The idea is to convert this multi-step flow into a sequential decision problem.",
+          "reason": "The context mentions treating DocuSearch’s retrieval workflow as a sequential decision problem.",
+          "verdict": 1
+        },
+        {
+          "statement": "For each query, an agent would learn which actions to execute and when to stop.",
+          "reason": "The context describes an agent learning to make decisions based on query interactions.",
+          "verdict": 1
+        },
+        {
+          "statement": "The state of the agent would include the query intention, the fragments retrieved so far, the confidence of the re-ranker, the state of the graph expansion, and the coverage of the evidence.",
+          "reason": "The context outlines the components of the agent's state in detail.",
+          "verdict": 1
+        },
+        {
+          "statement": "The actions of the agent could include activating BM25, expanding knowledge graph neighbors by one hop, modifying the number of results retained by the cross-encoder, retrieving a neighboring fragment, or ending the retrieval and moving to response generation.",
+          "reason": "The context lists the possible actions the agent can take during retrieval.",
+          "verdict": 1
+        },
+        {
+          "statement": "The reward would combine the quality of the response and the operational cost, including groundedness, feedback from engineers, and a penalty for latency.",
+          "reason": "The context describes how the reward is shaped by various factors including groundedness and feedback.",
+          "verdict": 1
+        },
+        {
+          "statement": "The article proposes to train an offline Q-Learning policy using recorded trajectories of production interactions and to test it first in shadow mode against the current rule-based system.",
+          "reason": "The context discusses training an offline Q-Learning policy and testing it against the current system.",
+          "verdict": 1
+        },
+        {
+          "statement": "In practical terms, the agent would learn to direct precision-oriented queries towards BM25, expand the graph more in recall-sensitive troubleshooting queries, and stop retrieval earlier when the evidence exceeds the sufficiency threshold.",
+          "reason": "The context explains how the agent would adapt its actions based on query types.",
+          "verdict": 1
+        },
+        {
+          "statement": "The measured results correspond to the current DocuSearch, not to a reinforcement learning policy.",
+          "reason": "The context clarifies that the results mentioned are from the current system, not from an RL policy.",
+          "verdict": 1
+        },
+        {
+          "statement": "In the internal telecommunications corpus, the system achieves specific precision and recall metrics.",
+          "reason": "The context provides specific precision and recall metrics achieved by DocuSearch.",
+          "verdict": 1
+        },
+        {
+          "statement": "These values represent improvements of 15, 16, and 18.4 percentage points, respectively, compared to a baseline RAG based solely on dense retrieval.",
+          "reason": "The context states the improvements in metrics compared to a baseline.",
+          "verdict": 1
+        },
+        {
+          "statement": "The ablation table also shows that DocuSearch outperforms the configurations 'Dense only' and 'Dense + BM25'.",
+          "reason": "The context mentions that DocuSearch outperforms these configurations.",
+          "verdict": 1
+        },
+        {
+          "statement": "For example, in P@10 and R@10, DocuSearch achieves 0.69 and 0.79, compared to 0.54 and 0.63 of the dense system.",
+          "reason": "The context provides specific performance metrics for DocuSearch compared to the dense system.",
+          "verdict": 1
+        },
+        {
+          "statement": "For grounding evaluation, the baseline is a single-pass RAG, which achieves 71.2% grounded responses and 21.4% hallucinated responses.",
+          "reason": "The context states the grounding evaluation metrics for the baseline system.",
+          "verdict": 1
+        },
+        {
+          "statement": "In contrast, DocuSearch achieves 89.6% grounded responses and 6.8% hallucinated responses.",
+          "reason": "The context provides the grounding and hallucination rates for DocuSearch.",
+          "verdict": 1
+        },
+        {
+          "statement": "The article defines a composite metric that combines precision, recall, and grounding.",
+          "reason": "The context describes the composite metric that includes these elements.",
+          "verdict": 1
+        },
+        {
+          "statement": "With the current figures, the article calculates approximately 80.2% for the current composite metric.",
+          "reason": "The context provides a calculation for the current composite metric.",
+          "verdict": 1
+        },
+        {
+          "statement": "For an offline Q-Learning policy, the article projects specific improvements in precision, recall, grounding, and the composite metric.",
+          "reason": "The context discusses projected improvements for the offline Q-Learning policy.",
+          "verdict": 1
+        },
+        {
+          "statement": "The overall prediction is an improvement of approximately 6.2 percentage points in the composite metric, from about 80.2% to 86.4%.",
+          "reason": "The context provides a specific prediction for improvement in the composite metric.",
+          "verdict": 1
+        },
+        {
+          "statement": "The evidence presents these figures as conservative projections, not as results obtained from a deployed RL experiment.",
+          "reason": "The context clarifies that the figures are projections and not actual results.",
+          "verdict": 1
+        },
+        {
+          "statement": "The offline training and shadow testing are described as future steps.",
+          "reason": "The context mentions offline training and shadow testing as future plans.",
+          "verdict": 1
+        },
+        {
+          "statement": "The article does not claim that the agent has actually achieved P@10 of 0.76, Recall@10 of 0.86, or grounding of 94.5%.",
+          "reason": "The context explicitly states that these achievements are not claimed yet.",
+          "verdict": 1
+        },
+        {
+          "statement": "There is a small inconsistency in the description of the reward.",
+          "reason": "The context mentions a discrepancy in how the reward is described.",
+          "verdict": 1
+        },
+        {
+          "statement": "One fragment states that the reward incorporates groundedness, feedback from engineers, accuracy of citations, and latency.",
+          "reason": "The context provides details on what the reward should include.",
+          "verdict": 1
+        },
+        {
+          "statement": "However, the formula presented later only includes groundedness, feedback, and penalty for latency.",
+          "reason": "The context points out that the formula does not include accuracy of citations.",
+          "verdict": 1
+        },
+        {
+          "statement": "The article does not explain how the accuracy of citations is ultimately incorporated into the mathematical function.",
+          "reason": "The context indicates a lack of explanation regarding citation accuracy in the reward function.",
+          "verdict": 1
+        },
+        {
+          "statement": "In summary, DocuSearch already demonstrates improvements with its current hybrid pipeline.",
+          "reason": "The context summarizes the improvements achieved by DocuSearch.",
+          "verdict": 1
+        },
+        {
+          "statement": "The gains attributed to reinforcement learning are estimates of a future adaptive policy and not yet demonstrated experimental results.",
+          "reason": "The context clarifies that the gains are projections for future improvements.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.0,
+      "reason": "All generated questions marked noncommittal; score forced to 0. generated='What are the projected improvements for DocuSearch using reinforcement learning according to the article?' similarity=0.7994 noncommittal=1; generated='What are the projected improvements for DocuSearch using reinforcement learning according to the article?' similarity=0.7994 noncommittal=1; generated='What are the projected improvements for DocuSearch using reinforcement learning according to the article?' similarity=0.7994 noncommittal=1",
+      "generated_questions": [
+        "What are the projected improvements for DocuSearch using reinforcement learning according to the article?",
+        "What are the projected improvements for DocuSearch using reinforcement learning according to the article?",
+        "What are the projected improvements for DocuSearch using reinforcement learning according to the article?"
+      ],
+      "noncommittal": [
+        1,
+        1,
+        1
+      ],
+      "similarities": [
+        0.7993942888126474,
+        0.7993942888126474,
+        0.7993942888126474
+      ],
+      "all_noncommittal": true
+    }
+  }
+}

@@ -17,7 +17,7 @@ This is the part recruiters should not skim.
 | Global `top-k` over a mixed corpus         | **One usable paper per search topic**; hybrid retrieve **per paper** so a compare query does not starve a method                                        |
 | Naive PDF `RecursiveCharacterTextSplitter` | **arXiv HTML ingest**: heading-aware prose (512/50 tokens), **tables and display equations stay atomic**                                                |
 | Dense search only                          | **RRF hybrid** (vector 0.7 / BM25 0.3) → Voyage `**rerank-3`** → **adaptive cut\*\* (`margin` / `floor` / `top_n`)                                      |
-| Chat UI owns the graph                     | **FastAPI SSE** is the product API. **Chainlit is an HTTP client** — it never imports LangGraph                                                         |
+| Chat UI owns the graph                     | **FastAPI SSE** is the product API. **`web/` is an HTTP client** — it never imports LangGraph                                                             |
 | “Looks good in the screenshot”             | Offline **RAGAS** (faithfulness + answer relevancy on Writer traces) **and** E2E **writer-pack Recall@k** on the **production graph** (Writer halted)   |
 
 Other product locks that usually never make it into a portfolio repo:
@@ -35,12 +35,12 @@ Other product locks that usually never make it into a portfolio repo:
 
 ## What a student actually sees
 
-1. Ask an AI/ML question in Chainlit (or `POST /research`).
+1. Ask an AI/ML question in the Next.js desk (or `POST /agent`).
 2. Gate accepts or refuses.
 3. Planner emits a structured plan (`search` × N → `retrieve` → `writer`; follow-ups can skip search).
 4. Consecutive search steps **fan out in parallel** (`LangGraph Send`), then a **wave judge** ranks titles+abstracts (no HTML yet).
 5. Retrieve walks each ranking, **ingests HTML on cache miss** `(arxiv_id, version)`, hybrid-overfetches, reranks against the **retrieve task**, packs `[n]`, expands table/equation bodies into excerpts.
-6. Writer streams markdown (`answer_delta`); citations arrive once for the side panel.
+6. Writer streams markdown; `[n]` in the prose opens the packed excerpt.
 7. Weak evidence → `insufficient`. Caps: 8 steps, 1 retry per step, 1 replan per run, 8 papers, ~2 min timeout.
 
 Evidence is **arXiv only**, categories `cs.AI` · `cs.LG` · `cs.CL` · `cs.CV` · `cs.NE` · `cs.RO` · `stat.ML`. Prefer papers from the last 5 years unless the planner marks a historical step.
@@ -51,7 +51,7 @@ Evidence is **arXiv only**, categories `cs.AI` · `cs.LG` · `cs.CL` · `cs.CV` 
 
 ```mermaid
 flowchart TB
-  UI[Chainlit HTTP client] -->|POST /research SSE| API[FastAPI]
+  UI[Next.js desk] -->|POST /agent SSE| API[FastAPI]
   API --> G[LangGraph compiled once in lifespan]
   G --> gate
   gate -->|refused| finalize
@@ -87,8 +87,8 @@ HTML parse → dual text (embedding_text vs BM25 content)
 | Layer          | Choice                                                                 |
 | -------------- | ---------------------------------------------------------------------- |
 | Language       | Python ≥ 3.12                                                          |
-| API            | FastAPI, `StreamingResponse` SSE (`astream_events` v2 dispatcher)      |
-| UI             | Chainlit (host process, port 8000)                                     |
+| API            | FastAPI, `StreamingResponse` SSE (`graph.astream` custom+updates)      |
+| UI             | Next.js App Router in `web/` (port 3000)                               |
 | Agents         | LangGraph 1.x + LangChain                                              |
 | LLMs           | OpenAI (`gpt-5.x` planner/writer vs mini on gate/search/retrieve/eval) |
 | Embed / rerank | Voyage `voyage-4-large` (1024-d) + `rerank-3`                          |
@@ -108,7 +108,7 @@ Two complementary harnesses — generation quality vs evidence delivery:
 
 Example from a live writer-pack run on `2609.11929v1`: **Recall@5 macro 0.944 / micro 0.926** (tables/equations count as hits when their body was **inlined** into a packed excerpt, not only when the atomic `chunk_id` sat in a packer slot).
 
-Unit gate: `python -m unittest discover -s tests` (130+ tests covering SSE frames, dispatch, rerank cut, HTML parse, recall scoring, Chainlit writer mapping).
+Unit gate: `python -m unittest discover -s tests` (190+ tests covering the AG-UI adapter, history prompts, rerank cut, HTML parse, recall scoring).
 
 ---
 
@@ -124,8 +124,9 @@ uv sync
 # API — http://127.0.0.1:8001  (SelectorEventLoop; required on Windows for psycopg)
 uv run python -m plan_based_researcher --host 127.0.0.1 --port 8001
 
-# UI — http://127.0.0.1:8000  (separate terminal; do not share DATABASE_URL with Chainlit)
-uv run chainlit run src/plan_based_researcher/ui/app.py --port 8000
+# UI — http://localhost:3000  (separate terminal)
+npm --prefix web install
+npm --prefix web run dev
 ```
 
 Health: `GET http://127.0.0.1:8001/health`
@@ -133,13 +134,13 @@ Health: `GET http://127.0.0.1:8001/health`
 Research:
 
 ```http
-POST /research
+POST /agent
 Content-Type: application/json
 
-{ "query": "How does multi-head attention work in the Transformer?", "thread_id": "<uuid>" }
+{ "threadId": "<uuid>", "runId": "<uuid>", "messages": [{ "id": "<uuid>", "role": "user", "content": "How does multi-head attention work in the Transformer?" }], "tools": [], "context": [], "forwardedProps": {} }
 ```
 
-`thread_id` is required (400 if missing). Follow-ups reuse the same id so the checkpointer keeps papers and plan.
+`threadId` is required. Follow-ups reuse the same id so the checkpointer keeps papers and the transcript.
 
 **Operator notes**
 
@@ -161,8 +162,8 @@ src/plan_based_researcher/
   adapters/       arXiv, hybrid retrieve, Voyage embeddings
   ports/          outbound contracts
   repo/           pgvector chunk store
-  api/            SSE headers, stream dispatcher, ResearchExecutor
-  ui/             Chainlit + SSE mapper (no graph import)
+  api/            AG-UI adapter, POST /agent, GET /threads
+web/              Next.js research desk (HTTP only)
 .specs/           product specs, designs, tasks (how the system was built)
 eval/retrieve/    golden queries + qrels
 reports/          RAGAS and recall reports

@@ -1,0 +1,95 @@
+{
+  "scored_at": "2026-09-16T21:59:05Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abd6-a621-7bf2-a233-58d4f3040e88",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "What four sub-problems does the paper identify as the core challenges that standard RAG pipelines fail to handle? (2609.01617)",
+  "retrieved_contexts": [
+    "Let $\\mathcal{D}=\\{d_{1},d_{2},\\ldots,d_{N}\\}$ be a large\nheterogeneous corpus of enterprise documents, where each\ndocument $d_{i}$ belongs to one or more vendor namespaces\n$\\mathcal{V}=\\{v_{1},v_{2},\\ldots,v_{M}\\}$. Each document\nis pre-processed into overlapping text chunks:  \nEquation\n$$\n\\mathcal{C}=\\bigcup_{i=1}^{N}\\bigl\\{c_{i,1},\\,c_{i,2},\\,\\ldots,\\,c_{i,k_{i}}\\bigr\\}\n$$  \nwhere $c_{i,j}$ is the $j$-th chunk of $d_{i}$ and $k_{i}$\nis the total chunk count for that document. Given a natural\nlanguage query $q$, the goal is to retrieve a subset\n$\\mathcal{E}\\subset\\mathcal{C}$ and generate an answer\n$a$ such that:  \nEquation\n$$\na=\\mathcal{G}\\!\\left(q,\\;\\mathcal{E}\\right)\n$$  \nwhere $\\mathcal{G}$ synthesises the answer strictly from\nretrieved evidence, without hallucinating content that\ndoes not appear in $\\mathcal{E}$. This deceptively simple\nformulation hides four concrete sub-problems that standard\npipelines fail to handle:  \n1. 1.  \nSignal incompleteness. No single retrieval\nfunction $f:q\\rightarrow\\mathcal{C}$ can capture\nall relevant chunks, because relevance spans semantic,\nlexical, and structural dimensions at the same time.\n2. 2.  \nChunk fragmentation. A chunk $c_{i,j}$\nretrieved in isolation is often incomplete when the\nrelevant procedure spans $c_{i,j-1}$ through $c_{i,j+1}$.\n3. 3.  \nRedundancy in evidence. Naive top-$k$\nselection tends to return clusters of near-duplicate\nchunks, squandering context window capacity on\nrepeated information.\n4. 4.  \nUnverified grounding. Standard RAG hands\nretrieved chunks to $\\mathcal{G}$ without ever checking\nwhether the generated answer $a$ is genuinely supported\nby $\\mathcal{E}$, which is a direct path to confident\nbut wrong responses.  \nDocuSearch addresses all four within a unified pipeline that\nruns entirely on locally hosted models with no dependency on\nexternal API services."
+  ],
+  "response": "The paper identifies four core sub-problems that standard RAG pipelines fail to handle [1]:\n\n1. **Signal incompleteness:** No single retrieval function captures all relevant chunks across semantic, lexical, and structural dimensions [1].\n2. **Chunk fragmentation:** A retrieved chunk may be incomplete when the relevant procedure spans neighboring chunks [1].\n3. **Redundancy in evidence:** Naive top-\\(k\\) retrieval can return near-duplicate chunks, wasting context-window capacity [1].\n4. **Unverified grounding:** Standard RAG does not check whether the generated answer is genuinely supported by the retrieved evidence, allowing confident but incorrect responses [1].\n\nNo substantive contradiction or ambiguity appears in the provided excerpt.",
+  "metrics": {
+    "faithfulness": {
+      "value": 1.0,
+      "reason": "[supported] The paper identifies four core sub-problems that standard RAG pipelines fail to handle. — The context explicitly states that there are four concrete sub-problems that standard pipelines fail to handle.\n[supported] The first sub-problem is signal incompleteness. — The context lists signal incompleteness as the first of the four sub-problems.\n[supported] No single retrieval function captures all relevant chunks across semantic, lexical, and structural dimensions. — The context mentions that no single retrieval function can capture all relevant chunks due to the complexity of relevance spanning multiple dimensions.\n[supported] The second sub-problem is chunk fragmentation. — The context explicitly states that chunk fragmentation is the second sub-problem.\n[supported] A retrieved chunk may be incomplete when the relevant procedure spans neighboring chunks. — The context explains that a chunk retrieved in isolation is often incomplete when the relevant procedure spans neighboring chunks.\n[supported] The third sub-problem is redundancy in evidence. — The context explicitly states that redundancy in evidence is the third sub-problem.\n[supported] Naive top-k retrieval can return near-duplicate chunks, wasting context-window capacity. — The context describes that naive top-k selection tends to return clusters of near-duplicate chunks, which wastes context window capacity.\n[supported] The fourth sub-problem is unverified grounding. — The context explicitly states that unverified grounding is the fourth sub-problem.\n[supported] Standard RAG does not check whether the generated answer is genuinely supported by the retrieved evidence. — The context mentions that standard RAG hands retrieved chunks to the answer generation without checking for genuine support from the retrieved evidence.\n[supported] This allows confident but incorrect responses. — The context states that the lack of verification leads to confident but wrong responses.\n[supported] No substantive contradiction or ambiguity appears in the provided excerpt. — The context does not present any contradictions or ambiguities regarding the statements made.",
+      "statements": [
+        {
+          "statement": "The paper identifies four core sub-problems that standard RAG pipelines fail to handle.",
+          "reason": "The context explicitly states that there are four concrete sub-problems that standard pipelines fail to handle.",
+          "verdict": 1
+        },
+        {
+          "statement": "The first sub-problem is signal incompleteness.",
+          "reason": "The context lists signal incompleteness as the first of the four sub-problems.",
+          "verdict": 1
+        },
+        {
+          "statement": "No single retrieval function captures all relevant chunks across semantic, lexical, and structural dimensions.",
+          "reason": "The context mentions that no single retrieval function can capture all relevant chunks due to the complexity of relevance spanning multiple dimensions.",
+          "verdict": 1
+        },
+        {
+          "statement": "The second sub-problem is chunk fragmentation.",
+          "reason": "The context explicitly states that chunk fragmentation is the second sub-problem.",
+          "verdict": 1
+        },
+        {
+          "statement": "A retrieved chunk may be incomplete when the relevant procedure spans neighboring chunks.",
+          "reason": "The context explains that a chunk retrieved in isolation is often incomplete when the relevant procedure spans neighboring chunks.",
+          "verdict": 1
+        },
+        {
+          "statement": "The third sub-problem is redundancy in evidence.",
+          "reason": "The context explicitly states that redundancy in evidence is the third sub-problem.",
+          "verdict": 1
+        },
+        {
+          "statement": "Naive top-k retrieval can return near-duplicate chunks, wasting context-window capacity.",
+          "reason": "The context describes that naive top-k selection tends to return clusters of near-duplicate chunks, which wastes context window capacity.",
+          "verdict": 1
+        },
+        {
+          "statement": "The fourth sub-problem is unverified grounding.",
+          "reason": "The context explicitly states that unverified grounding is the fourth sub-problem.",
+          "verdict": 1
+        },
+        {
+          "statement": "Standard RAG does not check whether the generated answer is genuinely supported by the retrieved evidence.",
+          "reason": "The context mentions that standard RAG hands retrieved chunks to the answer generation without checking for genuine support from the retrieved evidence.",
+          "verdict": 1
+        },
+        {
+          "statement": "This allows confident but incorrect responses.",
+          "reason": "The context states that the lack of verification leads to confident but wrong responses.",
+          "verdict": 1
+        },
+        {
+          "statement": "No substantive contradiction or ambiguity appears in the provided excerpt.",
+          "reason": "The context does not present any contradictions or ambiguities regarding the statements made.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.9000122216283967,
+      "reason": "generated='What are the core sub-problems that standard RAG pipelines fail to handle?' similarity=0.9000 noncommittal=0; generated='What are the core sub-problems that standard RAG pipelines fail to handle?' similarity=0.9000 noncommittal=0; generated='What are the core sub-problems that standard RAG pipelines fail to handle?' similarity=0.9000 noncommittal=0",
+      "generated_questions": [
+        "What are the core sub-problems that standard RAG pipelines fail to handle?",
+        "What are the core sub-problems that standard RAG pipelines fail to handle?",
+        "What are the core sub-problems that standard RAG pipelines fail to handle?"
+      ],
+      "noncommittal": [
+        0,
+        0,
+        0
+      ],
+      "similarities": [
+        0.9000122216283967,
+        0.9000122216283967,
+        0.9000122216283967
+      ],
+      "all_noncommittal": false
+    }
+  }
+}

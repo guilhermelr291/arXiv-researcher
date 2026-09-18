@@ -1,0 +1,76 @@
+{
+  "scored_at": "2026-09-16T22:00:30Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abd8-0a17-7141-8f9f-7519f82dfe26",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "What is DocuSearch's mean end-to-end latency, which phase dominates that latency, and what future work does the paper propose to reduce it? (2609.01617)",
+  "retrieved_contexts": [
+    "Mean end-to-end latency across $200$ queries is $12.6$\nseconds, with the per-chunk evaluation phase accounting\nfor $8.4$ seconds of that. Retrieval itself finishes in\nunder one second thanks to Qdrant ANN search and SQLite\nFTS5. For a document intelligence application where an\nengineer is waiting for a reliable answer rather than\nstreaming tokens, this trade-off is considered acceptable.\nThat said, reducing evaluation latency is an obvious\ntarget for future work.",
+    "The sequential LLM calls in the per-chunk evaluation phase\nare the main latency bottleneck, currently averaging $8.4$\nseconds. Parallelising chunk evaluation across inference\nthreads is a natural first step. The RRF signal weights\nwere determined empirically on telecom documentation and\nmay not transfer well to other domains; learning them from\nquery-relevance feedback via a differentiable ranking\nobjective would make the system more broadly applicable.\nThere is also potential in using named entity recognition\nto populate the KG with typed entity-relation triples,\nwhich would strengthen multi-hop query handling. Finally,\nextending DocuSearch to multimodal retrieval — covering\nembedded diagrams and specification tables that are\npervasive in vendor documentation — is a compelling\ndirection worth pursuing.\nReinforcement Learning for Adaptive Retrieval.\nOne promising future direction is treating\nDocuSearch’s multi-step retrieval workflow as a sequential\ndecision problem. The intuition comes from Karpathy’s\ninteractive GridWorld temporal-difference learning\ndemo[11], where an agent learns to\nnavigate a grid by trial-and-error using TD updates —\nwithout any hard-coded path rules. The analogy to the\npipeline is direct: just as that agent discovers which\nmoves lead to reward by accumulating Q-values over many\nepisodes, a retrieval agent in DocuSearch could learn\nwhen to invoke BM25, when to expand KG\nneighbours, and when to stop — adapting\ndynamically to each incoming query rather than applying\nthe same fixed configuration every time.\nFormally, each query-answer interaction can be modelled as\nan episode in a Markov Decision Process\n$\\mathcal{M}=(\\mathcal{S},\\mathcal{A},\\mathcal{P},\\mathcal{R},\\gamma)$.\nThe state $s\\in\\mathcal{S}$ encodes the current query\nintent, the set of chunks retrieved so far, reranker\nconfidence scores, KG expansion status, and evidence\ncoverage. The action space $\\mathcal{A}$ includes\ndiscrete choices such as triggering a BM25 search,\nexpanding KG neighbours by one hop, tightening the\ncross-encoder top-$k$, fetching a neighbouring chunk,\nor terminating retrieval and proceeding to answer\ngeneration. The reward $\\mathcal{R}$ is shaped by\nanswer groundedness (which is already measured at inference\ntime), engineer satisfaction feedback collected through"
+  ],
+  "response": "- **Mean end-to-end latency:** **12.6 seconds** across 200 queries.[1]\n- **Dominant phase:** **Per-chunk evaluation**, which accounts for **8.4 seconds**; the paper identifies its sequential LLM calls as the main bottleneck. Retrieval itself takes under one second.[1][2]\n- **Proposed latency reduction:** **Parallelise chunk evaluation across inference threads**. The paper also identifies reducing evaluation latency as an explicit future-work target.[1][2]\n\nNo contradictory latency figures or proposals are provided in the evidence.",
+  "metrics": {
+    "faithfulness": {
+      "value": 1.0,
+      "reason": "[supported] DocuSearch has a mean end-to-end latency of 12.6 seconds across 200 queries. — The context explicitly states that the mean end-to-end latency across 200 queries is 12.6 seconds.\n[supported] The dominant phase of latency is per-chunk evaluation, which accounts for 8.4 seconds. — The context mentions that the per-chunk evaluation phase accounts for 8.4 seconds of the total latency.\n[supported] The paper identifies sequential LLM calls as the main bottleneck in the per-chunk evaluation phase. — The context states that sequential LLM calls in the per-chunk evaluation phase are the main latency bottleneck.\n[supported] Retrieval itself takes under one second. — The context indicates that retrieval finishes in under one second.\n[supported] The proposed method for latency reduction is to parallelize chunk evaluation across inference threads. — The context suggests that parallelising chunk evaluation across inference threads is a natural first step for reducing latency.\n[supported] The paper identifies reducing evaluation latency as an explicit future-work target. — The context states that reducing evaluation latency is considered an obvious target for future work.\n[supported] No contradictory latency figures or proposals are provided in the evidence. — The context does not provide any contradictory figures or proposals regarding latency, supporting the statements made.",
+      "statements": [
+        {
+          "statement": "DocuSearch has a mean end-to-end latency of 12.6 seconds across 200 queries.",
+          "reason": "The context explicitly states that the mean end-to-end latency across 200 queries is 12.6 seconds.",
+          "verdict": 1
+        },
+        {
+          "statement": "The dominant phase of latency is per-chunk evaluation, which accounts for 8.4 seconds.",
+          "reason": "The context mentions that the per-chunk evaluation phase accounts for 8.4 seconds of the total latency.",
+          "verdict": 1
+        },
+        {
+          "statement": "The paper identifies sequential LLM calls as the main bottleneck in the per-chunk evaluation phase.",
+          "reason": "The context states that sequential LLM calls in the per-chunk evaluation phase are the main latency bottleneck.",
+          "verdict": 1
+        },
+        {
+          "statement": "Retrieval itself takes under one second.",
+          "reason": "The context indicates that retrieval finishes in under one second.",
+          "verdict": 1
+        },
+        {
+          "statement": "The proposed method for latency reduction is to parallelize chunk evaluation across inference threads.",
+          "reason": "The context suggests that parallelising chunk evaluation across inference threads is a natural first step for reducing latency.",
+          "verdict": 1
+        },
+        {
+          "statement": "The paper identifies reducing evaluation latency as an explicit future-work target.",
+          "reason": "The context states that reducing evaluation latency is considered an obvious target for future work.",
+          "verdict": 1
+        },
+        {
+          "statement": "No contradictory latency figures or proposals are provided in the evidence.",
+          "reason": "The context does not provide any contradictory figures or proposals regarding latency, supporting the statements made.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.5140277303117023,
+      "reason": "generated='What is the mean end-to-end latency across 200 queries?' similarity=0.5140 noncommittal=0; generated='What is the mean end-to-end latency across 200 queries?' similarity=0.5140 noncommittal=0; generated='What is the mean end-to-end latency across 200 queries?' similarity=0.5140 noncommittal=0",
+      "generated_questions": [
+        "What is the mean end-to-end latency across 200 queries?",
+        "What is the mean end-to-end latency across 200 queries?",
+        "What is the mean end-to-end latency across 200 queries?"
+      ],
+      "noncommittal": [
+        0,
+        0,
+        0
+      ],
+      "similarities": [
+        0.5140277303117023,
+        0.5140277303117023,
+        0.5140277303117023
+      ],
+      "all_noncommittal": false
+    }
+  }
+}

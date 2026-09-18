@@ -43,8 +43,11 @@ class Policy:
     retrieve_hop_cap: int = 6
     retrieve_hop_voyage_docs: int = 15
     retrieve_hop_rrf_k: int = 60
+    history_window_exchanges: int = 6
+    writer_history_exchanges: int = 2
     GROUNDING_RULE: str = (
-        "every technical claim has a real [n] citation from the provided chunk list"
+        "every technical claim has a real [n] citation that resolves to a "
+        "chunk packed in this thread"
     )
     HOLE_RULE: str = (
         'an absence sentence ("no usable paper was found for {topic}") needs no [n]; '

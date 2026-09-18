@@ -1,0 +1,162 @@
+{
+  "scored_at": "2026-09-16T22:14:16Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abd5-ce76-7a70-bc2b-9db87077e3c5",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "What grounding and hallucination rates does DocuSearch achieve compared to a single-pass RAG baseline? (2609.01617)",
+  "retrieved_contexts": [
+    "Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search > VIII Results and Analysis > VIII-B Answer Grounding\nTABLE IV: Answer Grounding and Hallucination Rates\n| System | Grounded | Hallucinated | Fallback |\n| --- | --- | --- | --- |\n| Single-pass RAG | 71.2% | 21.4% | — |\n| DocuSearch | 89.6% | 6.8% | 3.6% |\n",
+    "Table[IV](#S8.T4 \"TABLE IV ‣ VIII-B Answer Grounding ‣ VIII Results and Analysis ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") compares the per-chunk evaluation\nloop against a conventional single-pass RAG baseline.  \nTABLE IV: Answer Grounding and Hallucination Rates  \nDocuSearch achieves a grounding rate of $89.6\\%$, an\n$18.4$ percentage point improvement over single-pass RAG,\nand cuts the hallucination rate from $21.4\\%$ to $6.8\\%$.\nThe remaining $3.6\\%$ of queries hit the fallback path,\nwhere all expanded contexts are merged — these still\nproduce grounded answers, just through the consolidated\nroute rather than the per-chunk route.",
+    "This paper presented DocuSearch, a hybrid multi-agent RAG system\nbuilt for enterprise document intelligence in multi-vendor\ntelecom environments. The system was designed around three\nfailure modes observed in production: signal\nincompleteness, context fragmentation, and unverified answer\ngrounding. The two-phase pipeline — hybrid retrieval\nfusion followed by per-chunk agentic evaluation — directly\naddresses all three. Results show Precision@10 of $0.69$,\nRecall@10 of $0.79$, and a grounding rate of $89.6\\%$, with\nhallucinations dropping to $6.8\\%$. The ablation confirms\nthat groundedness verification and sufficiency scoring drive\nthe largest improvements, though no single component is\nredundant.\nA key practical finding is that\nproduction-quality document intelligence is achievable\nentirely on locally hosted models. DocuSearch requires no\nexternal API calls, which matters a great deal in telecom\noperations environments where sensitive network configuration\ndata cannot leave the organisation’s infrastructure.",
+    "Getting accurate, grounded answers out of large enterprise document\nrepositories is a difficult problem. Dense vector retrieval alone\nfrequently performs poorly on queries that mix technical\nterminology, vendor-specific acronyms, or require reasoning\nacross several non-adjacent sections. DocuSearch was built\nto address exactly this gap — an offline, multi-agent document\nintelligence system developed and evaluated in a production\ntelecom network operations environment. Rather than relying on a\nsingle retrieval signal, DocuSearch pulls together three\ncomplementary sources of evidence: semantic search over a Qdrant\nvector store using BGE-Large embeddings, BM25 full-text search\nover an SQLite FTS5 index, and Knowledge Graph neighbour expansion\nfrom a structured edge table. These three ranked lists are merged\nthrough Reciprocal Rank Fusion (RRF) with signal weights\n$w_{v}=0.50$, $w_{b}=0.35$, and $w_{kg}=0.15$, giving:  \nEquation\n$$\ns_{\\mathrm{RRF}}(d)\\;=\\;\\sum_{i\\in\\{v,\\,b,\\,kg\\}}\\frac{w_{i}}{k+r_{i}(d)},\\quad k=60\n$$  \nwhere $r_{i}(d)$ is the rank of chunk $d$ in signal list $i$.\nA cross-encoder then reranks the fused list, and Maximal\nMarginal Relevance (MMR) with $\\lambda=0.65$ prunes it\nfor both relevance and diversity. What makes DocuSearch\ndistinctive is a per-chunk evaluation loop that\ntreats each selected chunk as its own mini-retrieval problem:\nan LLM decides whether the chunk needs additional neighbouring\ncontext, whether it is actually sufficient to answer the query,\nand whether the answer it generates is genuinely grounded in\nthe retrieved text. Ungrounded answers are not returned; the\nsystem falls back to a multi-chunk merge instead. On an\ninternal telecom document corpus, DocuSearch reaches\nPrecision@10 of $0.69$, Recall@10 of $0.79$, and a grounding\nrate of $89.6\\%$ — gains of $15$, $16$, and $18.4$ percentage\npoints over a dense-only RAG baseline.",
+    "Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search > VIII Results and Analysis > VIII-D Ablation Study\nTABLE V: Ablation Study: Grounding Rate\n| Configuration | Grounding Rate |\n| --- | --- |\n| Full DocuSearch | 89.6% |\n| Without groundedness check | 74.3% |\n| Without sufficiency scoring | 78.1% |\n| Without neighbour expansion | 82.4% |\n| Without cross-encoder reranking | 83.7% |\n| Without KG expansion | 85.2% |\n| Without vendor scoping | 86.1% |\n",
+    "Each $c\\in\\mathcal{E}$ passes four sequential LLM-driven\nchecks, as shown in Figure[2](#S4.F2 \"Figure 2 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\"):  \n1. 1.  \nContext Need Detection. The LLM assesses\nwhether $c$ is a fragment that requires neighbours\n$c_{\\mathrm{prev}}$ or $c_{\\mathrm{next}}$ to make\nsense. If so, neighbours are fetched and appended,\nfor up to $L=2$ iterations.\n2. 2.  \nSufficiency Scoring. The expanded chunk\n$\\tilde{c}$ proceeds only if the LLM assigns a\nsufficiency score $\\sigma(\\tilde{c},q)\\geq\\tau=7$\non a $1$–$10$ scale. Chunks that do not clear this\nbar are skipped immediately.\n3. 3.  \nAnswer Generation. Given $\\tilde{c}$,\nthe query $q$, and the selected template $t^{\\*}$, the\nLLM generates candidate answer $\\hat{a}$ at temperature\n$T=0.0$ for reproducibility.\n4. 4.  \nGroundedness Verification. A separate\nLLM call checks whether $\\hat{a}$ is fully supported\nby $\\tilde{c}$. If it is, $a$ is set to $\\hat{a}$ and\nthe pipeline terminates (method=per_chunk).  \nWhen no chunk clears all four checks, the fallback merges\nall expanded contexts into $\\tilde{\\mathcal{E}}$, generates\na consolidated answer (method=fallback_merge),\nand runs one final groundedness check before anything is\nreturned to the user.",
+    "or terminating retrieval and proceeding to answer\ngeneration. The reward $\\mathcal{R}$ is shaped by\nanswer groundedness (which is already measured at inference\ntime), engineer satisfaction feedback collected through\nthe Dash UI, citation accuracy, and a latency penalty to\ndiscourage unnecessarily long retrieval chains:  \nEquation\n$$\n\\mathcal{R}=\\alpha\\cdot\\text{Groundedness}+\\beta\\cdot\\text{Feedback}-\\gamma_{l}\\cdot\\text{Latency}\n$$  \nTo give this direction a concrete anchor, a\ncomposite system accuracy $\\Phi$ is introduced that jointly captures\nretrieval quality and answer fidelity:  \nEquation\n$$\n\\Phi=0.30\\cdot P@10\\;+\\;0.30\\cdot R@10\\;+\\;0.40\\cdot\\text{Grounding}\n$$  \nUnder the current rule-based configuration, plugging in\nthe reported numbers gives:  \nEquation\n$$\n\\Phi_{\\text{current}}=0.30\\times 0.69+0.30\\times 0.79+0.40\\times 0.896\\approx 80.2\\%\n$$  \nAn offline-trained Q-Learning policy,\noptimised on logged production trajectories, is projected to lift\n$P@10$ to approximately $0.76$ ($+7$pp),\n$R@10$ to approximately $0.86$ ($+7$pp),\nand the grounding rate to approximately $94.5\\%$\n($+4.9$pp). These are deliberately conservative\nestimates: because DocuSearch already incorporates\ncross-encoder reranking, MMR selection, and a per-chunk\nsufficiency gate, the remaining headroom for any\nsingle optimisation layer is bounded. What the RL agent\nwould learn to do differently from the current fixed\npolicy is route precision-heavy queries through BM25\nrather than relying solely on dense retrieval, expand\nKG neighbours more aggressively on recall-sensitive\ntroubleshooting queries, and halt retrieval earlier\nwhen accumulated evidence already clears the sufficiency\nthreshold — decisions that are currently hard-coded but\ncould be learned from query-level feedback. Under these\nassumptions:  \nEquation\n$$\n\\Phi_{\\text{RL}}=0.30\\times 0.76+0.30\\times 0.86+0.40\\times 0.945\\approx 86.4\\%\n$$  \nThis represents an overall improvement of approximately\n$\\mathbf{6.2}$ percentage points, lifting composite\naccuracy from $\\approx 80\\%$ to $\\approx 86\\%$.\nTable[VI](#S9.T6 \"TABLE VI ‣ IX-A Limitations and Future Work ‣ IX Conclusion ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") summarises the projected\ngains per metric.  \nTABLE VI: Projected Performance Gains with RL-Based Adaptive Retrieval\n| Metric | Current | Projected (RL) | Gain |\n| --- | --- | --- | --- |\n| $P@10$ | 0.69 | 0.76 | $+7$ pp |\n| $R@10$ | 0.79 | 0.86 | $+7$ pp |\n| Grounding | 89.6% | 94.5% | $+4.9$ pp |\n| $\\Phi$ (composite) | 80.2% | 86.4% | $\\mathbf{+6.2}$ pp |\n  \nOff-policy Q-Learning is a natural fit here. Document\nretrieval is largely deterministic — the same action",
+    "Table[V](#S8.T5 \"TABLE V ‣ VIII-D Ablation Study ‣ VIII Results and Analysis ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") shows grounding rate when each\ncomponent is removed individually, holding everything\nelse constant.  \nTABLE V: Ablation Study: Grounding Rate  \nGroundedness verification has the largest individual impact\nat $15.3$ percentage points, followed by sufficiency scoring\nat $11.5$ points. It is worth noting that even the\n“smallest” contributors — vendor scoping at $3.5$ points\nand KG expansion at $4.4$ points — add up meaningfully\nin combination, indicating that no component is redundant."
+  ],
+  "response": "## Results\n\n| System | Grounding rate | Hallucination rate | Fallback |\n|---|---:|---:|---:|\n| Single-pass RAG baseline | **71.2%** | **21.4%** | — |\n| DocuSearch | **89.6%** | **6.8%** | **3.6%** |\n\nThese figures come from the paper’s per-chunk evaluation comparison.[1][2]\n\n- **Grounding rate** measures whether the generated answer is supported by the retrieved context: DocuSearch’s verifier accepts an answer only when it is fully supported by the expanded chunk.[6]\n- **Hallucination rate** is the reported proportion of answers classified as hallucinated rather than grounded.[1]\n\nCompared with single-pass RAG, DocuSearch improves grounding by **18.4 percentage points**, from 71.2% to 89.6%, and reduces hallucinations by **14.6 percentage points**, from 21.4% to 6.8%.[1][2] The remaining 3.6% of DocuSearch cases use a fallback that merges the expanded contexts before generating and checking a consolidated answer.[2][6]\n\n### Limitations and ambiguity\n\nThe comparison is not completely transparent: the baseline row has no reported fallback category, while DocuSearch’s categories sum to 100% only when fallback cases are included.[1] Moreover, the paper says that fallback cases “still produce grounded answers,” but the table lists fallback separately from the 89.6% grounded category; therefore, the excerpt does not make clear whether the 89.6% grounding rate excludes or includes grounded fallback answers.[2] The reported rates should consequently be read as table-level results, not necessarily as directly comparable, mutually exhaustive outcome categories.",
+  "metrics": {
+    "faithfulness": {
+      "value": 0.8260869565217391,
+      "reason": "[supported] The results of the comparison are presented in a table format. — The context explicitly mentions that the results are presented in a table format.\n[supported] The table includes the grounding rate, hallucination rate, and fallback for two systems: the single-pass RAG baseline and DocuSearch. — The context describes a table that compares the grounding rate, hallucination rate, and fallback for both systems.\n[supported] The grounding rate for the single-pass RAG baseline is 71.2%. — The context provides the grounding rate for the single-pass RAG baseline as 71.2%.\n[supported] The hallucination rate for the single-pass RAG baseline is 21.4%. — The context states the hallucination rate for the single-pass RAG baseline as 21.4%.\n[supported] The grounding rate for DocuSearch is 89.6%. — The context explicitly mentions that DocuSearch achieves a grounding rate of 89.6%.\n[supported] The hallucination rate for DocuSearch is 6.8%. — The context states that the hallucination rate for DocuSearch is 6.8%.\n[supported] The fallback rate for DocuSearch is 3.6%. — The context mentions that the fallback rate for DocuSearch is 3.6%.\n[supported] The grounding rate measures whether the generated answer is supported by the retrieved context. — The context explains that the grounding rate indicates if the generated answer is supported by the retrieved context.\n[supported] DocuSearch’s verifier accepts an answer only when the answer is fully supported by the expanded chunk. — The context states that DocuSearch's verifier checks if the answer is fully supported by the expanded chunk.\n[supported] The hallucination rate is the reported proportion of answers classified as hallucinated rather than grounded. — The context defines the hallucination rate as the proportion of answers classified as hallucinated.\n[supported] DocuSearch improves grounding by 18.4 percentage points compared to the single-pass RAG baseline. — The context states that DocuSearch achieves an 18.4 percentage point improvement in grounding over the single-pass RAG baseline.\n[supported] The grounding rate improves from 71.2% to 89.6% with DocuSearch. — The context explicitly states that the grounding rate improves from 71.2% to 89.6% with DocuSearch.\n[supported] DocuSearch reduces hallucinations by 14.6 percentage points compared to the single-pass RAG baseline. — The context mentions that DocuSearch reduces the hallucination rate by 14.6 percentage points compared to the single-pass RAG baseline.\n[supported] The hallucination rate reduces from 21.4% to 6.8% with DocuSearch. — The context states that the hallucination rate reduces from 21.4% to 6.8% with DocuSearch.\n[supported] The remaining 3.6% of DocuSearch cases use a fallback that merges the expanded contexts before generating and checking a consolidated answer. — The context explains that 3.6% of DocuSearch cases use a fallback that merges expanded contexts.\n[unsupported] The comparison is not completely transparent. — The context does not provide sufficient information to determine the transparency of the comparison.\n[supported] The baseline row has no reported fallback category. — The context does not mention any fallback category for the baseline row.\n[supported] DocuSearch’s categories sum to 100% only when fallback cases are included. — The context indicates that the categories for DocuSearch sum to 100% when including fallback cases.\n[supported] The paper states that fallback cases still produce grounded answers. — The context mentions that fallback cases still produce grounded answers.\n[supported] The table lists fallback separately from the 89.6% grounded category. — The context states that the table lists fallback separately from the grounded category.\n[unsupported] The excerpt does not clarify whether the 89.6% grounding rate excludes or includes grounded fallback answers. — The context does not provide clarity on whether the 89.6% grounding rate includes fallback answers.\n[unsupported] The reported rates should be read as table-level results. — The context does not specify how the reported rates should be interpreted.\n[unsupported] The reported rates are not necessarily directly comparable or mutually exhaustive outcome categories. — The context does not provide information on the comparability or exhaustiveness of the reported rates.",
+      "statements": [
+        {
+          "statement": "The results of the comparison are presented in a table format.",
+          "reason": "The context explicitly mentions that the results are presented in a table format.",
+          "verdict": 1
+        },
+        {
+          "statement": "The table includes the grounding rate, hallucination rate, and fallback for two systems: the single-pass RAG baseline and DocuSearch.",
+          "reason": "The context describes a table that compares the grounding rate, hallucination rate, and fallback for both systems.",
+          "verdict": 1
+        },
+        {
+          "statement": "The grounding rate for the single-pass RAG baseline is 71.2%.",
+          "reason": "The context provides the grounding rate for the single-pass RAG baseline as 71.2%.",
+          "verdict": 1
+        },
+        {
+          "statement": "The hallucination rate for the single-pass RAG baseline is 21.4%.",
+          "reason": "The context states the hallucination rate for the single-pass RAG baseline as 21.4%.",
+          "verdict": 1
+        },
+        {
+          "statement": "The grounding rate for DocuSearch is 89.6%.",
+          "reason": "The context explicitly mentions that DocuSearch achieves a grounding rate of 89.6%.",
+          "verdict": 1
+        },
+        {
+          "statement": "The hallucination rate for DocuSearch is 6.8%.",
+          "reason": "The context states that the hallucination rate for DocuSearch is 6.8%.",
+          "verdict": 1
+        },
+        {
+          "statement": "The fallback rate for DocuSearch is 3.6%.",
+          "reason": "The context mentions that the fallback rate for DocuSearch is 3.6%.",
+          "verdict": 1
+        },
+        {
+          "statement": "The grounding rate measures whether the generated answer is supported by the retrieved context.",
+          "reason": "The context explains that the grounding rate indicates if the generated answer is supported by the retrieved context.",
+          "verdict": 1
+        },
+        {
+          "statement": "DocuSearch’s verifier accepts an answer only when the answer is fully supported by the expanded chunk.",
+          "reason": "The context states that DocuSearch's verifier checks if the answer is fully supported by the expanded chunk.",
+          "verdict": 1
+        },
+        {
+          "statement": "The hallucination rate is the reported proportion of answers classified as hallucinated rather than grounded.",
+          "reason": "The context defines the hallucination rate as the proportion of answers classified as hallucinated.",
+          "verdict": 1
+        },
+        {
+          "statement": "DocuSearch improves grounding by 18.4 percentage points compared to the single-pass RAG baseline.",
+          "reason": "The context states that DocuSearch achieves an 18.4 percentage point improvement in grounding over the single-pass RAG baseline.",
+          "verdict": 1
+        },
+        {
+          "statement": "The grounding rate improves from 71.2% to 89.6% with DocuSearch.",
+          "reason": "The context explicitly states that the grounding rate improves from 71.2% to 89.6% with DocuSearch.",
+          "verdict": 1
+        },
+        {
+          "statement": "DocuSearch reduces hallucinations by 14.6 percentage points compared to the single-pass RAG baseline.",
+          "reason": "The context mentions that DocuSearch reduces the hallucination rate by 14.6 percentage points compared to the single-pass RAG baseline.",
+          "verdict": 1
+        },
+        {
+          "statement": "The hallucination rate reduces from 21.4% to 6.8% with DocuSearch.",
+          "reason": "The context states that the hallucination rate reduces from 21.4% to 6.8% with DocuSearch.",
+          "verdict": 1
+        },
+        {
+          "statement": "The remaining 3.6% of DocuSearch cases use a fallback that merges the expanded contexts before generating and checking a consolidated answer.",
+          "reason": "The context explains that 3.6% of DocuSearch cases use a fallback that merges expanded contexts.",
+          "verdict": 1
+        },
+        {
+          "statement": "The comparison is not completely transparent.",
+          "reason": "The context does not provide sufficient information to determine the transparency of the comparison.",
+          "verdict": 0
+        },
+        {
+          "statement": "The baseline row has no reported fallback category.",
+          "reason": "The context does not mention any fallback category for the baseline row.",
+          "verdict": 1
+        },
+        {
+          "statement": "DocuSearch’s categories sum to 100% only when fallback cases are included.",
+          "reason": "The context indicates that the categories for DocuSearch sum to 100% when including fallback cases.",
+          "verdict": 1
+        },
+        {
+          "statement": "The paper states that fallback cases still produce grounded answers.",
+          "reason": "The context mentions that fallback cases still produce grounded answers.",
+          "verdict": 1
+        },
+        {
+          "statement": "The table lists fallback separately from the 89.6% grounded category.",
+          "reason": "The context states that the table lists fallback separately from the grounded category.",
+          "verdict": 1
+        },
+        {
+          "statement": "The excerpt does not clarify whether the 89.6% grounding rate excludes or includes grounded fallback answers.",
+          "reason": "The context does not provide clarity on whether the 89.6% grounding rate includes fallback answers.",
+          "verdict": 0
+        },
+        {
+          "statement": "The reported rates should be read as table-level results.",
+          "reason": "The context does not specify how the reported rates should be interpreted.",
+          "verdict": 0
+        },
+        {
+          "statement": "The reported rates are not necessarily directly comparable or mutually exhaustive outcome categories.",
+          "reason": "The context does not provide information on the comparability or exhaustiveness of the reported rates.",
+          "verdict": 0
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.0,
+      "reason": "All generated questions marked noncommittal; score forced to 0. generated='What are the grounding and hallucination rates for DocuSearch compared to the single-pass RAG baseline?' similarity=0.9575 noncommittal=1; generated='What are the grounding and hallucination rates for DocuSearch compared to the single-pass RAG baseline?' similarity=0.9575 noncommittal=1; generated='What are the grounding and hallucination rates for DocuSearch compared to the single-pass RAG baseline?' similarity=0.9575 noncommittal=1",
+      "generated_questions": [
+        "What are the grounding and hallucination rates for DocuSearch compared to the single-pass RAG baseline?",
+        "What are the grounding and hallucination rates for DocuSearch compared to the single-pass RAG baseline?",
+        "What are the grounding and hallucination rates for DocuSearch compared to the single-pass RAG baseline?"
+      ],
+      "noncommittal": [
+        1,
+        1,
+        1
+      ],
+      "similarities": [
+        0.9574952450381691,
+        0.9574952450381691,
+        0.9574952450381691
+      ],
+      "all_noncommittal": true
+    }
+  }
+}

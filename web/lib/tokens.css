@@ -1,0 +1,78 @@
+/*
+ * Design tokens. Dark is the default (the desk is read at night);
+ * the light set answers `prefers-color-scheme: light`.
+ * Components take every colour from here — no hex literals in tsx.
+ */
+:root {
+  color-scheme: dark;
+  --bg: #14130f;
+  --surface: #1d1b16;
+  --surface-2: #26231c;
+  --surface-3: #302c24;
+  --ink: #ede8de;
+  --ink-muted: #a39e93;
+  --ink-faint: #6f6a60;
+  --rule: #302c24;
+  --rule-strong: #443e33;
+  --accent: #d4763f;
+  --accent-ink: #14130f;
+  --accent-wash: rgba(212, 118, 63, 0.14);
+  --accent-glow: rgba(212, 118, 63, 0.45);
+  --ok: #7fa084;
+  --ok-wash: rgba(127, 160, 132, 0.14);
+  --warn: #c4a45a;
+  --warn-wash: rgba(196, 164, 90, 0.14);
+  --danger: #d47a6a;
+  --danger-wash: rgba(212, 122, 106, 0.14);
+  --shadow: 0 18px 48px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.3);
+
+  --serif: "Newsreader", "Source Serif 4", "Iowan Old Style", Georgia, serif;
+  --ui: Inter, "IBM Plex Sans", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+  --reading-size: 17px;
+  --reading-leading: 1.65;
+  --ui-size: 14px;
+  --mono-size: 12px;
+  --column: 68ch;
+  --sidebar: 260px;
+  --user-rule: 2px;
+  --user-inset: 16px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --motion: 120ms;
+  --collapse: 180ms;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color-scheme: light;
+    --bg: #fbf9f5;
+    --surface: #f3f0e9;
+    --surface-2: #ece8df;
+    --surface-3: #e3ded3;
+    --ink: #1c1b18;
+    --ink-muted: #6b675e;
+    --ink-faint: #9b968b;
+    --rule: #e3ded3;
+    --rule-strong: #d2ccbe;
+    --accent: #b15423;
+    --accent-ink: #fbf9f5;
+    --accent-wash: rgba(177, 84, 35, 0.08);
+    --accent-glow: rgba(177, 84, 35, 0.35);
+    --ok: #4a6b4f;
+    --ok-wash: rgba(74, 107, 79, 0.1);
+    --warn: #8a6d1f;
+    --warn-wash: rgba(138, 109, 31, 0.1);
+    --danger: #a8402f;
+    --danger-wash: rgba(168, 64, 47, 0.1);
+    --shadow: 0 18px 48px rgba(28, 27, 24, 0.14), 0 2px 6px rgba(28, 27, 24, 0.08);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion: 0ms;
+    --collapse: 0ms;
+  }
+}

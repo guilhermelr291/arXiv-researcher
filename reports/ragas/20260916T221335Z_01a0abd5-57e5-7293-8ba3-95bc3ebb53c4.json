@@ -1,0 +1,98 @@
+{
+  "scored_at": "2026-09-16T22:13:35Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abd5-57e5-7293-8ba3-95bc3ebb53c4",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "How much does the full DocuSearch system improve Precision@10 and Recall@10 relative to the dense-only retrieval baseline? (2609.01617)",
+  "retrieved_contexts": [
+    "Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search > VIII Results and Analysis > VIII-A Retrieval Quality\nTABLE III: Retrieval Quality Comparison\n| Configuration | P@5 | R@5 | P@10 | R@10 |\n| --- | --- | --- | --- | --- |\n| Dense only | 0.61 | 0.48 | 0.54 | 0.63 |\n| Dense + BM25 | 0.68 | 0.56 | 0.61 | 0.71 |\n| DocuSearch (full) | 0.76 | 0.64 | 0.69 | 0.79 |\n",
+    "Getting accurate, grounded answers out of large enterprise document\nrepositories is a difficult problem. Dense vector retrieval alone\nfrequently performs poorly on queries that mix technical\nterminology, vendor-specific acronyms, or require reasoning\nacross several non-adjacent sections. DocuSearch was built\nto address exactly this gap — an offline, multi-agent document\nintelligence system developed and evaluated in a production\ntelecom network operations environment. Rather than relying on a\nsingle retrieval signal, DocuSearch pulls together three\ncomplementary sources of evidence: semantic search over a Qdrant\nvector store using BGE-Large embeddings, BM25 full-text search\nover an SQLite FTS5 index, and Knowledge Graph neighbour expansion\nfrom a structured edge table. These three ranked lists are merged\nthrough Reciprocal Rank Fusion (RRF) with signal weights\n$w_{v}=0.50$, $w_{b}=0.35$, and $w_{kg}=0.15$, giving:  \nEquation\n$$\ns_{\\mathrm{RRF}}(d)\\;=\\;\\sum_{i\\in\\{v,\\,b,\\,kg\\}}\\frac{w_{i}}{k+r_{i}(d)},\\quad k=60\n$$  \nwhere $r_{i}(d)$ is the rank of chunk $d$ in signal list $i$.\nA cross-encoder then reranks the fused list, and Maximal\nMarginal Relevance (MMR) with $\\lambda=0.65$ prunes it\nfor both relevance and diversity. What makes DocuSearch\ndistinctive is a per-chunk evaluation loop that\ntreats each selected chunk as its own mini-retrieval problem:\nan LLM decides whether the chunk needs additional neighbouring\ncontext, whether it is actually sufficient to answer the query,\nand whether the answer it generates is genuinely grounded in\nthe retrieved text. Ungrounded answers are not returned; the\nsystem falls back to a multi-chunk merge instead. On an\ninternal telecom document corpus, DocuSearch reaches\nPrecision@10 of $0.69$, Recall@10 of $0.79$, and a grounding\nrate of $89.6\\%$ — gains of $15$, $16$, and $18.4$ percentage\npoints over a dense-only RAG baseline.",
+    "This paper presented DocuSearch, a hybrid multi-agent RAG system\nbuilt for enterprise document intelligence in multi-vendor\ntelecom environments. The system was designed around three\nfailure modes observed in production: signal\nincompleteness, context fragmentation, and unverified answer\ngrounding. The two-phase pipeline — hybrid retrieval\nfusion followed by per-chunk agentic evaluation — directly\naddresses all three. Results show Precision@10 of $0.69$,\nRecall@10 of $0.79$, and a grounding rate of $89.6\\%$, with\nhallucinations dropping to $6.8\\%$. The ablation confirms\nthat groundedness verification and sufficiency scoring drive\nthe largest improvements, though no single component is\nredundant.\nA key practical finding is that\nproduction-quality document intelligence is achievable\nentirely on locally hosted models. DocuSearch requires no\nexternal API calls, which matters a great deal in telecom\noperations environments where sensitive network configuration\ndata cannot leave the organisation’s infrastructure.",
+    "or terminating retrieval and proceeding to answer\ngeneration. The reward $\\mathcal{R}$ is shaped by\nanswer groundedness (which is already measured at inference\ntime), engineer satisfaction feedback collected through\nthe Dash UI, citation accuracy, and a latency penalty to\ndiscourage unnecessarily long retrieval chains:  \nEquation\n$$\n\\mathcal{R}=\\alpha\\cdot\\text{Groundedness}+\\beta\\cdot\\text{Feedback}-\\gamma_{l}\\cdot\\text{Latency}\n$$  \nTo give this direction a concrete anchor, a\ncomposite system accuracy $\\Phi$ is introduced that jointly captures\nretrieval quality and answer fidelity:  \nEquation\n$$\n\\Phi=0.30\\cdot P@10\\;+\\;0.30\\cdot R@10\\;+\\;0.40\\cdot\\text{Grounding}\n$$  \nUnder the current rule-based configuration, plugging in\nthe reported numbers gives:  \nEquation\n$$\n\\Phi_{\\text{current}}=0.30\\times 0.69+0.30\\times 0.79+0.40\\times 0.896\\approx 80.2\\%\n$$  \nAn offline-trained Q-Learning policy,\noptimised on logged production trajectories, is projected to lift\n$P@10$ to approximately $0.76$ ($+7$pp),\n$R@10$ to approximately $0.86$ ($+7$pp),\nand the grounding rate to approximately $94.5\\%$\n($+4.9$pp). These are deliberately conservative\nestimates: because DocuSearch already incorporates\ncross-encoder reranking, MMR selection, and a per-chunk\nsufficiency gate, the remaining headroom for any\nsingle optimisation layer is bounded. What the RL agent\nwould learn to do differently from the current fixed\npolicy is route precision-heavy queries through BM25\nrather than relying solely on dense retrieval, expand\nKG neighbours more aggressively on recall-sensitive\ntroubleshooting queries, and halt retrieval earlier\nwhen accumulated evidence already clears the sufficiency\nthreshold — decisions that are currently hard-coded but\ncould be learned from query-level feedback. Under these\nassumptions:  \nEquation\n$$\n\\Phi_{\\text{RL}}=0.30\\times 0.76+0.30\\times 0.86+0.40\\times 0.945\\approx 86.4\\%\n$$  \nThis represents an overall improvement of approximately\n$\\mathbf{6.2}$ percentage points, lifting composite\naccuracy from $\\approx 80\\%$ to $\\approx 86\\%$.\nTable[VI](#S9.T6 \"TABLE VI ‣ IX-A Limitations and Future Work ‣ IX Conclusion ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") summarises the projected\ngains per metric.  \nTABLE VI: Projected Performance Gains with RL-Based Adaptive Retrieval\n| Metric | Current | Projected (RL) | Gain |\n| --- | --- | --- | --- |\n| $P@10$ | 0.69 | 0.76 | $+7$ pp |\n| $R@10$ | 0.79 | 0.86 | $+7$ pp |\n| Grounding | 89.6% | 94.5% | $+4.9$ pp |\n| $\\Phi$ (composite) | 80.2% | 86.4% | $\\mathbf{+6.2}$ pp |\n  \nOff-policy Q-Learning is a natural fit here. Document\nretrieval is largely deterministic — the same action"
+  ],
+  "response": "## Improvement over the dense-only baseline\n\nThe retrieval results are:\n\n- **Precision@10:** dense-only = **0.54**; full DocuSearch = **0.69**【1】\n- **Recall@10:** dense-only = **0.63**; full DocuSearch = **0.79**【1】\n\nTherefore:\n\n| Metric | Absolute improvement | Relative improvement |\n|---|---:|---:|\n| Precision@10 | \\(0.69-0.54=\\) **0.15** (**15 percentage points**) | \\(0.15/0.54\\approx\\) **27.8%** |\n| Recall@10 | \\(0.79-0.63=\\) **0.16** (**16 percentage points**) | \\(0.16/0.63\\approx\\) **25.4%** |\n\nThus, full DocuSearch improves **Precision@10 by 15 percentage points (about 27.8%)** and **Recall@10 by 16 percentage points (about 25.4%)** relative to dense-only retrieval. The paper also explicitly reports these gains as **15 and 16 percentage points**, respectively.【2】",
+  "metrics": {
+    "faithfulness": {
+      "value": 1.0,
+      "reason": "[supported] The retrieval results for Precision@10 show that the dense-only method has a value of 0.54. — The context states that the dense-only method has a Precision@10 value of 0.54.\n[supported] The retrieval results for Precision@10 show that the full DocuSearch method has a value of 0.69. — The context explicitly states that the full DocuSearch method has a Precision@10 value of 0.69.\n[supported] The absolute improvement in Precision@10 is calculated as 0.69 minus 0.54, resulting in 0.15. — The absolute improvement can be directly calculated from the values provided in the context.\n[supported] The relative improvement in Precision@10 is calculated as 0.15 divided by 0.54, resulting in approximately 27.8%. — The relative improvement can be directly calculated from the absolute improvement and the dense-only value provided in the context.\n[supported] The retrieval results for Recall@10 show that the dense-only method has a value of 0.63. — The context states that the dense-only method has a Recall@10 value of 0.63.\n[supported] The retrieval results for Recall@10 show that the full DocuSearch method has a value of 0.79. — The context explicitly states that the full DocuSearch method has a Recall@10 value of 0.79.\n[supported] The absolute improvement in Recall@10 is calculated as 0.79 minus 0.63, resulting in 0.16. — The absolute improvement can be directly calculated from the values provided in the context.\n[supported] The relative improvement in Recall@10 is calculated as 0.16 divided by 0.63, resulting in approximately 25.4%. — The relative improvement can be directly calculated from the absolute improvement and the dense-only value provided in the context.\n[supported] Full DocuSearch improves Precision@10 by 15 percentage points, which is about 27.8%. — The context states that the full DocuSearch improves Precision@10 by 15 percentage points, and the relative improvement is approximately 27.8%.\n[supported] Full DocuSearch improves Recall@10 by 16 percentage points, which is about 25.4%. — The context states that the full DocuSearch improves Recall@10 by 16 percentage points, and the relative improvement is approximately 25.4%.\n[supported] The paper explicitly reports these gains as 15 and 16 percentage points, respectively. — The context explicitly mentions that the paper reports these gains as 15 and 16 percentage points.",
+      "statements": [
+        {
+          "statement": "The retrieval results for Precision@10 show that the dense-only method has a value of 0.54.",
+          "reason": "The context states that the dense-only method has a Precision@10 value of 0.54.",
+          "verdict": 1
+        },
+        {
+          "statement": "The retrieval results for Precision@10 show that the full DocuSearch method has a value of 0.69.",
+          "reason": "The context explicitly states that the full DocuSearch method has a Precision@10 value of 0.69.",
+          "verdict": 1
+        },
+        {
+          "statement": "The absolute improvement in Precision@10 is calculated as 0.69 minus 0.54, resulting in 0.15.",
+          "reason": "The absolute improvement can be directly calculated from the values provided in the context.",
+          "verdict": 1
+        },
+        {
+          "statement": "The relative improvement in Precision@10 is calculated as 0.15 divided by 0.54, resulting in approximately 27.8%.",
+          "reason": "The relative improvement can be directly calculated from the absolute improvement and the dense-only value provided in the context.",
+          "verdict": 1
+        },
+        {
+          "statement": "The retrieval results for Recall@10 show that the dense-only method has a value of 0.63.",
+          "reason": "The context states that the dense-only method has a Recall@10 value of 0.63.",
+          "verdict": 1
+        },
+        {
+          "statement": "The retrieval results for Recall@10 show that the full DocuSearch method has a value of 0.79.",
+          "reason": "The context explicitly states that the full DocuSearch method has a Recall@10 value of 0.79.",
+          "verdict": 1
+        },
+        {
+          "statement": "The absolute improvement in Recall@10 is calculated as 0.79 minus 0.63, resulting in 0.16.",
+          "reason": "The absolute improvement can be directly calculated from the values provided in the context.",
+          "verdict": 1
+        },
+        {
+          "statement": "The relative improvement in Recall@10 is calculated as 0.16 divided by 0.63, resulting in approximately 25.4%.",
+          "reason": "The relative improvement can be directly calculated from the absolute improvement and the dense-only value provided in the context.",
+          "verdict": 1
+        },
+        {
+          "statement": "Full DocuSearch improves Precision@10 by 15 percentage points, which is about 27.8%.",
+          "reason": "The context states that the full DocuSearch improves Precision@10 by 15 percentage points, and the relative improvement is approximately 27.8%.",
+          "verdict": 1
+        },
+        {
+          "statement": "Full DocuSearch improves Recall@10 by 16 percentage points, which is about 25.4%.",
+          "reason": "The context states that the full DocuSearch improves Recall@10 by 16 percentage points, and the relative improvement is approximately 25.4%.",
+          "verdict": 1
+        },
+        {
+          "statement": "The paper explicitly reports these gains as 15 and 16 percentage points, respectively.",
+          "reason": "The context explicitly mentions that the paper reports these gains as 15 and 16 percentage points.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.904373825833043,
+      "reason": "generated='What are the improvements in Precision@10 and Recall@10 when comparing full DocuSearch to the dense-only baseline?' similarity=0.9044 noncommittal=0; generated='What are the improvements in Precision@10 and Recall@10 when comparing full DocuSearch to the dense-only baseline?' similarity=0.9044 noncommittal=0; generated='What are the improvements in Precision@10 and Recall@10 when comparing full DocuSearch to the dense-only baseline?' similarity=0.9044 noncommittal=0",
+      "generated_questions": [
+        "What are the improvements in Precision@10 and Recall@10 when comparing full DocuSearch to the dense-only baseline?",
+        "What are the improvements in Precision@10 and Recall@10 when comparing full DocuSearch to the dense-only baseline?",
+        "What are the improvements in Precision@10 and Recall@10 when comparing full DocuSearch to the dense-only baseline?"
+      ],
+      "noncommittal": [
+        0,
+        0,
+        0
+      ],
+      "similarities": [
+        0.904373825833043,
+        0.904373825833043,
+        0.904373825833043
+      ],
+      "all_noncommittal": false
+    }
+  }
+}

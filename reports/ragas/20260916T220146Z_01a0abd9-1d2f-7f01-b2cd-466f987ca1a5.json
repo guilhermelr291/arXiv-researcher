@@ -1,0 +1,168 @@
+{
+  "scored_at": "2026-09-16T22:01:46Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abd9-1d2f-7f01-b2cd-466f987ca1a5",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "What core technologies does DocuSearch use for embeddings, vector storage, and LLM inference, and how does the paper connect this technology choice to data privacy in telecom operations? (2609.01617)",
+  "retrieved_contexts": [
+    "Getting accurate, grounded answers out of large enterprise document\nrepositories is a difficult problem. Dense vector retrieval alone\nfrequently performs poorly on queries that mix technical\nterminology, vendor-specific acronyms, or require reasoning\nacross several non-adjacent sections. DocuSearch was built\nto address exactly this gap — an offline, multi-agent document\nintelligence system developed and evaluated in a production\ntelecom network operations environment. Rather than relying on a\nsingle retrieval signal, DocuSearch pulls together three\ncomplementary sources of evidence: semantic search over a Qdrant\nvector store using BGE-Large embeddings, BM25 full-text search\nover an SQLite FTS5 index, and Knowledge Graph neighbour expansion\nfrom a structured edge table. These three ranked lists are merged\nthrough Reciprocal Rank Fusion (RRF) with signal weights\n$w_{v}=0.50$, $w_{b}=0.35$, and $w_{kg}=0.15$, giving:  \nEquation\n$$\ns_{\\mathrm{RRF}}(d)\\;=\\;\\sum_{i\\in\\{v,\\,b,\\,kg\\}}\\frac{w_{i}}{k+r_{i}(d)},\\quad k=60\n$$  \nwhere $r_{i}(d)$ is the rank of chunk $d$ in signal list $i$.\nA cross-encoder then reranks the fused list, and Maximal\nMarginal Relevance (MMR) with $\\lambda=0.65$ prunes it\nfor both relevance and diversity. What makes DocuSearch\ndistinctive is a per-chunk evaluation loop that\ntreats each selected chunk as its own mini-retrieval problem:\nan LLM decides whether the chunk needs additional neighbouring\ncontext, whether it is actually sufficient to answer the query,\nand whether the answer it generates is genuinely grounded in\nthe retrieved text. Ungrounded answers are not returned; the\nsystem falls back to a multi-chunk merge instead. On an\ninternal telecom document corpus, DocuSearch reaches\nPrecision@10 of $0.69$, Recall@10 of $0.79$, and a grounding\nrate of $89.6\\%$ — gains of $15$, $16$, and $18.4$ percentage\npoints over a dense-only RAG baseline.",
+    "This paper presented DocuSearch, a hybrid multi-agent RAG system\nbuilt for enterprise document intelligence in multi-vendor\ntelecom environments. The system was designed around three\nfailure modes observed in production: signal\nincompleteness, context fragmentation, and unverified answer\ngrounding. The two-phase pipeline — hybrid retrieval\nfusion followed by per-chunk agentic evaluation — directly\naddresses all three. Results show Precision@10 of $0.69$,\nRecall@10 of $0.79$, and a grounding rate of $89.6\\%$, with\nhallucinations dropping to $6.8\\%$. The ablation confirms\nthat groundedness verification and sufficiency scoring drive\nthe largest improvements, though no single component is\nredundant.\nA key practical finding is that\nproduction-quality document intelligence is achievable\nentirely on locally hosted models. DocuSearch requires no\nexternal API calls, which matters a great deal in telecom\noperations environments where sensitive network configuration\ndata cannot leave the organisation’s infrastructure.",
+    "Dense Vector Retrieval. The query $q$ is encoded using\nBGE-Large-EN-v1.5 [4] to get\n$\\mathbf{q}\\in\\mathbb{R}^{1024}$. Cosine similarity is\ncomputed against all chunk embeddings in Qdrant, returning\nthe top $k_{v}=40$ chunks:  \nEquation\n$$\n\\mathrm{score}_{v}(c)=\\frac{\\mathbf{q}\\cdot\\mathbf{e}_{c}}{\\|\\mathbf{q}\\|\\cdot\\|\\mathbf{e}_{c}\\|}\n$$  \nBM25 Sparse Retrieval. Extracted keywords query the\nSQLite FTS5 index. Standard BM25 scoring applies:  \nEquation\n$$\n\\mathrm{score}_{b}(c,Q)=\\sum_{q_{i}\\in Q}\\mathrm{IDF}(q_{i})\\cdot\\frac{f(q_{i},c)(k_{1}+1)}{f(q_{i},c)+k_{1}(1-b+b\\cdot\\frac{|c|}{avgdl})}\n$$  \nwith $k_{1}=1.2$, $b=0.75$, where $|c|$ is chunk length\nand $avgdl$ is the average chunk length across $\\mathcal{C}$.\nTop $k_{b}=40$ chunks are retrieved. BM25 is particularly\nuseful here because technical acronyms and model numbers\nthat have no meaningful semantic neighbourhood still\nproduce strong lexical matches.\nKG Neighbour Expansion. Seed chunks from the vector\nand BM25 results traverse a KG edge table stored in SQLite,\npulling in structurally connected chunks (top $k_{kg}=15$).\nThis catches content that is topically related but\nlexically and semantically distant — for instance, a\nconfiguration snippet that references a procedure described\nin a different section.",
+    "Before any retrieval happens, every query $q$ goes through\ntemplate classification and keyword extraction. The Template\nSelection agent maps $q$ to one of five types in\n𝒯={\\mathcal{T}=\\{procedure_sop,\nconcept_explanation,\ncomparison_decision,\nparameter_lookup,\ntroubleshooting_rca$\\}$ using an LLM with a\ndeterministic heuristic as fallback when the model is\nuncertain. Accurate template classification is important because\nit shapes the structure of the generated answer downstream.\nThe BM25 Keyword agent then extracts domain-specific terms\nfrom a curated telecom vocabulary covering standard\nnetworking and protocol constructs, supplemented with\nquery-specific expansions. Finally, the Vendor Detection\nagent combines LLM classification with regex matching to\nidentify vendor references, scoping all retrieval signals\nto the detected vendor’s documents when applicable.",
+    "In telecom network operations centres, engineers frequently\nmust search through hundreds of vendor manuals for a specific\nconfiguration procedure under time pressure. These environments accumulate vast repositories of\ntechnical documentation — SOPs, RCA reports, audit records,\nmulti-vendor configuration guides — and the gap between\nwhat keyword search surfaces and what an engineer actually\nneeds can be substantial. Conventional search returns too many\nloosely related hits. Standard single-signal\nRetrieval-Augmented Generation (RAG)[1],\nwhile an improvement, still struggles with specialised\ntechnical vocabulary, fragmented document chunks, and the\nreality that relevant information is often spread across\nnon-adjacent sections from different vendors.\nThis paper describes DocuSearch, a hybrid multi-agent\nRAG system designed and deployed within a real telecom\nnetwork operations environment. Three limitations motivated\nits design: signal incompleteness, where a single\nretrieval function misses chunks that are relevant in semantic,\nlexical, and structural senses simultaneously;\ncontext fragmentation, where a retrieved chunk is\nonly half of a procedure; and unverified grounding,\nwhere a generated answer sounds plausible but is not actually\nsupported by the retrieved evidence. DocuSearch addresses all\nthree by combining dense vector retrieval, BM25 sparse\nretrieval [2], and Knowledge Graph\nexpansion[9] into a single fused ranking via Reciprocal Rank\nFusion (RRF) [7], followed by cross-encoder\nreranking, Maximal Marginal Relevance (MMR) selection\n[3], and — the primary novel\ncontribution — a per-chunk agentic evaluation loop\nthat verifies context sufficiency and answer grounding before\ncommitting to a response. The pipeline runs entirely on locally\nhosted models and is orchestrated via LangGraph\n[5], exposed through an interactive Dash web\napplication with vendor-scoped retrieval, session document\nupload, and integrated Knowledge and Learning Hub modules.\nThe main contributions are as follows:  \n* •  \nA three-signal hybrid retrieval architecture fused\nvia weighted RRF with signal weights\n$w_{v}{=}0.50,\\;w_{b}{=}0.35,\\;w_{kg}{=}0.15$.\n* •  \nA per-chunk agentic evaluation loop with LLM-driven\ncontext need detection, sufficiency scoring, and\ngroundedness verification.\n* •  \nVendor-aware retrieval scoping for multi-vendor",
+    "DocuSearch is implemented entirely in Python3 and served\nfrom a single application.\nTable[I](#S7.T1 \"TABLE I ‣ VII Implementation Details ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") summarises the core technology stack.  \nTABLE I: DocuSearch Core Technology Stack\n| Component | Technology |\n| --- | --- |\n| Vector Store | Qdrant (self-hosted) |\n| Embedding | BGE-Large-EN-v1.5 ($d{=}1024$, CUDA) |\n| Reranker | Cross-Encoder (CUDA) |\n| FTS Index | SQLite FTS5 |\n| Metadata Store | SQLite |\n| LLM Inference | Local REST or vLLM |\n| LLM Model | Mistral [10] |\n| Pipeline Graph | LangGraph |\n| UI Framework | Plotly Dash |\n| Doc Parsing | Docling, PyMuPDF, python-docx, openpyxl |\n| Auto Ingest | watchdog directory monitor |\n  \nDocuments reach the system through three paths: server-side\npath submission, browser upload via Dash dcc.Upload,\nor automatic detection through a watchdog directory\nmonitor. All formats are parsed and chunked with $s=900$\ncharacters and $\\delta=140$ characters overlap. These values were\nsettled on after experimenting with several chunk sizes;\nsmaller chunks hurt sufficiency scoring while larger ones\ndegraded retrieval precision. Table[II](#S7.T2 \"TABLE II ‣ VII Implementation Details ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\")\nsummarises the full retrieval configuration used across\nall experiments.  \nTABLE II: Default Retrieval and Ranking Configuration\n| Parameter | Symbol | Value |\n| --- | --- | --- |\n| Vector top-$k$ | $k_{v}$ | 40 |\n| BM25 top-$k$ | $k_{b}$ | 40 |\n| KG top-$k$ | $k_{kg}$ | 15 |\n| Rerank top-$k$ | $k_{r}$ | 12 |\n| Final evidence | $|\\mathcal{E}|$ | 10 |\n| RRF smoothing | $k$ | 60 |\n| RRF vector weight | $w_{v}$ | 0.50 |\n| RRF BM25 weight | $w_{b}$ | 0.35 |\n| RRF KG weight | $w_{kg}$ | 0.15 |\n| MMR lambda | $\\lambda$ | 0.65 |\n| Sufficiency thresh. | $\\tau$ | 7 |\n| Max neighbour loops | $L$ | 2 |\n| Chunk size | $s$ | 900 chars |\n| Chunk overlap | $\\delta$ | 140 chars |\n| LLM temperature | $T$ | 0.0 |\n  \nSession-only uploads are also supported: documents uploaded\nduring a session are embedded in memory using a local NumPy\narray (max $90{,}000$ chars, top-$k_{u}=8$) without being\nwritten to the persistent knowledge base. All LLM calls use\n$T=0.0$ to keep outputs deterministic across repeated\nqueries, which is important for reproducibility in an\noperational setting.",
+    "The sequential LLM calls in the per-chunk evaluation phase\nare the main latency bottleneck, currently averaging $8.4$\nseconds. Parallelising chunk evaluation across inference\nthreads is a natural first step. The RRF signal weights\nwere determined empirically on telecom documentation and\nmay not transfer well to other domains; learning them from\nquery-relevance feedback via a differentiable ranking\nobjective would make the system more broadly applicable.\nThere is also potential in using named entity recognition\nto populate the KG with typed entity-relation triples,\nwhich would strengthen multi-hop query handling. Finally,\nextending DocuSearch to multimodal retrieval — covering\nembedded diagrams and specification tables that are\npervasive in vendor documentation — is a compelling\ndirection worth pursuing.\nReinforcement Learning for Adaptive Retrieval.\nOne promising future direction is treating\nDocuSearch’s multi-step retrieval workflow as a sequential\ndecision problem. The intuition comes from Karpathy’s\ninteractive GridWorld temporal-difference learning\ndemo[11], where an agent learns to\nnavigate a grid by trial-and-error using TD updates —\nwithout any hard-coded path rules. The analogy to the\npipeline is direct: just as that agent discovers which\nmoves lead to reward by accumulating Q-values over many\nepisodes, a retrieval agent in DocuSearch could learn\nwhen to invoke BM25, when to expand KG\nneighbours, and when to stop — adapting\ndynamically to each incoming query rather than applying\nthe same fixed configuration every time.\nFormally, each query-answer interaction can be modelled as\nan episode in a Markov Decision Process\n$\\mathcal{M}=(\\mathcal{S},\\mathcal{A},\\mathcal{P},\\mathcal{R},\\gamma)$.\nThe state $s\\in\\mathcal{S}$ encodes the current query\nintent, the set of chunks retrieved so far, reranker\nconfidence scores, KG expansion status, and evidence\ncoverage. The action space $\\mathcal{A}$ includes\ndiscrete choices such as triggering a BM25 search,\nexpanding KG neighbours by one hop, tightening the\ncross-encoder top-$k$, fetching a neighbouring chunk,\nor terminating retrieval and proceeding to answer\ngeneration. The reward $\\mathcal{R}$ is shaped by\nanswer groundedness (which is already measured at inference\ntime), engineer satisfaction feedback collected through",
+    "The system is organised across six functional tiers spanning\nthe two phases shown in Figures[1](#S4.F1 \"Figure 1 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\")\nand[2](#S4.F2 \"Figure 2 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\").  \nFigure 1: Pre-MMR Phase ( run_supervisor ):\nStep 1 — Template Selection (LLM call);\nStep 2 — BM25 Keyword Extraction (LLM + Rule Based);\nStep 2b — Vendor Detection (LLM call);\nSteps 3/4/5 — Parallel Vector Search, BM25 Retrieval,\nKG Expansion;\nStep 5b — RRF Fusion\n( w v = 0.50 , w b = 0.35 , w k  g = 0.15 w_{v}{=}0.50,\\,w_{b}{=}0.35,\\,w_{kg}{=}0.15 );\nStep 6 — Cross-Encoder Reranking;\nStep 7 — MMR Selection\n( λ = 0.65 \\lambda{=}0.65 , relevance + diversity).\nOutput: ordered MMR chunks passed to Post-MMR phase.\nFigure 2: Post-MMR Phase ( run_per_chunk_evaluation ):\nPer-chunk loop — LLM evaluates current chunk;\nif more context needed, neighbouring chunks are fetched\n(green path); sufficiency check gates answer generation;\ngroundedness LLM verifies the generated answer;\nif grounded, pipeline terminates ( method=per_chunk );\notherwise retries next MMR chunk.\nWhen all MMR chunks are exhausted, fallback merges all\nexpanded contexts and returns a consolidated answer\n( method=fallback_merge ).  \nThe Document Ingestion Layer handles parsing and\nchunking, producing overlapping segments ($s=900$ chars,\n$\\delta=140$ chars) stored in both Qdrant[6] and SQLite FTS5.\nThe Multi-Signal Retrieval Layer runs three parallel\nagents ($k_{v}{=}40$, $k_{b}{=}40$, $k_{kg}{=}15$), each",
+    "DocuSearch tackles the four sub-problems through a layered\nmulti-agent pipeline split into two phases, illustrated in\nFigure[1](#S4.F1 \"Figure 1 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") and Figure[2](#S4.F2 \"Figure 2 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\").\nPre-MMR Phase. When a query $q$ arrives, a Template\nSelection agent first classifies it into one of five answer\ntemplates $\\mathcal{T}$. A BM25 Keyword agent then pulls\nout domain-specific terms, and a Vendor Detection agent\noptionally narrows all three retrieval signals to a specific\nvendor namespace $v\\in\\mathcal{V}$. Dense vector search,\nBM25 full-text search, and KG neighbour expansion run in\nparallel, and their ranked results are merged by weighted\nRRF, reranked by a cross-encoder, and filtered by MMR to\nproduce the evidence set $\\mathcal{E}$.\nPost-MMR Phase. Each chunk $c\\in\\mathcal{E}$ is\nevaluated individually by four sequential LLM-driven nodes:\ncontext need detection, sufficiency scoring against a\nthreshold $\\tau=7$, answer generation, and groundedness\nverification. The first chunk that clears all four checks\nproduces the final answer. When no individual chunk passes,\na fallback merges all expanded contexts, generates a\nconsolidated answer, and runs one final groundedness check\nbefore returning anything to the user."
+  ],
+  "response": "## Core technologies\n\n- **Embeddings:** DocuSearch uses **BGE-Large-EN-v1.5** embeddings. The model represents each query as a **1,024-dimensional vector**, and retrieval uses cosine similarity. [3]\n- **Vector storage:** These embeddings are stored in a **self-hosted Qdrant** vector store for dense semantic search. [6] Documents are also indexed in **SQLite FTS5** for BM25 keyword search, but SQLite FTS5 is the full-text component rather than the vector store. [1][6]\n- **LLM inference:** The system uses the **Mistral** model through either a **local REST endpoint or vLLM**. The overall multi-agent pipeline is orchestrated with **LangGraph**. [6]\n\n## Connection to telecom data privacy\n\nThe paper connects this technology choice directly to operational privacy: DocuSearch runs **offline with locally hosted models and makes no external API calls**. [2] This is important because telecom operations contain sensitive network-configuration data that, according to the paper, must not leave the organisation’s infrastructure. [2] The locally hosted Qdrant store, embedding model, and Mistral inference stack therefore support keeping document contents, embeddings, and LLM processing inside that infrastructure. [2][6]\n\nThe paper also describes a session-only upload mode in which documents are embedded in memory using a local NumPy array rather than being written to the persistent knowledge base. [6] This provides an additional privacy-oriented handling option for temporary documents.\n\n## What the paper does not clearly specify\n\nThe paper does **not clearly specify** concrete security controls such as encryption, access-control policies, retention rules, or whether every deployment uses the same local REST or vLLM configuration. It establishes the architectural privacy benefit of local, API-free processing, but not a complete telecom data-governance or security specification. [2][6]\n\nNo direct contradiction appears among the provided chunks: they consistently describe local inference, while [6] identifies the possible local inference interfaces as REST or vLLM.",
+  "metrics": {
+    "faithfulness": {
+      "value": 1.0,
+      "reason": "[supported] DocuSearch uses BGE-Large-EN-v1.5 embeddings. — The context explicitly states that the query is encoded using BGE-Large-EN-v1.5 to get a vector representation.\n[supported] The model represents each query as a 1,024-dimensional vector. — The context mentions that the query is encoded to get a vector in R^{1024}, indicating it is 1,024-dimensional.\n[supported] Retrieval uses cosine similarity. — The context describes that cosine similarity is computed against all chunk embeddings in Qdrant.\n[supported] These embeddings are stored in a self-hosted Qdrant vector store for dense semantic search. — The context states that the vector store is Qdrant and it is self-hosted, confirming the storage method for embeddings.\n[supported] Documents are indexed in SQLite FTS5 for BM25 keyword search. — The context explicitly states that BM25 scoring applies to an SQLite FTS5 index, confirming the indexing method.\n[supported] SQLite FTS5 is the full-text component rather than the vector store. — The context differentiates between the vector store (Qdrant) and the full-text search (SQLite FTS5), confirming this statement.\n[supported] The system uses the Mistral model through either a local REST endpoint or vLLM. — The context mentions that the LLM model used is Mistral and it can be accessed through local REST or vLLM.\n[supported] The overall multi-agent pipeline is orchestrated with LangGraph. — The context states that the pipeline is orchestrated via LangGraph, confirming this orchestration method.\n[supported] The paper connects this technology choice directly to operational privacy. — The context discusses the importance of local processing for operational privacy, indicating a connection to technology choices.\n[supported] DocuSearch runs offline with locally hosted models and makes no external API calls. — The context explicitly states that DocuSearch requires no external API calls and runs entirely on locally hosted models.\n[supported] Telecom operations contain sensitive network-configuration data. — The context mentions that sensitive network configuration data cannot leave the organization’s infrastructure, indicating its presence in telecom operations.\n[supported] Sensitive network-configuration data must not leave the organisation’s infrastructure. — The context explicitly states that sensitive data cannot leave the organization’s infrastructure, confirming this requirement.\n[supported] The locally hosted Qdrant store, embedding model, and Mistral inference stack support keeping document contents, embeddings, and LLM processing inside that infrastructure. — The context discusses the local hosting of Qdrant, the embedding model, and Mistral, confirming that they support keeping data within the infrastructure.\n[supported] The paper describes a session-only upload mode. — The context mentions that the paper describes a session-only upload mode for documents.\n[supported] In session-only upload mode, documents are embedded in memory using a local NumPy array. — The context states that in session-only upload mode, documents are embedded in memory using a local NumPy array.\n[supported] Documents are not written to the persistent knowledge base. — The context explicitly states that documents in session-only upload mode are not written to the persistent knowledge base.\n[supported] Session-only upload mode provides an additional privacy-oriented handling option for temporary documents. — The context indicates that session-only upload mode is a privacy-oriented handling option for temporary documents.\n[supported] The paper does not clearly specify concrete security controls such as encryption, access-control policies, or retention rules. — The context mentions that the paper does not provide a complete data-governance or security specification, implying a lack of concrete security controls.\n[supported] The paper does not specify whether every deployment uses the same local REST or vLLM configuration. — The context states that the paper does not specify if every deployment uses the same configuration, indicating uncertainty.\n[supported] The paper establishes the architectural privacy benefit of local, API-free processing. — The context discusses the architectural privacy benefits of local processing without APIs, confirming this statement.\n[supported] The paper does not provide a complete telecom data-governance or security specification. — The context explicitly states that the paper does not provide a complete data-governance or security specification.\n[supported] No direct contradiction appears among the provided chunks. — The context does not indicate any contradictions among the statements provided, confirming this statement.\n[supported] The provided chunks consistently describe local inference. — The context consistently discusses local inference throughout the provided information.\n[supported] The possible local inference interfaces are identified as REST or vLLM. — The context identifies REST and vLLM as the interfaces for local inference, confirming this statement.",
+      "statements": [
+        {
+          "statement": "DocuSearch uses BGE-Large-EN-v1.5 embeddings.",
+          "reason": "The context explicitly states that the query is encoded using BGE-Large-EN-v1.5 to get a vector representation.",
+          "verdict": 1
+        },
+        {
+          "statement": "The model represents each query as a 1,024-dimensional vector.",
+          "reason": "The context mentions that the query is encoded to get a vector in R^{1024}, indicating it is 1,024-dimensional.",
+          "verdict": 1
+        },
+        {
+          "statement": "Retrieval uses cosine similarity.",
+          "reason": "The context describes that cosine similarity is computed against all chunk embeddings in Qdrant.",
+          "verdict": 1
+        },
+        {
+          "statement": "These embeddings are stored in a self-hosted Qdrant vector store for dense semantic search.",
+          "reason": "The context states that the vector store is Qdrant and it is self-hosted, confirming the storage method for embeddings.",
+          "verdict": 1
+        },
+        {
+          "statement": "Documents are indexed in SQLite FTS5 for BM25 keyword search.",
+          "reason": "The context explicitly states that BM25 scoring applies to an SQLite FTS5 index, confirming the indexing method.",
+          "verdict": 1
+        },
+        {
+          "statement": "SQLite FTS5 is the full-text component rather than the vector store.",
+          "reason": "The context differentiates between the vector store (Qdrant) and the full-text search (SQLite FTS5), confirming this statement.",
+          "verdict": 1
+        },
+        {
+          "statement": "The system uses the Mistral model through either a local REST endpoint or vLLM.",
+          "reason": "The context mentions that the LLM model used is Mistral and it can be accessed through local REST or vLLM.",
+          "verdict": 1
+        },
+        {
+          "statement": "The overall multi-agent pipeline is orchestrated with LangGraph.",
+          "reason": "The context states that the pipeline is orchestrated via LangGraph, confirming this orchestration method.",
+          "verdict": 1
+        },
+        {
+          "statement": "The paper connects this technology choice directly to operational privacy.",
+          "reason": "The context discusses the importance of local processing for operational privacy, indicating a connection to technology choices.",
+          "verdict": 1
+        },
+        {
+          "statement": "DocuSearch runs offline with locally hosted models and makes no external API calls.",
+          "reason": "The context explicitly states that DocuSearch requires no external API calls and runs entirely on locally hosted models.",
+          "verdict": 1
+        },
+        {
+          "statement": "Telecom operations contain sensitive network-configuration data.",
+          "reason": "The context mentions that sensitive network configuration data cannot leave the organization’s infrastructure, indicating its presence in telecom operations.",
+          "verdict": 1
+        },
+        {
+          "statement": "Sensitive network-configuration data must not leave the organisation’s infrastructure.",
+          "reason": "The context explicitly states that sensitive data cannot leave the organization’s infrastructure, confirming this requirement.",
+          "verdict": 1
+        },
+        {
+          "statement": "The locally hosted Qdrant store, embedding model, and Mistral inference stack support keeping document contents, embeddings, and LLM processing inside that infrastructure.",
+          "reason": "The context discusses the local hosting of Qdrant, the embedding model, and Mistral, confirming that they support keeping data within the infrastructure.",
+          "verdict": 1
+        },
+        {
+          "statement": "The paper describes a session-only upload mode.",
+          "reason": "The context mentions that the paper describes a session-only upload mode for documents.",
+          "verdict": 1
+        },
+        {
+          "statement": "In session-only upload mode, documents are embedded in memory using a local NumPy array.",
+          "reason": "The context states that in session-only upload mode, documents are embedded in memory using a local NumPy array.",
+          "verdict": 1
+        },
+        {
+          "statement": "Documents are not written to the persistent knowledge base.",
+          "reason": "The context explicitly states that documents in session-only upload mode are not written to the persistent knowledge base.",
+          "verdict": 1
+        },
+        {
+          "statement": "Session-only upload mode provides an additional privacy-oriented handling option for temporary documents.",
+          "reason": "The context indicates that session-only upload mode is a privacy-oriented handling option for temporary documents.",
+          "verdict": 1
+        },
+        {
+          "statement": "The paper does not clearly specify concrete security controls such as encryption, access-control policies, or retention rules.",
+          "reason": "The context mentions that the paper does not provide a complete data-governance or security specification, implying a lack of concrete security controls.",
+          "verdict": 1
+        },
+        {
+          "statement": "The paper does not specify whether every deployment uses the same local REST or vLLM configuration.",
+          "reason": "The context states that the paper does not specify if every deployment uses the same configuration, indicating uncertainty.",
+          "verdict": 1
+        },
+        {
+          "statement": "The paper establishes the architectural privacy benefit of local, API-free processing.",
+          "reason": "The context discusses the architectural privacy benefits of local processing without APIs, confirming this statement.",
+          "verdict": 1
+        },
+        {
+          "statement": "The paper does not provide a complete telecom data-governance or security specification.",
+          "reason": "The context explicitly states that the paper does not provide a complete data-governance or security specification.",
+          "verdict": 1
+        },
+        {
+          "statement": "No direct contradiction appears among the provided chunks.",
+          "reason": "The context does not indicate any contradictions among the statements provided, confirming this statement.",
+          "verdict": 1
+        },
+        {
+          "statement": "The provided chunks consistently describe local inference.",
+          "reason": "The context consistently discusses local inference throughout the provided information.",
+          "verdict": 1
+        },
+        {
+          "statement": "The possible local inference interfaces are identified as REST or vLLM.",
+          "reason": "The context identifies REST and vLLM as the interfaces for local inference, confirming this statement.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.0,
+      "reason": "All generated questions marked noncommittal; score forced to 0. generated='What does the paper not clearly specify regarding security controls?' similarity=0.3104 noncommittal=1; generated='What does the paper not clearly specify regarding security controls?' similarity=0.3104 noncommittal=1; generated='What does the paper not clearly specify regarding security controls?' similarity=0.3104 noncommittal=1",
+      "generated_questions": [
+        "What does the paper not clearly specify regarding security controls?",
+        "What does the paper not clearly specify regarding security controls?",
+        "What does the paper not clearly specify regarding security controls?"
+      ],
+      "noncommittal": [
+        1,
+        1,
+        1
+      ],
+      "similarities": [
+        0.31038180957115796,
+        0.31038180957115796,
+        0.3103891240863945
+      ],
+      "all_noncommittal": true
+    }
+  }
+}

@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import re
+import uuid
 
 from langchain_openai import ChatOpenAI
 from langgraph.config import get_stream_writer
 
+from plan_based_researcher.agents.history import (
+    format_transcript,
+    last_exchanges,
+    prior_citation_chunks,
+)
 from plan_based_researcher.agents.query_schema import step_eval_feedback
 from plan_based_researcher.agents.registry import REGISTRY
 from plan_based_researcher.api.schemas import Citation
@@ -316,9 +322,14 @@ def _user_prompt(state: GraphState, formatted_chunks: str) -> str:
     language = _language(state)
     task = _current_task(state)
     feedback = _eval_feedback(state)
+    history = format_transcript(
+        last_exchanges(state.get("messages"), Policy.writer_history_exchanges)
+    )
     parts = [
         f"Student query:\n{state.get('query') or ''}",
     ]
+    if history:
+        parts.append(f"Recent conversation:\n{history}")
     if language:
         parts.append(
             f"Answer language: {language}\n"
@@ -344,11 +355,20 @@ class WriterRunner:
 
     async def run(self, state: GraphState) -> dict:
         chunks: list[EvidenceChunk] = list(state.get("evidence_chunks") or [])
+        if not chunks:
+            chunks = prior_citation_chunks(state)
+            if not chunks:
+                return {
+                    "outcome": "insufficient",
+                    "last_eval": {"feedback": "no evidence on this thread"},
+                }
         formatted = _format_chunks(chunks)
         messages = [
             {"role": "system", "content": _system_prompt()},
             {"role": "user", "content": _user_prompt(state, formatted)},
         ]
+        message_id = str(uuid.uuid4())
+        _emit_custom("answer_start", {"message_id": message_id})
         pieces: list[str] = []
         async for chunk in self._llm.astream(messages):
             text = _visible_text(chunk)
@@ -363,5 +383,6 @@ class WriterRunner:
         return {
             "writer_markdown": markdown,
             "citations": citations,
+            "writer_message_id": message_id,
             "last_agent": "writer",
         }

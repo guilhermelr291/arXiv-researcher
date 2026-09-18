@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from plan_based_researcher.graph.build import GraphDeps, build_graph
@@ -21,8 +22,14 @@ class ResearchGraph:
             halt_before_writer=halt_before_writer,
         )
 
+    def astream(self, input, config=None, **kwargs):
+        return self._compiled.astream(input, config, **kwargs)
+
     def astream_events(self, input, config=None, **kwargs):
         return self._compiled.astream_events(input, config, **kwargs)
+
+    def aget_state(self, config):
+        return self._compiled.aget_state(config)
 
     def ainvoke(self, input, config=None, **kwargs):
         return self._compiled.ainvoke(input, config, **kwargs)
@@ -53,6 +60,8 @@ class ResearchGraph:
             "hole_tasks": [],
             "evidence_chunks": [],
             "writer_markdown": "",
+            "writer_message_id": "",
+            "started_at_ms": int(time.time() * 1000),
             "citations": [],
             "outcome": "pending",
             "eval_next": "dispatch",

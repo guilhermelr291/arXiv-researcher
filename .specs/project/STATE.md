@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-09-16
-**Current Work:** Feature `retrieve-multi-facet-hops` — per-topic retrieve first pass (HOP-01–06).
+**Last Updated:** 2026-09-17
+**Current Work:** Feature `agui-frontend` — AG-UI `POST /agent` + Next.js `web/` desk (build, uncommitted).
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-029: AG-UI wire, astream consume path, transcript in messages (2026-09-17)
+
+**Decision:** Product HTTP is AG-UI `POST /agent` (`RunAgentInput`) and `GET /threads/{thread_id}`. The adapter consumes `graph.astream(..., stream_mode=["custom","updates"])`. `finalize` appends an `AIMessage` per terminal run (`response_metadata` is the turn projection). Grounding is thread-scoped: `[n]` resolves to a chunk packed in this thread. The student UI is Next.js `web/` (HTTP-only). Chainlit, `POST /research`, `StreamDispatcher`, and `ResearchExecutor` are removed.
+**Reason:** The private SSE vocabulary was unreadable by standard agent clients, and follow-ups planned cold because `messages` never stored the transcript. Grill-me + `.specs/features/agui-frontend/plan.md`.
+**Trade-off:** No SSE resumption of a live generator; drop reconnects via checkpoint replay. No auth, no HITL. Pre-feature checkpoints replay as user-only turns.
+**Impact:** Supersedes AD-008 (Chainlit, `/research`) and AD-020 (`astream_events` + `StreamDispatcher`). Supersedes AD-022's product SSE names (`answer_delta` / `citations` as wire events). Amends AD-007/AD-019 scope statements that assumed Chainlit / `/research`. Invariants 1, 6, 9 in `AGENTS.md` match this decision; invariant 8 (`halt_before_writer` eval-only) is unchanged.
 
 ### AD-028: Retrieve hops gate the multi first pass (2026-09-16)
 

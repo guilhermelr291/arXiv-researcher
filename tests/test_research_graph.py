@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import time
 import unittest
 from typing import cast
 
@@ -56,6 +57,8 @@ class ResearchGraphTest(unittest.TestCase):
                 "hole_tasks",
                 "evidence_chunks",
                 "writer_markdown",
+                "writer_message_id",
+                "started_at_ms",
                 "citations",
                 "outcome",
                 "eval_next",
@@ -72,6 +75,9 @@ class ResearchGraphTest(unittest.TestCase):
         self.assertEqual(state["papers"], [])
         self.assertEqual(state["plan"], [])
         self.assertEqual(state["outcome"], "pending")
+        now_ms = int(time.time() * 1000)
+        self.assertGreater(state["started_at_ms"], 0)
+        self.assertLessEqual(abs(state["started_at_ms"] - now_ms), 5_000)
 
     def test_compiles_with_stub_factory_no_postgres(self) -> None:
         graph = ResearchGraph(_stub_deps())

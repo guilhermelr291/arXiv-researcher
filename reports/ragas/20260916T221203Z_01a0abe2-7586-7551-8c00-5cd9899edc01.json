@@ -1,0 +1,215 @@
+{
+  "scored_at": "2026-09-16T22:12:03Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abe2-7586-7551-8c00-5cd9899edc01",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "How does the native Mixture-of-Transformers attention pattern reconcile causal language modeling with bidirectional visual processing? (2609.11929)",
+  "retrieved_contexts": [
+    "Between successive upsampling stages, $3\\times 3$ convolutions enable information exchange across neighboring token regions, allowing pixels near patch boundaries to be determined jointly rather than independently.\nThe decoder complements compact token-space modeling by restoring local spatial interactions before pixel synthesis, enabling global semantics, composition, and fine-grained structure to be jointly optimized within the same end-to-end framework. Trained together with the backbone under the flow-matching objective, this lightweight design improves cross-patch consistency and local continuity with only modest additional computation, substantially reducing boundary artifacts while enhancing the stability of high-resolution generation and downstream adaptation.  \nNative Mixture-of-Transformers.\nSenseNova-U1.5 retains the native Mixture-of-Transformers (MoT) design [29], integrating understanding and generation within a single Transformer backbone rather than completely separating them into two independent networks. Clean image-text context and noise-conditioned visual states are interleaved within a unified sequence, allowing semantic representations, visual evidence, and generative dynamics to interact directly through shared self-attention. This design lets generation draw continuously on representations formed during multimodal understanding, without introducing auxiliary fusion modules or cross-space feature conversion.  \nThe attention pattern is structured to reconcile causal language modeling with bidirectional visual interaction. Text tokens attend only to preceding context, while tokens within each clean image block attend bidirectionally to capture spatial dependencies. Noise-conditioned generation tokens likewise interact bidirectionally within their image block and attend to all preceding clean multimodal context. The reverse path is explicitly masked, preventing clean representations from accessing stochastic generation states. This asymmetric information flow exposes generation to rich semantic and visual context while preserving the integrity of representations used for understanding and reasoning.  \nCrucially, architectural unification does not imply parameter sharing everywhere. Understanding and generation retain separate attention projections, normalization layers, and feedforward modules, dynamically routed by token type at each Transformer layer. Shared attention therefore serves as the interface for cross-stream communication, while stream-specific parameters preserve the distinct computation required by perception and synthesis. This combination of dense interaction and parameter specialization allows the two capabilities to benefit from a common representational space without forcing their different optimization objectives into the same computational pathway.  \nUnified Training Objectives.\nSenseNova-U1.5 is trained with a unified objective that jointly couples autoregressive language modeling, native pixel-space flow learning, and perceptual supervision.\nFor multimodal understanding, we optimize the conditional likelihood of the target text sequence as follows:"
+  ],
+  "response": "## How the native MoT attention pattern works\n\nThe native Mixture-of-Transformers (MoT) uses one Transformer backbone for both understanding and generation. Its sequence interleaves clean image–text context with noise-conditioned visual states, so semantic information, visual evidence, and generation can interact through shared self-attention. [1]\n\nThe key is that different token types receive different attention permissions:\n\n1. **Text tokens remain causal.**  \n   Each text token attends only to preceding context. This preserves the directional information flow required for causal language modeling. [1]\n\n2. **Clean image tokens are bidirectional within their image block.**  \n   Tokens belonging to a clean image may attend to one another in both directions. This allows them to capture spatial dependencies across the image rather than processing visual information only from one direction. [1]\n\n3. **Noise-conditioned generation tokens are also bidirectional within their image block.**  \n   Generation tokens can therefore interact with the other tokens in the same generated-image block. In addition, they attend to all preceding clean multimodal context, giving generation access to the relevant text and visual representations. [1]\n\n4. **The reverse route is blocked.**  \n   Clean representations cannot attend back to stochastic generation states. Thus, generation can use the clean semantic and visual context, but the understanding pathway is protected from being contaminated by the noisy generation states. [1]\n\n## Reconciliation\n\nThe pattern reconciles the two objectives through **asymmetric masking**:\n\n- The **text-to-text** pathway is causal, supporting autoregressive language modeling. [1]\n- The **image-internal** pathways are bidirectional, supporting spatial visual interaction. [1]\n- The **generation-to-context** pathway is open toward preceding clean multimodal information, allowing visual generation to use semantic context. [1]\n- The **context-to-generation reverse pathway** is masked, preserving the integrity of representations used for understanding and reasoning. [1]\n\nTherefore, “bidirectional” does not mean that every token can attend freely to every other token. Instead, the model uses causal attention for language, bidirectional attention inside visual blocks, and a one-way flow from clean multimodal context into generation. [1]\n\nThis attention design is combined with token-type-specific parameters: understanding and generation use separate attention projections, normalization layers, and feedforward modules, while shared attention provides the interface between the streams. [1] Thus, the architecture shares a representational space without forcing perception and synthesis to use exactly the same internal computation. [1]\n\n## Limitations and contradictions\n\nNo contradiction is stated in the provided evidence. The evidence describes the pattern as combining causal text processing, bidirectional visual interaction, and protected one-way conditioning for generation. [1]",
+  "metrics": {
+    "faithfulness": {
+      "value": 1.0,
+      "reason": "[supported] The native Mixture-of-Transformers (MoT) uses one Transformer backbone for both understanding and generation. — The context explicitly states that SenseNova-U1.5 integrates understanding and generation within a single Transformer backbone.\n[supported] The sequence interleaves clean image–text context with noise-conditioned visual states. — The context mentions that clean image-text context and noise-conditioned visual states are interleaved within a unified sequence.\n[supported] Semantic information, visual evidence, and generation can interact through shared self-attention. — The context describes that semantic representations, visual evidence, and generative dynamics interact directly through shared self-attention.\n[supported] Different token types receive different attention permissions. — The context indicates that understanding and generation retain separate attention projections, implying different token types have different attention permissions.\n[supported] Text tokens remain causal. — The context states that text tokens attend only to preceding context, which is characteristic of causal tokens.\n[supported] Each text token attends only to preceding context. — The context explicitly states that text tokens attend only to preceding context.\n[supported] This preserves the directional information flow required for causal language modeling. — The context implies that the causal nature of text tokens preserves the necessary directional information flow for language modeling.\n[supported] Clean image tokens are bidirectional within their image block. — The context mentions that tokens within each clean image block attend bidirectionally to capture spatial dependencies.\n[supported] Tokens belonging to a clean image may attend to one another in both directions. — The context states that tokens within each clean image block attend bidirectionally, allowing them to interact in both directions.\n[supported] This allows clean image tokens to capture spatial dependencies across the image. — The context explains that bidirectional attention within clean image blocks captures spatial dependencies.\n[supported] Noise-conditioned generation tokens are also bidirectional within their image block. — The context states that noise-conditioned generation tokens interact bidirectionally within their image block.\n[supported] Generation tokens can interact with the other tokens in the same generated-image block. — The context indicates that generation tokens interact bidirectionally within their image block, allowing interaction with other tokens.\n[supported] Generation tokens attend to all preceding clean multimodal context. — The context states that generation tokens attend to all preceding clean multimodal context.\n[supported] This gives generation access to the relevant text and visual representations. — The context implies that attending to preceding clean multimodal context provides access to relevant representations.\n[supported] The reverse route is blocked. — The context explicitly states that the reverse path is masked, preventing clean representations from accessing stochastic generation states.\n[supported] Clean representations cannot attend back to stochastic generation states. — The context confirms that the reverse path is masked, preventing clean representations from accessing stochastic generation states.\n[supported] Generation can use the clean semantic and visual context. — The context indicates that generation can draw on clean semantic and visual context through the attention mechanism.\n[supported] The understanding pathway is protected from being contaminated by the noisy generation states. — The context states that the reverse path is masked, which protects the understanding pathway from noisy generation states.\n[supported] The pattern reconciles the two objectives through asymmetric masking. — The context describes the attention pattern as structured to reconcile causal language modeling with bidirectional visual interaction, implying asymmetric masking.\n[supported] The text-to-text pathway is causal, supporting autoregressive language modeling. — The context states that text tokens attend only to preceding context, which supports autoregressive language modeling.\n[supported] The image-internal pathways are bidirectional, supporting spatial visual interaction. — The context mentions that tokens within each clean image block attend bidirectionally, supporting spatial visual interaction.\n[supported] The generation-to-context pathway is open toward preceding clean multimodal information. — The context states that generation tokens attend to all preceding clean multimodal context, indicating an open pathway.\n[supported] This allows visual generation to use semantic context. — The context implies that attending to preceding clean multimodal context allows visual generation to utilize semantic context.\n[supported] The context-to-generation reverse pathway is masked. — The context explicitly states that the reverse path is masked, preventing access to stochastic generation states.\n[supported] This preserves the integrity of representations used for understanding and reasoning. — The context indicates that masking the reverse pathway preserves the integrity of representations for understanding and reasoning.\n[supported] Bidirectional does not mean that every token can attend freely to every other token. — The context clarifies that bidirectional attention is structured and does not imply unrestricted access between all tokens.\n[supported] The model uses causal attention for language. — The context states that text tokens attend only to preceding context, which is characteristic of causal attention.\n[supported] The model uses bidirectional attention inside visual blocks. — The context explicitly states that tokens within each clean image block attend bidirectionally.\n[supported] The model uses a one-way flow from clean multimodal context into generation. — The context indicates that the reverse path is masked, allowing a one-way flow from clean multimodal context into generation.\n[supported] This attention design is combined with token-type-specific parameters. — The context mentions that understanding and generation use separate attention projections, indicating token-type-specific parameters.\n[supported] Understanding and generation use separate attention projections, normalization layers, and feedforward modules. — The context explicitly states that understanding and generation retain separate attention projections, normalization layers, and feedforward modules.\n[supported] Shared attention provides the interface between the streams. — The context describes shared attention as the interface for cross-stream communication.\n[supported] The architecture shares a representational space without forcing perception and synthesis to use exactly the same internal computation. — The context states that this combination allows the two capabilities to benefit from a common representational space without forcing the same computational pathway.\n[supported] No contradiction is stated in the provided evidence. — The context does not present any contradictory statements regarding the architecture or its functions.\n[supported] The evidence describes the pattern as combining causal text processing, bidirectional visual interaction, and protected one-way conditioning for generation. — The context describes the attention pattern as reconciling causal language modeling with bidirectional visual interaction, confirming the stated pattern.",
+      "statements": [
+        {
+          "statement": "The native Mixture-of-Transformers (MoT) uses one Transformer backbone for both understanding and generation.",
+          "reason": "The context explicitly states that SenseNova-U1.5 integrates understanding and generation within a single Transformer backbone.",
+          "verdict": 1
+        },
+        {
+          "statement": "The sequence interleaves clean image–text context with noise-conditioned visual states.",
+          "reason": "The context mentions that clean image-text context and noise-conditioned visual states are interleaved within a unified sequence.",
+          "verdict": 1
+        },
+        {
+          "statement": "Semantic information, visual evidence, and generation can interact through shared self-attention.",
+          "reason": "The context describes that semantic representations, visual evidence, and generative dynamics interact directly through shared self-attention.",
+          "verdict": 1
+        },
+        {
+          "statement": "Different token types receive different attention permissions.",
+          "reason": "The context indicates that understanding and generation retain separate attention projections, implying different token types have different attention permissions.",
+          "verdict": 1
+        },
+        {
+          "statement": "Text tokens remain causal.",
+          "reason": "The context states that text tokens attend only to preceding context, which is characteristic of causal tokens.",
+          "verdict": 1
+        },
+        {
+          "statement": "Each text token attends only to preceding context.",
+          "reason": "The context explicitly states that text tokens attend only to preceding context.",
+          "verdict": 1
+        },
+        {
+          "statement": "This preserves the directional information flow required for causal language modeling.",
+          "reason": "The context implies that the causal nature of text tokens preserves the necessary directional information flow for language modeling.",
+          "verdict": 1
+        },
+        {
+          "statement": "Clean image tokens are bidirectional within their image block.",
+          "reason": "The context mentions that tokens within each clean image block attend bidirectionally to capture spatial dependencies.",
+          "verdict": 1
+        },
+        {
+          "statement": "Tokens belonging to a clean image may attend to one another in both directions.",
+          "reason": "The context states that tokens within each clean image block attend bidirectionally, allowing them to interact in both directions.",
+          "verdict": 1
+        },
+        {
+          "statement": "This allows clean image tokens to capture spatial dependencies across the image.",
+          "reason": "The context explains that bidirectional attention within clean image blocks captures spatial dependencies.",
+          "verdict": 1
+        },
+        {
+          "statement": "Noise-conditioned generation tokens are also bidirectional within their image block.",
+          "reason": "The context states that noise-conditioned generation tokens interact bidirectionally within their image block.",
+          "verdict": 1
+        },
+        {
+          "statement": "Generation tokens can interact with the other tokens in the same generated-image block.",
+          "reason": "The context indicates that generation tokens interact bidirectionally within their image block, allowing interaction with other tokens.",
+          "verdict": 1
+        },
+        {
+          "statement": "Generation tokens attend to all preceding clean multimodal context.",
+          "reason": "The context states that generation tokens attend to all preceding clean multimodal context.",
+          "verdict": 1
+        },
+        {
+          "statement": "This gives generation access to the relevant text and visual representations.",
+          "reason": "The context implies that attending to preceding clean multimodal context provides access to relevant representations.",
+          "verdict": 1
+        },
+        {
+          "statement": "The reverse route is blocked.",
+          "reason": "The context explicitly states that the reverse path is masked, preventing clean representations from accessing stochastic generation states.",
+          "verdict": 1
+        },
+        {
+          "statement": "Clean representations cannot attend back to stochastic generation states.",
+          "reason": "The context confirms that the reverse path is masked, preventing clean representations from accessing stochastic generation states.",
+          "verdict": 1
+        },
+        {
+          "statement": "Generation can use the clean semantic and visual context.",
+          "reason": "The context indicates that generation can draw on clean semantic and visual context through the attention mechanism.",
+          "verdict": 1
+        },
+        {
+          "statement": "The understanding pathway is protected from being contaminated by the noisy generation states.",
+          "reason": "The context states that the reverse path is masked, which protects the understanding pathway from noisy generation states.",
+          "verdict": 1
+        },
+        {
+          "statement": "The pattern reconciles the two objectives through asymmetric masking.",
+          "reason": "The context describes the attention pattern as structured to reconcile causal language modeling with bidirectional visual interaction, implying asymmetric masking.",
+          "verdict": 1
+        },
+        {
+          "statement": "The text-to-text pathway is causal, supporting autoregressive language modeling.",
+          "reason": "The context states that text tokens attend only to preceding context, which supports autoregressive language modeling.",
+          "verdict": 1
+        },
+        {
+          "statement": "The image-internal pathways are bidirectional, supporting spatial visual interaction.",
+          "reason": "The context mentions that tokens within each clean image block attend bidirectionally, supporting spatial visual interaction.",
+          "verdict": 1
+        },
+        {
+          "statement": "The generation-to-context pathway is open toward preceding clean multimodal information.",
+          "reason": "The context states that generation tokens attend to all preceding clean multimodal context, indicating an open pathway.",
+          "verdict": 1
+        },
+        {
+          "statement": "This allows visual generation to use semantic context.",
+          "reason": "The context implies that attending to preceding clean multimodal context allows visual generation to utilize semantic context.",
+          "verdict": 1
+        },
+        {
+          "statement": "The context-to-generation reverse pathway is masked.",
+          "reason": "The context explicitly states that the reverse path is masked, preventing access to stochastic generation states.",
+          "verdict": 1
+        },
+        {
+          "statement": "This preserves the integrity of representations used for understanding and reasoning.",
+          "reason": "The context indicates that masking the reverse pathway preserves the integrity of representations for understanding and reasoning.",
+          "verdict": 1
+        },
+        {
+          "statement": "Bidirectional does not mean that every token can attend freely to every other token.",
+          "reason": "The context clarifies that bidirectional attention is structured and does not imply unrestricted access between all tokens.",
+          "verdict": 1
+        },
+        {
+          "statement": "The model uses causal attention for language.",
+          "reason": "The context states that text tokens attend only to preceding context, which is characteristic of causal attention.",
+          "verdict": 1
+        },
+        {
+          "statement": "The model uses bidirectional attention inside visual blocks.",
+          "reason": "The context explicitly states that tokens within each clean image block attend bidirectionally.",
+          "verdict": 1
+        },
+        {
+          "statement": "The model uses a one-way flow from clean multimodal context into generation.",
+          "reason": "The context indicates that the reverse path is masked, allowing a one-way flow from clean multimodal context into generation.",
+          "verdict": 1
+        },
+        {
+          "statement": "This attention design is combined with token-type-specific parameters.",
+          "reason": "The context mentions that understanding and generation use separate attention projections, indicating token-type-specific parameters.",
+          "verdict": 1
+        },
+        {
+          "statement": "Understanding and generation use separate attention projections, normalization layers, and feedforward modules.",
+          "reason": "The context explicitly states that understanding and generation retain separate attention projections, normalization layers, and feedforward modules.",
+          "verdict": 1
+        },
+        {
+          "statement": "Shared attention provides the interface between the streams.",
+          "reason": "The context describes shared attention as the interface for cross-stream communication.",
+          "verdict": 1
+        },
+        {
+          "statement": "The architecture shares a representational space without forcing perception and synthesis to use exactly the same internal computation.",
+          "reason": "The context states that this combination allows the two capabilities to benefit from a common representational space without forcing the same computational pathway.",
+          "verdict": 1
+        },
+        {
+          "statement": "No contradiction is stated in the provided evidence.",
+          "reason": "The context does not present any contradictory statements regarding the architecture or its functions.",
+          "verdict": 1
+        },
+        {
+          "statement": "The evidence describes the pattern as combining causal text processing, bidirectional visual interaction, and protected one-way conditioning for generation.",
+          "reason": "The context describes the attention pattern as reconciling causal language modeling with bidirectional visual interaction, confirming the stated pattern.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.757318539334161,
+      "reason": "generated='How does the native Mixture-of-Transformers (MoT) attention pattern work?' similarity=0.7573 noncommittal=0; generated='How does the native Mixture-of-Transformers (MoT) attention pattern work?' similarity=0.7573 noncommittal=0; generated='How does the native Mixture-of-Transformers (MoT) attention pattern work?' similarity=0.7573 noncommittal=0",
+      "generated_questions": [
+        "How does the native Mixture-of-Transformers (MoT) attention pattern work?",
+        "How does the native Mixture-of-Transformers (MoT) attention pattern work?",
+        "How does the native Mixture-of-Transformers (MoT) attention pattern work?"
+      ],
+      "noncommittal": [
+        0,
+        0,
+        0
+      ],
+      "similarities": [
+        0.757318539334161,
+        0.757318539334161,
+        0.757318539334161
+      ],
+      "all_noncommittal": false
+    }
+  }
+}
