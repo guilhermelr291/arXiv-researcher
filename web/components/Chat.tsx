@@ -19,6 +19,20 @@ type Props = {
 
 type Terminal = "finished" | "error" | "dropped"
 
+function failReplay(current: DeskState, message: string): DeskState {
+  return {
+    ...current,
+    status: "idle",
+    showResume: false,
+    blocks: [
+      ...current.blocks.map((block) =>
+        block.kind === "steps" && block.live ? { ...block, live: false } : block,
+      ),
+      { kind: "error", id: `error-replay-${current.blocks.length}`, message },
+    ],
+  }
+}
+
 export function Chat({ threadId: initialId, hydrate = false }: Props) {
   const [threadId, setThreadId] = useState(initialId ?? "")
   const [desk, setDesk] = useState<DeskState>(emptyDesk())
@@ -100,19 +114,27 @@ export function Chat({ threadId: initialId, hydrate = false }: Props) {
       terminal = "dropped"
     }
     if (terminal === "dropped") {
-      const replay = await fetch(apiUrl(`/threads/${id}`))
-      const body = (await replay.json()) as { messages: AguiMessage[]; status: string }
-      setDesk(applyReplay(body.messages ?? []))
-      if (body.status === "interrupted") {
-        if (!autoResume.current) {
-          autoResume.current = true
-          setTimeout(() => {
-            void runResume(id, true)
-          }, 1000)
-        } else {
-          setManualResume(true)
-          setDesk((current) => ({ ...current, status: "interrupted", showResume: true }))
+      try {
+        const replay = await fetch(apiUrl(`/threads/${id}`))
+        if (!replay.ok) {
+          setDesk((current) => failReplay(current, `thread replay failed (${replay.status})`))
+          return
         }
+        const body = (await replay.json()) as { messages: AguiMessage[]; status: string }
+        setDesk(applyReplay(body.messages ?? []))
+        if (body.status === "interrupted") {
+          if (!autoResume.current) {
+            autoResume.current = true
+            setTimeout(() => {
+              void runResume(id, true)
+            }, 1000)
+          } else {
+            setManualResume(true)
+            setDesk((current) => ({ ...current, status: "interrupted", showResume: true }))
+          }
+        }
+      } catch {
+        setDesk((current) => failReplay(current, "thread replay failed"))
       }
     }
   }

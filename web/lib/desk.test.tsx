@@ -154,6 +154,17 @@ describe("desk", () => {
     await waitFor(() => expect(screen.getByText("replayed")).toBeTruthy())
   })
 
+  it("dropped stream with failed replay stays idle", async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(sse([]))
+      .mockResolvedValueOnce(new Response("nope", { status: 500 }))
+    render(<Chat />)
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "q" } })
+    fireEvent.submit(screen.getByLabelText("Message").closest("form")!)
+    await waitFor(() => expect(screen.getByText("thread replay failed (500)")).toBeTruthy())
+    expect(screen.getByText("idle")).toBeTruthy()
+  })
+
   it("interrupted auto-resumes once then shows resume", async () => {
     vi.useFakeTimers()
     vi.mocked(fetch)

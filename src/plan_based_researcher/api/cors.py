@@ -2,17 +2,11 @@
 
 from __future__ import annotations
 
-import os
-
 from fastapi.middleware.cors import CORSMiddleware
 
-__all__ = ["install_cors", "web_origin"]
+from plan_based_researcher.config import DEFAULT_WEB_ORIGIN, web_origin
 
-DEFAULT_WEB_ORIGIN = "http://localhost:3000"
-
-
-def web_origin() -> str:
-    return os.environ.get("WEB_ORIGIN", DEFAULT_WEB_ORIGIN)
+__all__ = ["DEFAULT_WEB_ORIGIN", "install_cors", "web_origin"]
 
 
 def install_cors(app, origin: str | None = None) -> None:

@@ -290,4 +290,3 @@ class PlannerRunner:
             "A plan may omit search for an already admitted paper."
         )
         return await self._complete(prompt)
-        return await self._complete(prompt)

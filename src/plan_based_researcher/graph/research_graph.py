@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from plan_based_researcher.graph.build import GraphDeps, build_graph
@@ -60,7 +61,7 @@ class ResearchGraph:
             "evidence_chunks": [],
             "writer_markdown": "",
             "writer_message_id": "",
-            "started_at_ms": 0,
+            "started_at_ms": int(time.time() * 1000),
             "citations": [],
             "outcome": "pending",
             "eval_next": "dispatch",

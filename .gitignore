@@ -16,5 +16,6 @@ _tmp_*
 .playwright
 web/node_modules/
 web/.next/
+*.tsbuildinfo
 
 node_modules/

@@ -13,9 +13,9 @@ from plan_based_researcher.adapters.arxiv import ArxivPaperAdapter
 from plan_based_researcher.adapters.hybrid import HybridRetrieveAdapter
 from plan_based_researcher.adapters.voyage_embeddings import VoyageEmbeddingAdapter
 from plan_based_researcher.agents.factory import AgentFactory
-from plan_based_researcher.api.cors import install_cors, web_origin
+from plan_based_researcher.api.cors import install_cors
 from plan_based_researcher.api.routes import router
-from plan_based_researcher.config import Settings
+from plan_based_researcher.config import Settings, web_origin
 from plan_based_researcher.eval.strategies import (
     RetrieveEvalStrategy,
     SearchEvalStrategy,

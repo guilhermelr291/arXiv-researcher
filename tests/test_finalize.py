@@ -182,6 +182,7 @@ class FinalizeTest(unittest.IsolatedAsyncioTestCase):
             )
         steps = metadata["steps"]
         self.assertEqual(set(steps), {"count", "elapsed_ms"})
+        self.assertGreater(steps["elapsed_ms"], 0)
 
 
 if __name__ == "__main__":
