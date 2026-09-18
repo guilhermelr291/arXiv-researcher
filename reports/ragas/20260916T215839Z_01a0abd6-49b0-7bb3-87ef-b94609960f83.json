@@ -1,0 +1,70 @@
+{
+  "scored_at": "2026-09-16T21:58:39Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abd6-49b0-7bb3-87ef-b94609960f83",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "According to the ablation study, which component contributes most to DocuSearch's grounding rate when removed, and which contributes least? (2609.01617)",
+  "retrieved_contexts": [
+    "Table[V](#S8.T5 \"TABLE V ‣ VIII-D Ablation Study ‣ VIII Results and Analysis ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") shows grounding rate when each\ncomponent is removed individually, holding everything\nelse constant.  \nTABLE V: Ablation Study: Grounding Rate\n| Configuration | Grounding Rate |\n| --- | --- |\n| Full DocuSearch | 89.6% |\n| Without groundedness check | 74.3% |\n| Without sufficiency scoring | 78.1% |\n| Without neighbour expansion | 82.4% |\n| Without cross-encoder reranking | 83.7% |\n| Without KG expansion | 85.2% |\n| Without vendor scoping | 86.1% |\n  \nGroundedness verification has the largest individual impact\nat $15.3$ percentage points, followed by sufficiency scoring\nat $11.5$ points. It is worth noting that even the\n“smallest” contributors — vendor scoping at $3.5$ points\nand KG expansion at $4.4$ points — add up meaningfully\nin combination, indicating that no component is redundant."
+  ],
+  "response": "According to the ablation study, removing the **groundedness check (groundedness verification)** has the largest effect: grounding rate falls from **89.6% to 74.3%**, a decrease of **15.3 percentage points**.\n\nRemoving **vendor scoping** has the smallest effect: grounding rate falls to **86.1%**, a decrease of **3.5 percentage points**.【1】",
+  "metrics": {
+    "faithfulness": {
+      "value": 1.0,
+      "reason": "[supported] The ablation study indicates that removing the groundedness check has the largest effect on DocuSearch's grounding rate. — The context states that groundedness verification has the largest individual impact at 15.3 percentage points, confirming the statement.\n[supported] When the groundedness check is removed, the grounding rate falls from 89.6% to 74.3%. — The context provides the grounding rates with and without the groundedness check, confirming the statement.\n[supported] The decrease in grounding rate due to the removal of the groundedness check is 15.3 percentage points. — The context explicitly states that the largest impact from removing the groundedness check is 15.3 percentage points.\n[supported] The ablation study indicates that removing vendor scoping has the smallest effect on DocuSearch's grounding rate. — The context mentions that vendor scoping has a smaller impact of 3.5 points, confirming the statement.\n[supported] When vendor scoping is removed, the grounding rate falls to 86.1%. — The context states that the grounding rate without vendor scoping is 86.1%, confirming the statement.\n[supported] The decrease in grounding rate due to the removal of vendor scoping is 3.5 percentage points. — The context explicitly states that vendor scoping contributes 3.5 points, confirming the statement.",
+      "statements": [
+        {
+          "statement": "The ablation study indicates that removing the groundedness check has the largest effect on DocuSearch's grounding rate.",
+          "reason": "The context states that groundedness verification has the largest individual impact at 15.3 percentage points, confirming the statement.",
+          "verdict": 1
+        },
+        {
+          "statement": "When the groundedness check is removed, the grounding rate falls from 89.6% to 74.3%.",
+          "reason": "The context provides the grounding rates with and without the groundedness check, confirming the statement.",
+          "verdict": 1
+        },
+        {
+          "statement": "The decrease in grounding rate due to the removal of the groundedness check is 15.3 percentage points.",
+          "reason": "The context explicitly states that the largest impact from removing the groundedness check is 15.3 percentage points.",
+          "verdict": 1
+        },
+        {
+          "statement": "The ablation study indicates that removing vendor scoping has the smallest effect on DocuSearch's grounding rate.",
+          "reason": "The context mentions that vendor scoping has a smaller impact of 3.5 points, confirming the statement.",
+          "verdict": 1
+        },
+        {
+          "statement": "When vendor scoping is removed, the grounding rate falls to 86.1%.",
+          "reason": "The context states that the grounding rate without vendor scoping is 86.1%, confirming the statement.",
+          "verdict": 1
+        },
+        {
+          "statement": "The decrease in grounding rate due to the removal of vendor scoping is 3.5 percentage points.",
+          "reason": "The context explicitly states that vendor scoping contributes 3.5 points, confirming the statement.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.5122356537027017,
+      "reason": "generated='What effect does removing the groundedness check have on the grounding rate?' similarity=0.5122 noncommittal=0; generated='What effect does removing the groundedness check have on the grounding rate?' similarity=0.5122 noncommittal=0; generated='What effect does removing the groundedness check have on the grounding rate?' similarity=0.5122 noncommittal=0",
+      "generated_questions": [
+        "What effect does removing the groundedness check have on the grounding rate?",
+        "What effect does removing the groundedness check have on the grounding rate?",
+        "What effect does removing the groundedness check have on the grounding rate?"
+      ],
+      "noncommittal": [
+        0,
+        0,
+        0
+      ],
+      "similarities": [
+        0.5122356537027017,
+        0.5122356537027017,
+        0.5122356537027017
+      ],
+      "all_noncommittal": false
+    }
+  }
+}

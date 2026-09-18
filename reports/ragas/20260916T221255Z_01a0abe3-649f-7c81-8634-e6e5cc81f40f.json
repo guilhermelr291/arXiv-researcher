@@ -1,0 +1,116 @@
+{
+  "scored_at": "2026-09-16T22:12:55Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abe3-649f-7c81-8634-e6e5cc81f40f",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "What were the resolution ranges, training steps, and learning rates used across the three phases of Stage 1 (Generation Pre-Training), and when was the LPIPS perceptual loss introduced? (2609.11929)",
+  "retrieved_contexts": [
+    "SenseNova-U1.5 progressively builds native multimodal capabilities, beginning with generation pre-training, unified mid-training, and unified supervised fine-tuning (Stages 1–3), as summarized in Table [2](#S3.T2 \"Table 2 ‣ 3.1 Model architecture ‣ 3 Methodology ‣ SenseNova-U1.5: Towards Native Unified Visual Intelligence\"). These stages are followed by capability-specific learning (Stage 4) and multi-expert on-policy distillation (Stage 5).  \nStage 1: Generation Pre-Training. Building on a pre-trained understanding branch, we randomly initialize the generation branch and train it via pixel-space flow matching, conditioned on representations from the frozen understanding branch.\nSenseNova-U1.5 increases the compute budget and introduces a dedicated native 4K training phase. Training begins with text-to-image data at resolutions ranging from $256\\times 256$ to $1024\\times 1024$. During this phase, we train for 180K steps with a constant learning rate of $2\\times 10^{-4}$ and a sequence length of 8,196. We then extend to higher-resolution text-to-image data ranging from $512\\times 512$ to $4096\\times 4096$, thereby strengthening the model’s native 4K generation capability. This phase runs for 100K steps with a constant learning rate of $1\\times 10^{-4}$ and an increased sequence length of 20,480. In the final phase, we introduce image-editing and interleaved-generation tasks and train for an additional 185K steps, broadening the model’s generative capabilities across diverse downstream scenarios. The training mixture comprises 60% text-to-image, 30% image-editing, and 10% interleaved image-text data. We apply a cosine learning-rate schedule that decays from $1\\times 10^{-4}$ to $2\\times 10^{-5}$, while maintaining the sequence length at 20,480. Beginning in this phase, we augment the flow-matching objective with an LPIPS-based perceptual loss [154] weighted by 0.1 to improve the generation of fine-grained visual details and local visual coherence. Notably, we maintain this combined generation objective throughout the subsequent unified mid-training and supervised fine-tuning stages.  \nStage 2: Unified Mid-Training.",
+    "SenseNova-U1.5: Towards Native Unified Visual Intelligence > 3 Methodology > 3.1 Model architecture\nTable 2 : Training recipe of SenseNova-U1.5. denotes frozen modules; denotes trainable modules.\n|  | Stage 1: Generation Pre-Training | | |  |  |\n| --- | --- | --- | --- | --- | --- |\n| Training Stage | Phase I | Phase II | Phase III | Stage 2: Unified  Mid-Training | Stage 3: Unified  SFT |\n| Optimization | | | | | |\n| Training steps | 180K | 100K | 185K | 80K | 10.5K |\n| Peak learning rate | $2\\times 10^{-4}$ | $1\\times 10^{-4}$ | $1\\times 10^{-4}$ | $2\\times 10^{-5}$ | $2\\times 10^{-5}$ |\n| Min learning rate | $2\\times 10^{-4}$ | $1\\times 10^{-4}$ | $2\\times 10^{-5}$ | $2\\times 10^{-5}$ | $0$ |\n| LR scheduler | Constant | Constant | Cosine decay | Constant | Cosine decay |\n| Sequence length | 8,196 | 20,480 | 20,480 | 32,768 | 32,768 |\n| Optimizer | AdamW ($\\beta_{1}=0.9$, $\\beta_{2}=0.95$, $\\epsilon=10^{-8}$) | | | | |\n| Module settings | | | | | |\n| Understanding branch |  |  |  |  |  |\n| Generation branch |  |  |  |  |  |\n| $\\lambda_{\\mathrm{AR}}:\\lambda_{\\mathrm{Flow}}:\\lambda_{\\mathrm{Perc}}$ | $0:1:0$ | $0:1:0$ | $0.1:1:0.1$ | $0.1:1:0.1$ | $0.1:1:0.1$ |\n| Generation resolution | $256^{2}$–$1024^{2}$ | $512^{2}$–$4096^{2}$ | $512^{2}$–$4096^{2}$ | $512^{2}$–$4096^{2}$ | $512^{2}$–$4096^{2}$ |\n| Data sampling ratio | | | | | |\n| Understanding data | 0.00 | 0.00 | 0.00 | 0.30 | 0.30 |\n| Text-to-image data | 1.00 | 1.00 | 0.60 | 0.40 | 0.40 |\n| Image-editing data | 0.00 | 0.00 | 0.30 | 0.20 | 0.30 |\n| Interleaved data | 0.00 | 0.00 | 0.10 | 0.10 | 0.10 |\n"
+  ],
+  "response": "## Stage 1: Generation Pre-Training\n\n| Phase | Resolution range | Training steps | Learning rate |\n|---|---:|---:|---|\n| **Phase I** | \\(256^2\\)–\\(1024^2\\) | **180K** | Constant \\(2\\times10^{-4}\\) |\n| **Phase II** | \\(512^2\\)–\\(4096^2\\) | **100K** | Constant \\(1\\times10^{-4}\\) |\n| **Phase III** | \\(512^2\\)–\\(4096^2\\) | **185K** | Cosine decay from \\(1\\times10^{-4}\\) to \\(2\\times10^{-5}\\) |\n\nThese values are given in the training description and summarized in the paper’s training-recipe table. [1] [2]\n\nThe **LPIPS-based perceptual loss was introduced at the beginning of Phase III**, when image-editing and interleaved-generation tasks were added. It was weighted by **0.1** and then retained in the later unified mid-training and supervised fine-tuning stages. [1] [2]\n\n**Contradictions or missing details:** No contradiction or relevant missing detail appears in the provided evidence.",
+  "metrics": {
+    "faithfulness": {
+      "value": 1.0,
+      "reason": "[supported] Stage 1 is referred to as Generation Pre-Training. — The context explicitly states that Stage 1 is Generation Pre-Training.\n[supported] Phase I has a resolution range of \\(256^2\\) to \\(1024^2\\). — The context specifies that Phase I has a resolution range of \\(256^2\\) to \\(1024^2\\).\n[supported] Phase I involves 180K training steps. — The context clearly states that Phase I involves 180K training steps.\n[supported] Phase I uses a constant learning rate of \\(2\\times10^{-4}\\). — The context mentions that Phase I uses a constant learning rate of \\(2\\times10^{-4}\\).\n[supported] Phase II has a resolution range of \\(512^2\\) to \\(4096^2\\). — The context indicates that Phase II has a resolution range of \\(512^2\\) to \\(4096^2\\).\n[supported] Phase II involves 100K training steps. — The context states that Phase II involves 100K training steps.\n[supported] Phase II uses a constant learning rate of \\(1\\times10^{-4}\\). — The context specifies that Phase II uses a constant learning rate of \\(1\\times10^{-4}\\).\n[supported] Phase III has a resolution range of \\(512^2\\) to \\(4096^2\\). — The context states that Phase III has a resolution range of \\(512^2\\) to \\(4096^2\\).\n[supported] Phase III involves 185K training steps. — The context clearly states that Phase III involves 185K training steps.\n[supported] Phase III uses a cosine decay learning rate from \\(1\\times10^{-4}\\) to \\(2\\times10^{-5}\\). — The context mentions that Phase III uses a cosine decay learning rate from \\(1\\times10^{-4}\\) to \\(2\\times10^{-5}\\).\n[supported] The LPIPS-based perceptual loss was introduced at the beginning of Phase III. — The context states that the LPIPS-based perceptual loss was introduced in the final phase, which is Phase III.\n[supported] Image-editing and interleaved-generation tasks were added in Phase III. — The context indicates that image-editing and interleaved-generation tasks were introduced in Phase III.\n[supported] The LPIPS-based perceptual loss was weighted by 0.1. — The context specifies that the LPIPS-based perceptual loss was weighted by 0.1.\n[supported] The LPIPS-based perceptual loss was retained in the later unified mid-training and supervised fine-tuning stages. — The context states that the LPIPS-based perceptual loss was maintained throughout the subsequent stages.\n[supported] No contradiction or relevant missing detail appears in the provided evidence. — The context provides comprehensive details without contradictions or missing information.",
+      "statements": [
+        {
+          "statement": "Stage 1 is referred to as Generation Pre-Training.",
+          "reason": "The context explicitly states that Stage 1 is Generation Pre-Training.",
+          "verdict": 1
+        },
+        {
+          "statement": "Phase I has a resolution range of \\(256^2\\) to \\(1024^2\\).",
+          "reason": "The context specifies that Phase I has a resolution range of \\(256^2\\) to \\(1024^2\\).",
+          "verdict": 1
+        },
+        {
+          "statement": "Phase I involves 180K training steps.",
+          "reason": "The context clearly states that Phase I involves 180K training steps.",
+          "verdict": 1
+        },
+        {
+          "statement": "Phase I uses a constant learning rate of \\(2\\times10^{-4}\\).",
+          "reason": "The context mentions that Phase I uses a constant learning rate of \\(2\\times10^{-4}\\).",
+          "verdict": 1
+        },
+        {
+          "statement": "Phase II has a resolution range of \\(512^2\\) to \\(4096^2\\).",
+          "reason": "The context indicates that Phase II has a resolution range of \\(512^2\\) to \\(4096^2\\).",
+          "verdict": 1
+        },
+        {
+          "statement": "Phase II involves 100K training steps.",
+          "reason": "The context states that Phase II involves 100K training steps.",
+          "verdict": 1
+        },
+        {
+          "statement": "Phase II uses a constant learning rate of \\(1\\times10^{-4}\\).",
+          "reason": "The context specifies that Phase II uses a constant learning rate of \\(1\\times10^{-4}\\).",
+          "verdict": 1
+        },
+        {
+          "statement": "Phase III has a resolution range of \\(512^2\\) to \\(4096^2\\).",
+          "reason": "The context states that Phase III has a resolution range of \\(512^2\\) to \\(4096^2\\).",
+          "verdict": 1
+        },
+        {
+          "statement": "Phase III involves 185K training steps.",
+          "reason": "The context clearly states that Phase III involves 185K training steps.",
+          "verdict": 1
+        },
+        {
+          "statement": "Phase III uses a cosine decay learning rate from \\(1\\times10^{-4}\\) to \\(2\\times10^{-5}\\).",
+          "reason": "The context mentions that Phase III uses a cosine decay learning rate from \\(1\\times10^{-4}\\) to \\(2\\times10^{-5}\\).",
+          "verdict": 1
+        },
+        {
+          "statement": "The LPIPS-based perceptual loss was introduced at the beginning of Phase III.",
+          "reason": "The context states that the LPIPS-based perceptual loss was introduced in the final phase, which is Phase III.",
+          "verdict": 1
+        },
+        {
+          "statement": "Image-editing and interleaved-generation tasks were added in Phase III.",
+          "reason": "The context indicates that image-editing and interleaved-generation tasks were introduced in Phase III.",
+          "verdict": 1
+        },
+        {
+          "statement": "The LPIPS-based perceptual loss was weighted by 0.1.",
+          "reason": "The context specifies that the LPIPS-based perceptual loss was weighted by 0.1.",
+          "verdict": 1
+        },
+        {
+          "statement": "The LPIPS-based perceptual loss was retained in the later unified mid-training and supervised fine-tuning stages.",
+          "reason": "The context states that the LPIPS-based perceptual loss was maintained throughout the subsequent stages.",
+          "verdict": 1
+        },
+        {
+          "statement": "No contradiction or relevant missing detail appears in the provided evidence.",
+          "reason": "The context provides comprehensive details without contradictions or missing information.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.4908349134292518,
+      "reason": "generated='What are the phases and details of the generation pre-training process?' similarity=0.4908 noncommittal=0; generated='What are the phases and details of the generation pre-training process?' similarity=0.4908 noncommittal=0; generated='What are the phases and details of the generation pre-training process?' similarity=0.4908 noncommittal=0",
+      "generated_questions": [
+        "What are the phases and details of the generation pre-training process?",
+        "What are the phases and details of the generation pre-training process?",
+        "What are the phases and details of the generation pre-training process?"
+      ],
+      "noncommittal": [
+        0,
+        0,
+        0
+      ],
+      "similarities": [
+        0.4908349134292518,
+        0.4908349134292518,
+        0.4908349134292518
+      ],
+      "all_noncommittal": false
+    }
+  }
+}

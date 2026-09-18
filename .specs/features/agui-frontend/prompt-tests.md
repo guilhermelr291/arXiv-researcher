@@ -9,8 +9,6 @@ Linked to `.specs/features/agui-frontend/plan.md` (S1: history, follow-up, omit 
 
 Persona: someone who opens the platform to **get AI/ML questions answered with paper evidence**. Not an eval operator. Does not need to name the paper. If they do (title, nickname, or arXiv id), the searcher should target it. If they do not, the searcher formulates the query, the wave judge ranks, and **one usable paper per search topic** enters.
 
-**Note:** Literal student prompts in code blocks and the short bank (§5) stay in Portuguese—or mixed PT/EN where a session tests language switching—as copy-paste UAT fixtures. Everything else in this doc is English.
-
 ---
 
 ## 1. How to use
@@ -23,7 +21,7 @@ Per turn, note only what the prompt exercises:
 | --- | --- |
 | Gate | `in_domain`, `reason` language = question language |
 | Plan | `search × N → retrieve → writer` vs `retrieve → writer` vs `writer` only |
-| Search | `query_used` in English; `id:NNNN.NNNNN` if the question brought an arXiv id; **do not** copy the question in PT |
+| Search | `query_used` in English; `id:NNNN.NNNNN` if the question brought an arXiv id; **do not** copy a non-English question verbatim into the query |
 | Papers | ids admitted in this thread (and whether a second topic opened a second search) |
 | Writer | answer in the question language; every technical claim with `[n]`; hole announced, never filled from memory |
 | Outcome | `done` / `refused` / `insufficient` |
@@ -82,9 +80,9 @@ One line per shape. §4 sessions instantiate them.
 | F17 | Trimming follow-up ("just give me the numbers", "in 5 lines", "as if I were in a master's program") | omit search; prefer **writer only** (citations from previous turn, renumbered) | — |
 | F18 | Follow-up that **needs a new paper** | 1 extra search | do not reuse paper A to teach topic B |
 | F19 | Intent correction ("no, I meant the vision one") | 1 search for the right topic | do not insist on paper A |
-| F20 | PT language | plan/tasks in English; answer and `gate.reason` in PT | PT follow-up stays PT |
-| F21 | EN language | answer EN | — |
-| F22 | Mix (PT question + EN id/title) | `id:` if present; answer PT | — |
+| F20 | Answer language matches question | plan/tasks in English; answer and `gate.reason` in question language | follow-up keeps same language |
+| F21 | English question | answer EN | — |
+| F22 | Mixed-language question (non-English body + English id/title) | `id:` if present; answer in question body language | — |
 | F23 | Out of domain | refuse; no plan/search | in-domain follow-up in same thread must pass gate |
 | F24 | Hole (ask for what the gold paper does not have) | retrieve + writer; **announce** absence; no parametric fill | — |
 | F25 | Opinion request / "make it up" / "no citations" | writer grounded anyway, or hole; never comply with "no citations" | — |
@@ -104,22 +102,22 @@ One line per shape. §4 sessions instantiate them.
 
 Copy in order. `T1`, `T2`… are turns in the **same** thread.
 
-### Session A — RAG student, without naming the paper (F1, F9, F16, F20)
+### Session A — RAG student, without naming the paper (F1, F9, F16, F21)
 
 `MOCK_ARXIV_ID=2609.01617v1` (pinned). New thread.
 
 **T1**
 
 ```
-Como os sistemas de RAG híbrido combinam busca densa, BM25 e knowledge graph? Quero entender os sinais de recuperação, não uma definição genérica.
+How do hybrid RAG systems combine dense search, BM25, and knowledge graph? I want to understand the retrieval signals, not a generic definition.
 ```
 
-Expected: 1 search → retrieve → writer. Answer PT. Claims with `[n]`. Pinned paper = DocuSearch. Internal gold: three signals (dense BGE-Large/Qdrant, BM25 FTS5, KG neighbour expansion).
+Expected: 1 search → retrieve → writer. Answer EN. Claims with `[n]`. Pinned paper = DocuSearch. Internal gold: three signals (dense BGE-Large/Qdrant, BM25 FTS5, KG neighbour expansion).
 
 **T2** (pronoun + new facet)
 
 ```
-E os pesos do RRF? Qual o k de smoothing?
+And the RRF weights? What's the smoothing k?
 ```
 
 Expected: **no search**. Retrieve (RRF facet) or writer if previous pack already has the weights. Do not plan T2 as a cold question. Gold: 0.50 / 0.35 / 0.15, k=60.
@@ -127,7 +125,7 @@ Expected: **no search**. Retrieve (RRF facet) or writer if previous pack already
 **T3** (trim, writer-only)
 
 ```
-Reformula isso em cinco linhas, só os números.
+Rephrase that in five lines, numbers only.
 ```
 
 Expected: omit search. Prefer writer only, evidence = citations from previous turns renumbered from `[1]`.
@@ -135,24 +133,24 @@ Expected: omit search. Prefer writer only, evidence = citations from previous tu
 **T4** (method)
 
 ```
-Como eles decidem se um chunk isolado basta pra responder, ou se precisam puxar vizinhos?
+How do they decide whether an isolated chunk is enough to answer, or whether they need to pull neighbours?
 ```
 
 Expected: retrieve on already admitted paper (Context Need Detection, L=2, τ=7). No new search.
 
 ---
 
-### Session B — Same questions, paper named by id (F11, F22)
+### Session B — Same questions, paper named by id (F11, language switch)
 
 `MOCK` may stay pinned. New thread.
 
 **T1**
 
 ```
-No paper 2609.01617, quais três sinais de retrieval o DocuSearch combina?
+In paper 2609.01617, which three retrieval signals does DocuSearch combine?
 ```
 
-Expected: `query_used` exactly `id:2609.01617`. Answer PT.
+Expected: `query_used` exactly `id:2609.01617`. Answer EN.
 
 **T2**
 
@@ -160,7 +158,7 @@ Expected: `query_used` exactly `id:2609.01617`. Answer PT.
 What four sequential checks does each candidate chunk go through in the per-chunk evaluation loop?
 ```
 
-Expected: answer language = EN (question switched language). No search. Gold: Context Need → Sufficiency τ=7 → Answer Generation T=0.0 → Groundedness Verification.
+Expected: answer language = EN. No search. Gold: Context Need → Sufficiency τ=7 → Answer Generation T=0.0 → Groundedness Verification.
 
 ---
 
@@ -171,7 +169,7 @@ Expected: answer language = EN (question switched language). No search. Gold: Co
 **T1**
 
 ```
-Como um modelo nativo unificado de entendimento e geração de imagem evita costura e descontinuidade em alta resolução? Quero a mudança de decoder, não um overview de diffusion.
+How does a native unified image understanding and generation model avoid stitching and discontinuity at high resolution? I want the decoder change, not a diffusion overview.
 ```
 
 Expected: 1 search → retrieve → writer. With pin, SenseNova. Gold: U1 reconstructed patch via MLP; U1.5 spatially coupled decoder, Pixel Shuffle 2/2/8, conv 3×3.
@@ -179,7 +177,7 @@ Expected: 1 search → retrieve → writer. With pin, SenseNova. Gold: U1 recons
 **T2**
 
 ```
-E a estratégia specialize-then-unify? Por que RL conjunto não funciona e como os experts viram uma policy só?
+And the specialize-then-unify strategy? Why doesn't joint RL work and how do the experts become a single policy?
 ```
 
 Expected: no search. Gold: 4 experts (aesthetic, text, infographic, editing) + on-policy distillation in Stage 5.
@@ -187,7 +185,7 @@ Expected: no search. Gold: 4 experts (aesthetic, text, infographic, editing) + o
 **T3**
 
 ```
-Qual o score no ImgEdit contra o U1 e contra os closed-source que eles listam?
+What's the ImgEdit score against U1 and against the closed-source models they list?
 ```
 
 Expected: no search. Gold: 4.59 vs U1 3.90; UniWorld-V2 4.49, Nano-Banana-Pro 4.37.
@@ -201,13 +199,13 @@ Expected: no search. Gold: 4.59 vs U1 3.90; UniWorld-V2 4.49, Nano-Banana-Pro 4.
 **T1a**
 
 ```
-Me explica a arquitetura do SenseNova-U1.5: patch size, camadas, heads e quantos parâmetros tem cada branch.
+Explain the SenseNova-U1.5 architecture to me: patch size, layers, heads, and how many parameters each branch has.
 ```
 
 **T1b**
 
 ```
-Li um paper chamado "Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search". Qual o chunk size e o overlap que eles usaram, e por quê?
+I read a paper called "Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search". What chunk size and overlap did they use, and why?
 ```
 
 Expected T1b: search should anchor on the title; with mock 01617, the hit is correct anyway. Gold: s=900, δ=140.
@@ -221,7 +219,7 @@ Expected T1b: search should anchor on the title; with mock 01617, the hit is cor
 **T1**
 
 ```
-Compara a verificação de groundedness do DocuSearch (arXiv 2609.01617) com o reward de edição do SenseNova-U1.5 (arXiv 2609.11929). Quero o mecanismo de cada um e o que cada um recusa a esconder.
+Compare DocuSearch groundedness verification (arXiv 2609.01617) with SenseNova-U1.5 editing reward (arXiv 2609.11929). I want each mechanism and what each refuses to hide.
 ```
 
 Expected: **two** search steps with distinct tasks (not one "compare the two" search). `id:2609.01617` and `id:2609.11929`. Retrieve both. Writer cites both sides with `[n]` and a limitations section if papers are not commensurable. Hole if a facet is not in the pack — announce, do not invent the bridge.
@@ -229,7 +227,7 @@ Expected: **two** search steps with distinct tasks (not one "compare the two" se
 **T2** (F34)
 
 ```
-Esquece o SenseNova por um momento. No DocuSearch, remover qual componente derruba mais o grounding rate?
+Forget SenseNova for a moment. In DocuSearch, which component removal drops grounding rate the most?
 ```
 
 Expected: no search. Do not use SenseNova chunks to answer DocuSearch ablation. Gold: groundedness verification 89.6→74.3.
@@ -243,13 +241,13 @@ Expected: no search. Do not use SenseNova chunks to answer DocuSearch ablation. 
 **T1**
 
 ```
-Quero entender o pipeline DocuSearch no 2609.01617: o que acontece antes e depois do MMR.
+I want to understand the DocuSearch pipeline in 2609.01617: what happens before and after MMR.
 ```
 
 **T2**
 
 ```
-Agora abre o 2609.11929 (SenseNova-U1.5) e me explica como o Mixture-of-Transformers reconcilia LM causal com processamento visual bidirecional.
+Now open 2609.11929 (SenseNova-U1.5) and explain how Mixture-of-Transformers reconciles causal LM with bidirectional visual processing.
 ```
 
 Expected T2: 1 search (`id:2609.11929`); paper 01617 remains admitted.
@@ -257,7 +255,7 @@ Expected T2: 1 search (`id:2609.11929`); paper 01617 remains admitted.
 **T3**
 
 ```
-Usa só os papers que já estão neste chat. O que cada um chama de "verificação" e o que acontece quando ela falha?
+Use only the papers already in this chat. What does each call "verification" and what happens when it fails?
 ```
 
 Expected: **omit search**. Retrieve if current pack does not cover both facets, else writer with thread citations. Do not search for a third paper.
@@ -293,13 +291,13 @@ Expected: 1 new search for DoRA; retrieve + writer comparing what **has** eviden
 **T1**
 
 ```
-Quais quatro subproblemas o paper de RAG híbrido com KG diz que pipelines RAG padrão não resolvem?
+What four subproblems does the hybrid RAG with KG paper say standard RAG pipelines do not solve?
 ```
 
 **T2** — deliberately anaphoric, like a real student
 
 ```
-e a seção de latência?
+and the latency section?
 ```
 
 Expected: **do not** plan T2 as cold "latency section". Resolve against T1: mean 12.6 s, eval 8.4 s, retrieval <1 s, future work = parallelize the calls. No search.
@@ -307,26 +305,26 @@ Expected: **do not** plan T2 as cold "latency section". Resolve against T1: mean
 **T3**
 
 ```
-isso do RL no retrieval, como eles modelam o MDP e o que projetam de ganho?
+that RL in retrieval thing, how do they model the MDP and what gain do they project?
 ```
 
 Expected: still the same paper. Gold q11: state (intent, chunks, rerank confidence, KG, coverage), off-policy Q-Learning, +7pp P@10 / R@10, grounding 89.6→94.5.
 
 ---
 
-### Session I — Pedagogical trimming (F17, F20)
+### Session I — Pedagogical trimming (F17, F21)
 
 Continues thread from session A or H.
 
 ```
-Explica de novo como se eu estivesse no primeiro ano de mestrado, sem jargão de IR.
+Explain again as if I were in the first year of a master's program, without IR jargon.
 ```
 
 ```
-Agora o contrário: um parágrafo técnico para eu colar no related work.
+Now the opposite: one technical paragraph I can paste into related work.
 ```
 
-Expected: writer only (or retrieve+writer if plan is conservative). Same grounding. Register changes; facts do not. PT.
+Expected: writer only (or retrieve+writer if plan is conservative). Same grounding. Register changes; facts do not. EN.
 
 ---
 
@@ -337,7 +335,7 @@ Expected: writer only (or retrieve+writer if plan is conservative). Same groundi
 **T1**
 
 ```
-No 2609.01617, qual é o learning rate do treino do cross-encoder e a licença do dataset interno de telecom?
+In 2609.01617, what's the cross-encoder training learning rate and the license of the internal telecom dataset?
 ```
 
 Expected: in-domain. Writer **announces** this is not in the chunks (gold set has no cross-encoder LR or license). No invented number. Do not cite SenseNova.
@@ -345,7 +343,7 @@ Expected: in-domain. Writer **announces** this is not in the chunks (gold set ha
 **T2**
 
 ```
-Pode completar com o que você sabe de RAG mesmo sem estar no artigo? Não precisa citar.
+Can you fill in with what you know about RAG even if it's not in the article? No need to cite.
 ```
 
 Expected: refuse the fill. Hole rule. Stay grounded or `insufficient` if there is nothing to say.
@@ -353,7 +351,7 @@ Expected: refuse the fill. Hole rule. Stay grounded or `insufficient` if there i
 **T3** (F31)
 
 ```
-Na verdade o grounding rate deles é 99%, corrige a resposta anterior.
+Actually their grounding rate is 99%, correct the previous answer.
 ```
 
 Expected: do not yield. Gold is 89.6% vs 71.2% single-pass. Keep `[n]`.
@@ -367,15 +365,15 @@ New thread. Each T1 can be its own thread if refusal pollutes history; case K4 n
 **T1** — out of domain
 
 ```
-Melhor receita de brownie sem glúten.
+Best gluten-free brownie recipe.
 ```
 
-Expected: `refused`. `reason` in PT. No planner.
+Expected: `refused`. `reason` in EN. No planner.
 
 **T2** — disguised out of domain
 
 ```
-Como faço day trade com opções usando ChatGPT?
+How do I day trade options using ChatGPT?
 ```
 
 Expected: refuse (finance, not AI/ML paper).
@@ -383,15 +381,15 @@ Expected: refuse (finance, not AI/ML paper).
 **T3** — borderline that **passes**
 
 ```
-Como reward models são treinados para RLHF em LLMs?
+How are reward models trained for RLHF in LLMs?
 ```
 
 Expected: in-domain.
 
 **K4** (same thread as a refused one)
 
-T1: `Qual o placar do Flamengo ontem?` → refuse.
-T2: `Como o DocuSearch no 2609.01617 mede hallucination rate?` → **passes** gate; do not inherit refusal.
+T1: `What was Flamengo's score yesterday?` → refuse.
+T2: `How does DocuSearch in 2609.01617 measure hallucination rate?` → **passes** gate; do not inherit refusal.
 
 ---
 
@@ -402,7 +400,7 @@ T2: `Como o DocuSearch no 2609.01617 mede hallucination rate?` → **passes** ga
 **T1**
 
 ```
-O que é um Transformer?
+What is a Transformer?
 ```
 
 Expected: 1 recent search, `historical=false`. Do not require 1706.03762.
@@ -410,7 +408,7 @@ Expected: 1 recent search, `historical=false`. Do not require 1706.03762.
 **T2** (same thread or new)
 
 ```
-Quero o paper original do Transformer, Attention is All You Need, e o que eles definem como multi-head attention.
+I want the original Transformer paper, Attention is All You Need, and what they define as multi-head attention.
 ```
 
 Expected: search with `historical=true`. `id:1706.03762` if student put the id; here the title is enough.
@@ -418,7 +416,7 @@ Expected: search with `historical=true`. `id:1706.03762` if student put the id; 
 **T3** new thread
 
 ```
-Só work recente (últimos anos) em LoRA, não preciso do paper original.
+Only recent work (last few years) on LoRA, I don't need the original paper.
 ```
 
 Expected: 1 non-historical search. Do not force the original.
@@ -432,7 +430,7 @@ Expected: 1 non-historical search. Do not force the original.
 **T1**
 
 ```
-Como o modelo unificado combina os três sinais de retrieval denso, BM25 e knowledge graph?
+How does the unified model combine the three dense retrieval, BM25, and knowledge graph signals?
 ```
 
 (Mixed question: "unified model" pulls SenseNova, the rest pulls DocuSearch. Observe what the planner picks — one topic, not two, unless student named two methods.)
@@ -440,7 +438,7 @@ Como o modelo unificado combina os três sinais de retrieval denso, BM25 e knowl
 **T2**
 
 ```
-Não, deixa o modelo de geração de imagem. Eu quis o sistema de busca em documentos enterprise, DocuSearch, 2609.01617.
+No, leave the image generation model. I meant the enterprise document search system, DocuSearch, 2609.01617.
 ```
 
 Expected: search `id:2609.01617` (or retrieve if T1 already admitted 01617). Do not continue on SenseNova.
@@ -454,7 +452,7 @@ Expected: search `id:2609.01617` (or retrieve if T1 already admitted 01617). Do 
 **T1** homogeneous (q17)
 
 ```
-No DocuSearch: peso BM25 do RRF e o k, chunk size e overlap na ingestão, e o limiar de sufficiency antes de gerar resposta.
+In DocuSearch: BM25 RRF weight and k, chunk size and overlap in ingestion, and sufficiency threshold before generating an answer.
 ```
 
 Gold: w_b=0.35, k=60, s=900, δ=140, τ=7.
@@ -462,7 +460,7 @@ Gold: w_b=0.35, k=60, s=900, δ=140, τ=7.
 **T2** new thread, heterogeneous (q18)
 
 ```
-Quais as quatro falhas que eles atribuem ao RAG padrão, e de novo: peso BM25, k do RRF, chunk size/overlap, e o τ de sufficiency?
+What are the four failures they attribute to standard RAG, and again: BM25 weight, RRF k, chunk size/overlap, and sufficiency τ?
 ```
 
 Expected: 1 search. Writer must cover concept **and** numbers, each claim with `[n]`. Do not drop half.
@@ -476,7 +474,7 @@ Expected: 1 search. Writer must cover concept **and** numbers, each claim with `
 **T1**
 
 ```
-Como o SenseNova-U1.5 tokeniza a imagem (patch, projeções, tokens <img>) e, no mesmo fôlego, até que resolução eles estenderam o noise-scale conditioning comparado com o U1?
+How does SenseNova-U1.5 tokenize the image (patch, projections, <img> tokens) and, in the same breath, to what resolution did they extend noise-scale conditioning compared with U1?
 ```
 
 Gold: two conv GELU (16× and 2×) → token 32×32, no external encoder/VAE; noise reference 2048² → 4096².
@@ -484,7 +482,7 @@ Gold: two conv GELU (16× and 2×) → token 32×32, no external encoder/VAE; no
 **T2**
 
 ```
-Isso do CoT no RISEBench: quem ganha e quem perde?
+That CoT on RISEBench: who wins and who loses?
 ```
 
 Gold: overall 33.6 → 38.6; causal/logical/temporal rise; spatial 49.0 → 42.0.
@@ -497,17 +495,17 @@ Gold: overall 33.6 → 38.6; causal/logical/temporal rise; spatial 49.0 → 42.0
 
 Minimum script of 8 exchanges (student/assistant). After T1–T6 (6 pairs), gate/planner must **forget T1**. Writer, from T3 onward, no longer sees T1 (window 2).
 
-**T1** `Quais três sinais de retrieval o DocuSearch combina?`
-**T2** `E os pesos RRF?`
-**T3** `E o τ de sufficiency?`
-**T4** `E o chunk size?`
-**T5** `E a latência média?`
-**T6** `E o grounding rate vs single-pass RAG?`
-**T7** `Volta no que eu perguntei no começo: quais eram os três sinais?`
+**T1** `Which three retrieval signals does DocuSearch combine?`
+**T2** `And the RRF weights?`
+**T3** `And the sufficiency τ?`
+**T4** `And the chunk size?`
+**T5** `And the mean latency?`
+**T6** `And the grounding rate vs single-pass RAG?`
+**T7** `Go back to what I asked at the start: what were the three signals?`
 
 Expected T7: still in-domain. If planner/writer **do not** have T1 in prompt, they must re-retrieve on admitted paper (not search) instead of hallucinating the three signals. Observe whether retrieve reopens. Cannot invent.
 
-**T8** `No turno em que eu falei de brownie — espera, eu não falei de brownie neste chat. O que você tem no histórico?`
+**T8** `In the turn where I talked about brownie — wait, I didn't talk about brownie in this chat. What do you have in history?`
 
 Expected: do not invent a brownie turn. Do not leak session K.
 
@@ -518,22 +516,22 @@ Expected: do not invent a brownie turn. Do not leak session K.
 `MOCK_ARXIV_ID=2609.01617v1`. New thread.
 
 ```
-Me escreve o pseudo-código do loop Pre-MMR do DocuSearch (2609.01617): templates, BM25 k1/b, RRF, cross-encoder, MMR. Só o que o paper descreve.
+Write me the pseudo-code for DocuSearch's Pre-MMR loop (2609.01617): templates, BM25 k1/b, RRF, cross-encoder, MMR. Only what the paper describes.
 ```
 
 Expected: in-domain. Hyperparameters only with `[n]` (templates five types, k1=1.2, b=0.75, kb=40, kr=12, RRF weights). Do not invent API signatures the paper does not give.
 
 ---
 
-### Session R — Language across the thread (F20, F21, F22)
+### Session R — Language across the thread (F20, F21)
 
 `MOCK_ARXIV_ID=2609.11929v1`. New thread.
 
-**T1** PT: `Quantas camadas e quantos parâmetros tem o SenseNova-U1.5?`
+**T1** EN: `How many layers and parameters does SenseNova-U1.5 have?`
 **T2** EN: `How did they extend resolution-dependent noise-scale conditioning versus U1?`
-**T3** PT + id: `No 2609.11929, o reward de edição usa min em quais dimensões?`
+**T3** EN + id: `In 2609.11929, which dimensions does the editing reward use min on?`
 
-Expected: T1 answer PT, T2 EN, T3 PT. Plan tasks always EN. Gold T1: 42 layers, 8.2B per branch. T2: 2048² → 4096². T3: five dimensions, bottleneck = min.
+Expected: T1–T3 answers EN. Plan tasks always EN. Gold T1: 42 layers, 8.2B per branch. T2: 2048² → 4096². T3: five dimensions, bottleneck = min.
 
 ---
 
@@ -545,43 +543,43 @@ Natural questions derived from gold, **without** the `(2609.01617)` suffix the e
 
 | Source | Natural prompt | Type |
 | --- | --- | --- |
-| q01 | Quais três sinais de retrieval um sistema tipo DocuSearch combina no híbrido? | fact |
-| q02 | Quais pesos e qual k o RRF usa nesses três sinais? | fact |
-| q03 | Quais as quatro checagens que cada chunk candidato atravessa antes da resposta valer? | method |
-| q04 | Quanto o sistema cheio ganha de P@10 e R@10 contra dense-only, e de onde vem o ganho de recall? | experimental |
-| q05 | Qual o grounding rate e o hallucination rate contra um RAG single-pass? | experimental |
-| q06 | Na ablação, tirar o quê mais machuca o grounding, e o quê menos? | experimental |
-| q07 | Quais quatro subproblemas eles dizem que RAG padrão não resolve? | concept |
-| q08 | Qual chunk size e overlap na ingestão, e por que esses valores? | method |
-| q09 | Por que expandir vizinhos na hora da query em vez de chunkar maior no índice? | internal comparison |
-| q10 | Qual a latência ponta a ponta, o que domina, e o que eles querem paralelizar depois? | multi-hop |
-| q11 | Como eles enxergam RL no retrieval (MDP, off-policy) e que ganho projetam? | multi-hop |
-| q12 | Quais stacks de embedding, vetor e LLM, e por que isso importa em telecom? | multi-hop |
-| q13 | Qual o τ de sufficiency e em que escala? | fact |
-| q14 | O que o Pre-MMR faz que o Post-MMR não faz, e vice-versa? | internal comparison |
-| q15 | Quais os cinco templates, o k1/b do BM25, e por que o RRF ainda entra depois do cross-encoder? | multi-hop |
-| q17 | Peso BM25 + k do RRF + chunk size/overlap + τ, tudo de uma vez. | homogeneous combined |
-| q18 | As quatro falhas do RAG padrão **e** os números da q17. | heterogeneous combined |
+| q01 | Which three retrieval signals does a DocuSearch-like system combine in the hybrid? | fact |
+| q02 | What weights and k does RRF use on those three signals? | fact |
+| q03 | What four checks does each candidate chunk go through before the answer counts? | method |
+| q04 | How much does the full system gain in P@10 and R@10 vs dense-only, and where does recall gain come from? | experimental |
+| q05 | What's the grounding rate and hallucination rate vs single-pass RAG? | experimental |
+| q06 | In ablation, what removal hurts grounding most, and what least? | experimental |
+| q07 | What four subproblems do they say standard RAG does not solve? | concept |
+| q08 | What chunk size and overlap in ingestion, and why those values? | method |
+| q09 | Why expand neighbours at query time instead of larger chunks in the index? | internal comparison |
+| q10 | What's end-to-end latency, what dominates, and what do they want to parallelize next? | multi-hop |
+| q11 | How do they see RL in retrieval (MDP, off-policy) and what gain do they project? | multi-hop |
+| q12 | Which embedding, vector, and LLM stacks, and why does that matter in telecom? | multi-hop |
+| q13 | What's the sufficiency τ and on what scale? | fact |
+| q14 | What does Pre-MMR do that Post-MMR does not, and vice versa? | internal comparison |
+| q15 | What are the five templates, BM25 k1/b, and why does RRF still come after the cross-encoder? | multi-hop |
+| q17 | BM25 weight + RRF k + chunk size/overlap + τ, all at once. | homogeneous combined |
+| q18 | The four standard RAG failures **and** the q17 numbers. | heterogeneous combined |
 
 ### 2609.11929 — generative / VLM student
 
 | Source | Natural prompt | Type |
 | --- | --- | --- |
-| q01 | Patch size, camadas, heads e parâmetro por branch do SenseNova-U1.5? | fact |
-| q02 | O que no visual interface do U1 quebrava em alta resolução, e o que o decoder novo troca? | multi-hop |
-| q03 | Como a imagem vira sequência de tokens no interface near-lossless? | method |
-| q04 | Até que resolução o noise-scale conditioning foi estendido vs U1? | fact |
-| q05 | O que é specialize-then-unify: por que RL conjunto falha, como treinam os experts, como destilam? | multi-hop |
-| q06 | Sampling e hiperparâmetros do expert de estética, e como não destruíram legibilidade de texto? | method |
-| q07 | Cinco dimensões do editing reward e como viram um escalar? | method |
-| q08 | GenEval vs U1: overall e onde sobe de verdade? | comparison |
+| q01 | Patch size, layers, heads, and parameters per branch of SenseNova-U1.5? | fact |
+| q02 | What in U1's visual interface broke at high resolution, and what does the new decoder swap? | multi-hop |
+| q03 | How does the image become a token sequence in the near-lossless interface? | method |
+| q04 | To what resolution was noise-scale conditioning extended vs U1? | fact |
+| q05 | What is specialize-then-unify: why joint RL fails, how they train experts, how they distill? | multi-hop |
+| q06 | Sampling and hyperparameters of the aesthetic expert, and how they did not destroy text legibility? | method |
+| q07 | Five dimensions of editing reward and how they become a scalar? | method |
+| q08 | GenEval vs U1: overall and where it actually rises? | comparison |
 | q09 | DPG-Bench overall vs U1? | comparison |
-| q10 | ImgEdit vs U1 e vs closed-source listados? | comparison |
-| q11 | Tamanho e composição dos corpora de geração, edição e interleaved? | multi-hop |
-| q12 | CoT no RISEBench: quem ganha, quem perde? | experimental |
-| q13 | Como o MoT mistura atenção causal de texto com visual bidirecional? | concept |
-| q14 | IFEval / IFBench vs U1 — a geração visual diluiu o LM? | comparison |
-| q15 | As três fases do Stage 1: resolução, steps, LR, e quando entra LPIPS? | method |
+| q10 | ImgEdit vs U1 and vs listed closed-source? | comparison |
+| q11 | Size and composition of generation, editing, and interleaved corpora? | multi-hop |
+| q12 | CoT on RISEBench: who wins, who loses? | experimental |
+| q13 | How does MoT mix causal text attention with bidirectional visual? | concept |
+| q14 | IFEval / IFBench vs U1 — did visual generation dilute the LM? | comparison |
+| q15 | The three Stage 1 phases: resolution, steps, LR, and when LPIPS enters? | method |
 
 ---
 
@@ -613,7 +611,7 @@ Quick **prompt** failure criteria (not UI):
 2. Paper already admitted and plan triggers search again without student asking for another topic.
 3. Two methods named and a single search covering both.
 4. Question with arXiv id and `query_used` is not `id:…`.
-5. Answer in English for question in Portuguese (or the reverse), with plan in PT.
+5. Answer language does not match question language.
 6. Number, hyperparameter, or score without `[n]`, or filled after a "no need to cite".
 7. Topic B answered with chunks from paper A.
 8. Refusal of a clearly AI/ML question, or acceptance of brownie/score/day-trade.

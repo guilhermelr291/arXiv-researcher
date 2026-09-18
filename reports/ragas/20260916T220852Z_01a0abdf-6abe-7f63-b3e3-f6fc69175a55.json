@@ -1,0 +1,121 @@
+{
+  "scored_at": "2026-09-16T22:08:52Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abdf-6abe-7f63-b3e3-f6fc69175a55",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "What are the five dimensions of the editing reward, and how are they combined into a single scalar reward? (2609.11929)",
+  "retrieved_contexts": [
+    "In the final training stage, let $m\\in\\{\\mathrm{ocr},\\mathrm{aesthetic}\\}$ identify the prompt partition. The reward is assigned as follows:  \nEquation ((9))\n$$\nR_{\\mathrm{info}}^{final}(\\hat{\\mathbf{x}}_{\\theta},\\mathbf{c},m)=\\begin{cases}R_{\\mathrm{ocr}}(\\hat{\\mathbf{x}}_{\\theta},\\mathbf{c}),&m=\\mathrm{ocr},\\\\\nR_{\\mathrm{HPSv3++}}(\\hat{\\mathbf{x}}_{\\theta},\\mathbf{c}),&m=\\mathrm{aesthetic}.\\end{cases}\n$$  \nThe OCR and HPSv3++ scores are therefore not summed or normalized against one another. This routing preserves their distinct scales and semantics while providing complementary supervision for textual fidelity and perceptual quality.  \nEditing Reward.\nReinforcement learning for image editing requires reward signals that assess not only whether the requested change is successfully completed, but also whether the result is visually convincing and unrelated source content is preserved. A single holistic score can obscure these distinct failure modes, allowing strength in one aspect to compensate for critical errors in another. We therefore employ a set of dimension-specific rewards. (i) Instruction fulfillment measures the semantic correctness of the edited result and the completeness of the requested changes. (ii) Edit execution quality evaluates the visual quality of the target region and how naturally it integrates with the surrounding context. (iii) Overall visual quality captures global technical quality and coherence with the intended style. When visible text modification is required, (iv) text-editing quality further assesses textual correctness and rendering quality. (v) Unedited-region preservation compares the source and edited images and penalizes unintended semantic, structural, or visual changes outside the target region. For criteria with multiple sub-dimensions, we retain the minimum sub-dimension score to expose the weakest aspect. After normalization, the applicable scores are aggregated as  \nEquation ((10))\n$$\nR_{\\mathrm{edit}}=\\min\\!\\left(\\left\\{R_{\\mathrm{inst}},R_{\\mathrm{exec}},R_{\\mathrm{visual}},R_{\\mathrm{pres}}\\right\\}\\cup\\left\\{R_{\\mathrm{text}}\\ \\middle|\\ \\mathrm{text\\ edit\\ is\\ applicable}\\right\\}\\right).\n$$  \nThe text-editing criterion is omitted for instructions that do not involve text modification, while the edit-execution score is set to zero when no requested change is visibly realized. This bottleneck-style aggregation emphasizes the weakest aspect of each edit and prevents strong performance in one dimension from masking critical failures in another. As a result, the reward remains sensitive to incomplete edits, unintended modifications, and local quality defects, providing more balanced and reliable supervision for image-editing RL during the training process.",
+    "We generate 16 candidates per prompt using a 30-step trajectory with guidance scale 4.0 and timestep shift 3, and sample a contiguous five-step optimization window from the first ten steps. Rollouts use Precise sampling with $\\eta=1.5$ [163], while GRPO-Guard [124] stabilizes optimization under sparse high OCR rewards. Training uses dynamic resolutions and aspect ratios, a constant learning rate of $2\\times 10^{-5}$, and a reference-policy KL coefficient of $0.02$. We also freeze the final generation Transformer block, flow-matching output head, and output-normalization layer during RL.  \n(3) Editing Expert.\nEffective image editing requires balancing three objectives: instruction adherence, preservation of unedited content, and the visual quality of edited regions [131, 123]. Under-editing can leave instructions only partially fulfilled, while over-editing may alter content that should remain unchanged. The editing expert must therefore learn what to modify, what to preserve, and how to integrate the requested changes naturally into the source image.  \nThe editing expert is trained with a constant learning rate of learning rate of $4\\times 10^{-5}$, KL coefficient of $0.01$, rollout size of 24, and noise scale of $0.7$, with an exponential moving average (EMA). We avoid SDE-based trajectory sampling, as excessive stochastic perturbations can introduce residual noise and visual artifacts. Under this setup, we further introduce two editing-specific strategies for targeted reward supervision and more effective optimization.  \n(i) Multi-dimensional reward.\nWe utilize a VLM-based reward framework that evaluates editing quality along five dimensions: instruction fulfillment, edit execution, overall visual quality, text-editing quality when applicable, and preservation of unedited regions. These complementary signals provide targeted supervision for distinct failure modes while jointly balancing edit accuracy, visual fidelity, and content preservation.  \n(ii) Progressive training.\nWe adopt a progressive sliding-window strategy, shifting optimization from early stages that establish semantics to later stages that refine textures. This coarse-to-fine progression first secures the intended structural change and then improves local fidelity and visual integration with the surrounding content.  \nInfographic Expert."
+  ],
+  "response": "## Five editing-reward dimensions\n\nThe paper evaluates editing along five dimensions:\n\n1. **Instruction fulfillment** — whether the requested changes are semantically correct and complete.\n2. **Edit execution quality** — the visual quality and natural integration of the edited target region.\n3. **Overall visual quality** — global technical quality and stylistic coherence.\n4. **Text-editing quality** — textual correctness and rendering quality, when text is modified.\n5. **Unedited-region preservation** — whether unrelated regions remain semantically, structurally, and visually unchanged. [1] [2]\n\n## Combination into one scalar reward\n\nFor criteria with multiple sub-dimensions, the minimum sub-score is retained. After normalization, the applicable dimension scores are combined using a **minimum, or bottleneck, operation**:\n\n\\[\nR_{\\mathrm{edit}}\n=\n\\min\\left(\n\\{R_{\\mathrm{inst}},R_{\\mathrm{exec}},R_{\\mathrm{visual}},R_{\\mathrm{pres}}\\}\n\\cup\n\\{R_{\\mathrm{text}}\\mid \\text{text edit is applicable}\\}\n\\right).\n\\]\n\nThus, the weakest applicable dimension determines the final scalar reward; the scores are not averaged or summed. The text-editing score is omitted when no text modification is requested, and the edit-execution score is set to zero if the requested change is not visibly realized. [1]\n\n**Ambiguity/limitation:** the provided excerpt states that the scores are normalized, but it does not specify the normalization formula or its range. Also, the paper separately describes OCR and HPSv3++ reward routing for other prompt partitions; those scores are not summed or normalized with each other, which should not be confused with the editing-reward aggregation above. [1]",
+  "metrics": {
+    "faithfulness": {
+      "value": 0.9375,
+      "reason": "[supported] The paper evaluates editing along five dimensions. — The context explicitly states that a VLM-based reward framework evaluates editing quality along five dimensions.\n[supported] The first dimension is instruction fulfillment, which assesses whether the requested changes are semantically correct and complete. — The context describes instruction fulfillment as the first dimension that measures semantic correctness and completeness of requested changes.\n[supported] The second dimension is edit execution quality, which evaluates the visual quality and natural integration of the edited target region. — The context clearly defines edit execution quality as the second dimension that evaluates visual quality and integration.\n[supported] The third dimension is overall visual quality, which refers to global technical quality and stylistic coherence. — The context specifies overall visual quality as the third dimension, relating to technical quality and coherence.\n[supported] The fourth dimension is text-editing quality, which concerns textual correctness and rendering quality when text is modified. — The context identifies text-editing quality as the fourth dimension, applicable when text modification is involved.\n[supported] The fifth dimension is unedited-region preservation, which checks whether unrelated regions remain semantically, structurally, and visually unchanged. — The context describes unedited-region preservation as the fifth dimension that assesses the preservation of unrelated regions.\n[supported] For criteria with multiple sub-dimensions, the minimum sub-score is retained. — The context states that for criteria with multiple sub-dimensions, the minimum sub-dimension score is retained.\n[supported] After normalization, the applicable dimension scores are combined using a minimum, or bottleneck, operation. — The context explains that after normalization, scores are aggregated using a minimum operation.\n[supported] The weakest applicable dimension determines the final scalar reward. — The context indicates that the weakest aspect determines the final scalar reward after aggregation.\n[supported] The scores are not averaged or summed. — The context explicitly states that the scores are not summed or normalized against one another.\n[supported] The text-editing score is omitted when no text modification is requested. — The context mentions that the text-editing criterion is omitted for instructions that do not involve text modification.\n[supported] The edit-execution score is set to zero if the requested change is not visibly realized. — The context states that the edit-execution score is set to zero when no requested change is visibly realized.\n[unsupported] The provided excerpt states that the scores are normalized, but it does not specify the normalization formula or its range. — The context mentions normalization but does not provide details about the normalization formula or its range.\n[supported] The paper separately describes OCR and HPSv3++ reward routing for other prompt partitions. — The context states that the paper describes OCR and HPSv3++ reward routing for different prompt partitions.\n[supported] The scores for other prompt partitions are not summed or normalized with each other. — The context clearly states that the scores for OCR and HPSv3++ are not summed or normalized against one another.\n[supported] The editing-reward aggregation should not be confused with the scores for other prompt partitions. — The context indicates that the editing-reward aggregation is distinct from the scores for other prompt partitions.",
+      "statements": [
+        {
+          "statement": "The paper evaluates editing along five dimensions.",
+          "reason": "The context explicitly states that a VLM-based reward framework evaluates editing quality along five dimensions.",
+          "verdict": 1
+        },
+        {
+          "statement": "The first dimension is instruction fulfillment, which assesses whether the requested changes are semantically correct and complete.",
+          "reason": "The context describes instruction fulfillment as the first dimension that measures semantic correctness and completeness of requested changes.",
+          "verdict": 1
+        },
+        {
+          "statement": "The second dimension is edit execution quality, which evaluates the visual quality and natural integration of the edited target region.",
+          "reason": "The context clearly defines edit execution quality as the second dimension that evaluates visual quality and integration.",
+          "verdict": 1
+        },
+        {
+          "statement": "The third dimension is overall visual quality, which refers to global technical quality and stylistic coherence.",
+          "reason": "The context specifies overall visual quality as the third dimension, relating to technical quality and coherence.",
+          "verdict": 1
+        },
+        {
+          "statement": "The fourth dimension is text-editing quality, which concerns textual correctness and rendering quality when text is modified.",
+          "reason": "The context identifies text-editing quality as the fourth dimension, applicable when text modification is involved.",
+          "verdict": 1
+        },
+        {
+          "statement": "The fifth dimension is unedited-region preservation, which checks whether unrelated regions remain semantically, structurally, and visually unchanged.",
+          "reason": "The context describes unedited-region preservation as the fifth dimension that assesses the preservation of unrelated regions.",
+          "verdict": 1
+        },
+        {
+          "statement": "For criteria with multiple sub-dimensions, the minimum sub-score is retained.",
+          "reason": "The context states that for criteria with multiple sub-dimensions, the minimum sub-dimension score is retained.",
+          "verdict": 1
+        },
+        {
+          "statement": "After normalization, the applicable dimension scores are combined using a minimum, or bottleneck, operation.",
+          "reason": "The context explains that after normalization, scores are aggregated using a minimum operation.",
+          "verdict": 1
+        },
+        {
+          "statement": "The weakest applicable dimension determines the final scalar reward.",
+          "reason": "The context indicates that the weakest aspect determines the final scalar reward after aggregation.",
+          "verdict": 1
+        },
+        {
+          "statement": "The scores are not averaged or summed.",
+          "reason": "The context explicitly states that the scores are not summed or normalized against one another.",
+          "verdict": 1
+        },
+        {
+          "statement": "The text-editing score is omitted when no text modification is requested.",
+          "reason": "The context mentions that the text-editing criterion is omitted for instructions that do not involve text modification.",
+          "verdict": 1
+        },
+        {
+          "statement": "The edit-execution score is set to zero if the requested change is not visibly realized.",
+          "reason": "The context states that the edit-execution score is set to zero when no requested change is visibly realized.",
+          "verdict": 1
+        },
+        {
+          "statement": "The provided excerpt states that the scores are normalized, but it does not specify the normalization formula or its range.",
+          "reason": "The context mentions normalization but does not provide details about the normalization formula or its range.",
+          "verdict": 0
+        },
+        {
+          "statement": "The paper separately describes OCR and HPSv3++ reward routing for other prompt partitions.",
+          "reason": "The context states that the paper describes OCR and HPSv3++ reward routing for different prompt partitions.",
+          "verdict": 1
+        },
+        {
+          "statement": "The scores for other prompt partitions are not summed or normalized with each other.",
+          "reason": "The context clearly states that the scores for OCR and HPSv3++ are not summed or normalized against one another.",
+          "verdict": 1
+        },
+        {
+          "statement": "The editing-reward aggregation should not be confused with the scores for other prompt partitions.",
+          "reason": "The context indicates that the editing-reward aggregation is distinct from the scores for other prompt partitions.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.8107718446855277,
+      "reason": "generated='What are the five dimensions evaluated in the paper regarding editing rewards?' similarity=0.8108 noncommittal=0; generated='What are the five dimensions evaluated in the paper regarding editing rewards?' similarity=0.8108 noncommittal=0; generated='What are the five dimensions evaluated in the paper regarding editing rewards?' similarity=0.8108 noncommittal=0",
+      "generated_questions": [
+        "What are the five dimensions evaluated in the paper regarding editing rewards?",
+        "What are the five dimensions evaluated in the paper regarding editing rewards?",
+        "What are the five dimensions evaluated in the paper regarding editing rewards?"
+      ],
+      "noncommittal": [
+        0,
+        0,
+        0
+      ],
+      "similarities": [
+        0.8107718446855277,
+        0.8107718446855277,
+        0.8107718446855277
+      ],
+      "all_noncommittal": false
+    }
+  }
+}

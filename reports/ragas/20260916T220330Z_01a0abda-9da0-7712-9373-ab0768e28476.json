@@ -1,0 +1,102 @@
+{
+  "scored_at": "2026-09-16T22:03:30Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abda-9da0-7712-9373-ab0768e28476",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "Which five answer templates can DocuSearch's Template Selection agent assign before retrieval, what BM25 k1 and b does sparse retrieval use, and why does the cross-encoder still keep an RRF term after fusion? (2609.01617)",
+  "retrieved_contexts": [
+    "Before any retrieval happens, every query $q$ goes through\ntemplate classification and keyword extraction. The Template\nSelection agent maps $q$ to one of five types in\n𝒯={\\mathcal{T}=\\{procedure_sop,\nconcept_explanation,\ncomparison_decision,\nparameter_lookup,\ntroubleshooting_rca$\\}$ using an LLM with a\ndeterministic heuristic as fallback when the model is\nuncertain. Accurate template classification is important because\nit shapes the structure of the generated answer downstream.\nThe BM25 Keyword agent then extracts domain-specific terms\nfrom a curated telecom vocabulary covering standard\nnetworking and protocol constructs, supplemented with\nquery-specific expansions. Finally, the Vendor Detection\nagent combines LLM classification with regex matching to\nidentify vendor references, scoping all retrieval signals\nto the detected vendor’s documents when applicable.",
+    "Dense Vector Retrieval. The query $q$ is encoded using\nBGE-Large-EN-v1.5 [4] to get\n$\\mathbf{q}\\in\\mathbb{R}^{1024}$. Cosine similarity is\ncomputed against all chunk embeddings in Qdrant, returning\nthe top $k_{v}=40$ chunks:  \nEquation\n$$\n\\mathrm{score}_{v}(c)=\\frac{\\mathbf{q}\\cdot\\mathbf{e}_{c}}{\\|\\mathbf{q}\\|\\cdot\\|\\mathbf{e}_{c}\\|}\n$$  \nBM25 Sparse Retrieval. Extracted keywords query the\nSQLite FTS5 index. Standard BM25 scoring applies:  \nEquation\n$$\n\\mathrm{score}_{b}(c,Q)=\\sum_{q_{i}\\in Q}\\mathrm{IDF}(q_{i})\\cdot\\frac{f(q_{i},c)(k_{1}+1)}{f(q_{i},c)+k_{1}(1-b+b\\cdot\\frac{|c|}{avgdl})}\n$$  \nwith $k_{1}=1.2$, $b=0.75$, where $|c|$ is chunk length\nand $avgdl$ is the average chunk length across $\\mathcal{C}$.\nTop $k_{b}=40$ chunks are retrieved. BM25 is particularly\nuseful here because technical acronyms and model numbers\nthat have no meaningful semantic neighbourhood still\nproduce strong lexical matches.\nKG Neighbour Expansion. Seed chunks from the vector\nand BM25 results traverse a KG edge table stored in SQLite,\npulling in structurally connected chunks (top $k_{kg}=15$).\nThis catches content that is topically related but\nlexically and semantically distant — for instance, a\nconfiguration snippet that references a procedure described\nin a different section.",
+    "The top $k_{r}=12$ fused chunks are reranked\nwith a cross-encoder [8] that jointly\nencodes the query and each chunk:  \nEquation\n$$\ns_{\\mathrm{final}}(c)=0.65\\cdot s_{\\mathrm{CE}}(q,c)+0.35\\cdot s_{\\mathrm{RRF}}(c)\n$$  \nThe cross-encoder score $s_{\\mathrm{CE}}(q,c)$ is weighted\nhigher because it captures fine-grained query-chunk\ninteractions that bi-encoder cosine similarity cannot.\nRetaining the RRF component prevents the cross-encoder from\ncompletely discarding evidence that multiple retrieval\nsignals agreed on.",
+    "Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search > VII Implementation Details\nTABLE II: Default Retrieval and Ranking Configuration\n| Parameter | Symbol | Value |\n| --- | --- | --- |\n| Vector top-$k$ | $k_{v}$ | 40 |\n| BM25 top-$k$ | $k_{b}$ | 40 |\n| KG top-$k$ | $k_{kg}$ | 15 |\n| Rerank top-$k$ | $k_{r}$ | 12 |\n| Final evidence | $|\\mathcal{E}|$ | 10 |\n| RRF smoothing | $k$ | 60 |\n| RRF vector weight | $w_{v}$ | 0.50 |\n| RRF BM25 weight | $w_{b}$ | 0.35 |\n| RRF KG weight | $w_{kg}$ | 0.15 |\n| MMR lambda | $\\lambda$ | 0.65 |\n| Sufficiency thresh. | $\\tau$ | 7 |\n| Max neighbour loops | $L$ | 2 |\n| Chunk size | $s$ | 900 chars |\n| Chunk overlap | $\\delta$ | 140 chars |\n| LLM temperature | $T$ | 0.0 |\n",
+    "Getting accurate, grounded answers out of large enterprise document\nrepositories is a difficult problem. Dense vector retrieval alone\nfrequently performs poorly on queries that mix technical\nterminology, vendor-specific acronyms, or require reasoning\nacross several non-adjacent sections. DocuSearch was built\nto address exactly this gap — an offline, multi-agent document\nintelligence system developed and evaluated in a production\ntelecom network operations environment. Rather than relying on a\nsingle retrieval signal, DocuSearch pulls together three\ncomplementary sources of evidence: semantic search over a Qdrant\nvector store using BGE-Large embeddings, BM25 full-text search\nover an SQLite FTS5 index, and Knowledge Graph neighbour expansion\nfrom a structured edge table. These three ranked lists are merged\nthrough Reciprocal Rank Fusion (RRF) with signal weights\n$w_{v}=0.50$, $w_{b}=0.35$, and $w_{kg}=0.15$, giving:  \nEquation\n$$\ns_{\\mathrm{RRF}}(d)\\;=\\;\\sum_{i\\in\\{v,\\,b,\\,kg\\}}\\frac{w_{i}}{k+r_{i}(d)},\\quad k=60\n$$  \nwhere $r_{i}(d)$ is the rank of chunk $d$ in signal list $i$.\nA cross-encoder then reranks the fused list, and Maximal\nMarginal Relevance (MMR) with $\\lambda=0.65$ prunes it\nfor both relevance and diversity. What makes DocuSearch\ndistinctive is a per-chunk evaluation loop that\ntreats each selected chunk as its own mini-retrieval problem:\nan LLM decides whether the chunk needs additional neighbouring\ncontext, whether it is actually sufficient to answer the query,\nand whether the answer it generates is genuinely grounded in\nthe retrieved text. Ungrounded answers are not returned; the\nsystem falls back to a multi-chunk merge instead. On an\ninternal telecom document corpus, DocuSearch reaches\nPrecision@10 of $0.69$, Recall@10 of $0.79$, and a grounding\nrate of $89.6\\%$ — gains of $15$, $16$, and $18.4$ percentage\npoints over a dense-only RAG baseline.",
+    "DocuSearch tackles the four sub-problems through a layered\nmulti-agent pipeline split into two phases, illustrated in\nFigure[1](#S4.F1 \"Figure 1 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") and Figure[2](#S4.F2 \"Figure 2 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\").\nPre-MMR Phase. When a query $q$ arrives, a Template\nSelection agent first classifies it into one of five answer\ntemplates $\\mathcal{T}$. A BM25 Keyword agent then pulls\nout domain-specific terms, and a Vendor Detection agent\noptionally narrows all three retrieval signals to a specific\nvendor namespace $v\\in\\mathcal{V}$. Dense vector search,\nBM25 full-text search, and KG neighbour expansion run in\nparallel, and their ranked results are merged by weighted\nRRF, reranked by a cross-encoder, and filtered by MMR to\nproduce the evidence set $\\mathcal{E}$.\nPost-MMR Phase. Each chunk $c\\in\\mathcal{E}$ is\nevaluated individually by four sequential LLM-driven nodes:\ncontext need detection, sufficiency scoring against a\nthreshold $\\tau=7$, answer generation, and groundedness\nverification. The first chunk that clears all four checks\nproduces the final answer. When no individual chunk passes,\na fallback merges all expanded contexts, generates a\nconsolidated answer, and runs one final groundedness check\nbefore returning anything to the user.",
+    "In telecom network operations centres, engineers frequently\nmust search through hundreds of vendor manuals for a specific\nconfiguration procedure under time pressure. These environments accumulate vast repositories of\ntechnical documentation — SOPs, RCA reports, audit records,\nmulti-vendor configuration guides — and the gap between\nwhat keyword search surfaces and what an engineer actually\nneeds can be substantial. Conventional search returns too many\nloosely related hits. Standard single-signal\nRetrieval-Augmented Generation (RAG)[1],\nwhile an improvement, still struggles with specialised\ntechnical vocabulary, fragmented document chunks, and the\nreality that relevant information is often spread across\nnon-adjacent sections from different vendors.\nThis paper describes DocuSearch, a hybrid multi-agent\nRAG system designed and deployed within a real telecom\nnetwork operations environment. Three limitations motivated\nits design: signal incompleteness, where a single\nretrieval function misses chunks that are relevant in semantic,\nlexical, and structural senses simultaneously;\ncontext fragmentation, where a retrieved chunk is\nonly half of a procedure; and unverified grounding,\nwhere a generated answer sounds plausible but is not actually\nsupported by the retrieved evidence. DocuSearch addresses all\nthree by combining dense vector retrieval, BM25 sparse\nretrieval [2], and Knowledge Graph\nexpansion[9] into a single fused ranking via Reciprocal Rank\nFusion (RRF) [7], followed by cross-encoder\nreranking, Maximal Marginal Relevance (MMR) selection\n[3], and — the primary novel\ncontribution — a per-chunk agentic evaluation loop\nthat verifies context sufficiency and answer grounding before\ncommitting to a response. The pipeline runs entirely on locally\nhosted models and is orchestrated via LangGraph\n[5], exposed through an interactive Dash web\napplication with vendor-scoped retrieval, session document\nupload, and integrated Knowledge and Learning Hub modules.\nThe main contributions are as follows:  \n* •  \nA three-signal hybrid retrieval architecture fused\nvia weighted RRF with signal weights\n$w_{v}{=}0.50,\\;w_{b}{=}0.35,\\;w_{kg}{=}0.15$.\n* •  \nA per-chunk agentic evaluation loop with LLM-driven\ncontext need detection, sufficiency scoring, and\ngroundedness verification.\n* •  \nVendor-aware retrieval scoping for multi-vendor",
+    "The three ranked lists are fused following [7]:  \nEquation\n$$\ns_{\\mathrm{RRF}}(c)=\\sum_{i\\in\\{v,\\,b,\\,kg\\}}\\frac{w_{i}}{k+r_{i}(c)}\n$$  \nEquation\n$$\nw_{v}{=}0.50,\\quad w_{b}{=}0.35,\\quad w_{kg}{=}0.15,\\quad k{=}60\n$$  \nChunks that surface in multiple lists receive additive\ncontributions, naturally elevating content that is relevant\nacross different notions of similarity. The smoothing\nconstant $k=60$ prevents very high-ranked items from\ndominating the fused score entirely."
+  ],
+  "response": "## 1. Pre-retrieval answer templates\n\nBefore retrieval, DocuSearch’s Template Selection agent assigns each query to one of these five templates: [1]\n\n1. `procedure_sop`\n2. `concept_explanation`\n3. `comparison_decision`\n4. `parameter_lookup`\n5. `troubleshooting_rca`\n\nThe agent uses an LLM, with a deterministic heuristic fallback when the model is uncertain. [1]\n\n## 2. BM25 parameters\n\nSparse BM25 retrieval uses:\n\n- \\(k_1 = 1.2\\)\n- \\(b = 0.75\\) [2]\n\nThe paper also states that BM25 retrieves the top \\(k_b=40\\) chunks, but that value is separate from the BM25 scoring parameters. [2]\n\n## 3. Why retain an RRF term after fusion?\n\nAfter reciprocal rank fusion, the cross-encoder assigns the final score as:\n\n\\[\ns_{\\mathrm{final}}(c)\n=\n0.65\\,s_{\\mathrm{CE}}(q,c)\n+\n0.35\\,s_{\\mathrm{RRF}}(c).\n\\]\n\nThe cross-encoder receives the larger weight because it captures fine-grained query–chunk interactions. The RRF term is retained so that the cross-encoder cannot completely discard chunks supported by agreement among multiple retrieval signals. [3] In other words, the final ranking combines detailed cross-encoder relevance with evidence that several retrieval methods ranked the same chunk highly. [3][8]\n\nThe provided evidence does not establish how the weights \\(0.65\\) and \\(0.35\\) were selected or tuned; it only reports the formula and the stated reason for retaining the RRF component. [3]",
+  "metrics": {
+    "faithfulness": {
+      "value": 1.0,
+      "reason": "[supported] DocuSearch's Template Selection agent assigns each query to one of five templates before retrieval. — The context explicitly states that the Template Selection agent maps queries to one of five types before retrieval.\n[supported] The five templates assigned by the agent are: `procedure_sop`, `concept_explanation`, `comparison_decision`, `parameter_lookup`, and `troubleshooting_rca`. — The context provides the exact list of five templates that the agent uses.\n[supported] The agent uses a large language model (LLM) with a deterministic heuristic fallback when the model is uncertain. — The context mentions that the Template Selection agent uses an LLM with a deterministic heuristic as a fallback.\n[supported] Sparse BM25 retrieval uses the parameters k1 equal to 1.2 and b equal to 0.75. — The context specifies the parameters k1 and b for BM25 scoring.\n[supported] BM25 retrieves the top kb equal to 40 chunks, but this value is separate from the BM25 scoring parameters. — The context states that BM25 retrieves the top k_b equal to 40 chunks, which is a separate parameter from k1 and b.\n[supported] After reciprocal rank fusion, the cross-encoder assigns the final score using a specific formula. — The context describes the process of cross-encoder reranking after reciprocal rank fusion.\n[supported] The formula for the final score includes a larger weight for the cross-encoder to capture fine-grained query–chunk interactions. — The context explains that the cross-encoder score is weighted higher to capture fine-grained interactions.\n[supported] The RRF term is retained to ensure that the cross-encoder does not completely discard chunks supported by agreement among multiple retrieval signals. — The context states that retaining the RRF component prevents the cross-encoder from discarding evidence supported by multiple signals.\n[supported] The final ranking combines detailed cross-encoder relevance with evidence that several retrieval methods ranked the same chunk highly. — The context indicates that the final ranking merges results from different retrieval methods, including cross-encoder relevance.\n[supported] The provided evidence does not establish how the weights 0.65 and 0.35 were selected or tuned. — The context does not provide information on how the weights were selected or tuned, only the formula.\n[supported] The evidence only reports the formula and the stated reason for retaining the RRF component. — The context confirms that it only discusses the formula and the rationale for retaining the RRF component without further details.",
+      "statements": [
+        {
+          "statement": "DocuSearch's Template Selection agent assigns each query to one of five templates before retrieval.",
+          "reason": "The context explicitly states that the Template Selection agent maps queries to one of five types before retrieval.",
+          "verdict": 1
+        },
+        {
+          "statement": "The five templates assigned by the agent are: `procedure_sop`, `concept_explanation`, `comparison_decision`, `parameter_lookup`, and `troubleshooting_rca`.",
+          "reason": "The context provides the exact list of five templates that the agent uses.",
+          "verdict": 1
+        },
+        {
+          "statement": "The agent uses a large language model (LLM) with a deterministic heuristic fallback when the model is uncertain.",
+          "reason": "The context mentions that the Template Selection agent uses an LLM with a deterministic heuristic as a fallback.",
+          "verdict": 1
+        },
+        {
+          "statement": "Sparse BM25 retrieval uses the parameters k1 equal to 1.2 and b equal to 0.75.",
+          "reason": "The context specifies the parameters k1 and b for BM25 scoring.",
+          "verdict": 1
+        },
+        {
+          "statement": "BM25 retrieves the top kb equal to 40 chunks, but this value is separate from the BM25 scoring parameters.",
+          "reason": "The context states that BM25 retrieves the top k_b equal to 40 chunks, which is a separate parameter from k1 and b.",
+          "verdict": 1
+        },
+        {
+          "statement": "After reciprocal rank fusion, the cross-encoder assigns the final score using a specific formula.",
+          "reason": "The context describes the process of cross-encoder reranking after reciprocal rank fusion.",
+          "verdict": 1
+        },
+        {
+          "statement": "The formula for the final score includes a larger weight for the cross-encoder to capture fine-grained query–chunk interactions.",
+          "reason": "The context explains that the cross-encoder score is weighted higher to capture fine-grained interactions.",
+          "verdict": 1
+        },
+        {
+          "statement": "The RRF term is retained to ensure that the cross-encoder does not completely discard chunks supported by agreement among multiple retrieval signals.",
+          "reason": "The context states that retaining the RRF component prevents the cross-encoder from discarding evidence supported by multiple signals.",
+          "verdict": 1
+        },
+        {
+          "statement": "The final ranking combines detailed cross-encoder relevance with evidence that several retrieval methods ranked the same chunk highly.",
+          "reason": "The context indicates that the final ranking merges results from different retrieval methods, including cross-encoder relevance.",
+          "verdict": 1
+        },
+        {
+          "statement": "The provided evidence does not establish how the weights 0.65 and 0.35 were selected or tuned.",
+          "reason": "The context does not provide information on how the weights were selected or tuned, only the formula.",
+          "verdict": 1
+        },
+        {
+          "statement": "The evidence only reports the formula and the stated reason for retaining the RRF component.",
+          "reason": "The context confirms that it only discusses the formula and the rationale for retaining the RRF component without further details.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.692506069374188,
+      "reason": "generated='What are the five templates assigned by DocuSearch’s Template Selection agent?' similarity=0.6681 noncommittal=0; generated='What are the five templates assigned by DocuSearch’s Template Selection agent before retrieval?' similarity=0.7047 noncommittal=0; generated='What are the five templates assigned by DocuSearch’s Template Selection agent before retrieval?' similarity=0.7047 noncommittal=0",
+      "generated_questions": [
+        "What are the five templates assigned by DocuSearch’s Template Selection agent?",
+        "What are the five templates assigned by DocuSearch’s Template Selection agent before retrieval?",
+        "What are the five templates assigned by DocuSearch’s Template Selection agent before retrieval?"
+      ],
+      "noncommittal": [
+        0,
+        0,
+        0
+      ],
+      "similarities": [
+        0.6681300641161056,
+        0.7046940720032293,
+        0.7046940720032293
+      ],
+      "all_noncommittal": false
+    }
+  }
+}

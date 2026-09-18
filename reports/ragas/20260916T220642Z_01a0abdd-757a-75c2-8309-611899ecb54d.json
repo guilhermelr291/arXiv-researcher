@@ -1,0 +1,152 @@
+{
+  "scored_at": "2026-09-16T22:06:42Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abdd-757a-75c2-8309-611899ecb54d",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "How was the resolution-dependent noise-scale conditioning extended in SenseNova-U1.5 compared to SenseNova-U1? (2609.11929)",
+  "retrieved_contexts": [
+    "Let $\\sigma_{R}(H,W)$ denote the noise scale associated with resolution $(H,W)$.\nWe normalize it as\n$\\bar{\\sigma}_{R}={\\sigma_{R}(H,W)}/\\sigma_{\\max}$, where $\\sigma_{\\max}$ corresponds to the $4096\\times 4096$ reference resolution, and encode it using a dedicated sinusoidal MLP, $\\mathrm{NSEmb}(\\cdot)$.\nThe resulting embedding is combined with the diffusion timestep representation:\n$\\mathbf{s}_{t}=\\bm{\\tau}_{t}+\\mathrm{NSEmb}\\!\\left(\\bar{\\sigma}_{R}\\right)$, providing the denoiser with explicit awareness of both diffusion time and resolution-dependent noise statistics.\nThis conditioning helps the model adapt more consistently to variations across diverse image resolutions and aspect ratios.  \nTable 1: Configurations of SenseNova-U1.5. It features a high spatial compression ratio, Pre-Buffer design, native RoPE for unified spatiotemporal encoding, and a Mixture-of-Transformers architecture for joint multimodal understanding and generation.\n| Configuration | Patch Size | Pre-Buffer | # Layers | # Heads (Q/KV) | Head Size (T/H/W) | Hidden Size | # Parameters (Und/Gen) |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| SenseNova-U1.5 | $32\\times 32$ | ✓ | 42 | 32 / 8 | 64 / 32 / 32 | 4,096 | 8.2B / 8.2B |\n  \nCompact patchification greatly reduces image-modeling cost, but independently decoding each $32\\times 32$ token with an MLP imposes an undesirable patch-wise factorization on the output. This is particularly problematic at high resolutions, where local image continuity makes independent patch prediction prone to seams, grid artifacts, and texture discontinuities. SenseNova-U1.5 therefore replaces the original MLP head with a lightweight spatially coupled decoder.\nGiven backbone hidden states\n$\\mathbf{H}\\in\\mathbb{R}^{B\\times hw\\times d}$, we first restore their two-dimensional topology,\n$\\mathbf{H}_{\\mathrm{2D}}\\in\\mathbb{R}^{B\\times d\\times h\\times w}$, and progressively reconstruct the full-resolution RGB image through Pixel Shuffle stages with upsampling factors of $2$, $2$, and $8$ in Figure [3](#S3.F3 \"Figure 3 ‣ 3.1 Model architecture ‣ 3 Methodology ‣ SenseNova-U1.5: Towards Native Unified Visual Intelligence\").\nBetween successive upsampling stages, $3\\times 3$ convolutions enable information exchange across neighboring token regions, allowing pixels near patch boundaries to be determined jointly rather than independently.",
+    "Figure 3 : Overview of SenseNova-U1.5. Compared with SenseNova-U1, U1.5 further refines the near-lossless visual interface on both encoding and decoding: resolution-aware noise conditioning is extended to the 4096 × 4096 4096\\times 4096 range, while the original patch-wise MLP head is replaced by a lightweight spatial decoder with Pixel Shuffle and 3 × 3 3\\times 3 convolutions. These improvements preserve compact 32 × 32 32\\times 32 visual tokenization while enhancing spatial continuity, high-resolution fidelity, and downstream robustness.  \nNear-Lossless Visual Interface.\nSenseNova-U1.5 retains the lightweight native visual interface introduced in NEO [26], directly transforming raw images or noise-corrupted visual inputs into compact token sequences without relying on an external visual encoder or VAE.\nSpecifically, two convolutional projections with GELU activations downsample the input by factors of $16$ and $2$, respectively, yielding one visual token for each $32\\times 32$ image region.\nTwo-dimensional sinusoidal positional embeddings preserve spatial coordinates, while special <img> and </img> tokens delimit individual visual blocks.\nText is tokenized with the original language tokenizer, after which visual and textual representations are projected into a shared hidden space and jointly processed by the unified backbone.\nThis design preserves near-lossless visual information while keeping the sequence length tractable for large-scale multimodal modeling.  \nFor generation, the effective noise magnitude varies with image resolution, making resolution an important conditioning signal for the denoising process.\nSenseNova-U1.5 therefore explicitly incorporates a resolution-dependent noise-scale embedding.\nCompared with SenseNova-U1, whose normalization range is calibrated up to $2048\\times 2048$, we extend the reference resolution to $4096\\times 4096$ to better support native high-resolution synthesis in Figure [3](#S3.F3 \"Figure 3 ‣ 3.1 Model architecture ‣ 3 Methodology ‣ SenseNova-U1.5: Towards Native Unified Visual Intelligence\").\nLet $\\sigma_{R}(H,W)$ denote the noise scale associated with resolution $(H,W)$.\nWe normalize it as",
+    "For multimodal understanding, we optimize the conditional likelihood of the target text sequence as follows:  \nEquation ((1))\n$$\n\\mathcal{L}_{\\mathrm{AR}}=-\\frac{1}{N}\\sum_{n=1}^{N}\\log p_{\\theta}\\left(x_{n}\\mid x_{<n},\\mathbf{c}\\right),\n$$  \nwhere $x_{n}$ is the $n$-th target token and $\\mathbf{c}$ denotes the preceding multimodal context.  \nFor visual generation, SenseNova-U1.5 follows the $\\mathbf{x}$-prediction [65] and learns pixel-space flow matching directly in RGB space. To accommodate varying image resolutions, we construct the training trajectory with resolution-adaptive noise, sampling $\\bm{\\epsilon}\\sim\\mathcal{N}(0,\\mathbf{I})$ and $t\\in[0,1]$ to form  \nEquation ((2))\n$$\n\\mathbf{z}_{t}=t\\mathbf{x}+(1-t)\\sigma_{R}(H,W)\\bm{\\epsilon},\n$$  \nwhere $\\sigma_{R}(H,W)$ adjusts the noise magnitude according to the target resolution.\nAfter that, the model attempts to predict the clean endpoint $\\hat{\\mathbf{x}}_{\\theta}$, which induces the velocity estimate:  \nEquation ((3))\n$$\n\\mathbf{v}_{\\theta}=\\frac{\\hat{\\mathbf{x}}_{\\theta}-\\mathbf{z}_{t}}{1-t},\\qquad\\mathbf{v}^{\\star}=\\frac{\\mathbf{x}-\\mathbf{z}_{t}}{1-t}.\n$$  \nFinally, we supervise this trajectory with the pixel-space flow-matching loss as follows:  \nEquation ((4))\n$$\n\\mathcal{L}_{\\mathrm{Flow}}=\\mathbb{E}\\left[\\left\\|\\mathbf{v}_{\\theta}-\\mathbf{v}^{\\star}\\right\\|_{2}^{2}\\right].\n$$  \nBeyond pixel-space trajectory supervision, SenseNova-U1.5 further introduces a perceptual objective to improve structural consistency and local visual coherence:  \nEquation ((5))\n$$\n\\mathcal{L}_{\\mathrm{Perc}}=\\mathrm{LPIPS}\\left(\\hat{\\mathbf{x}}_{\\theta},\\mathbf{x}\\right),\n$$  \nwhere LPIPS [154] provides feature-space supervision complementary to the RGB-space flow objective.\nThe entire training process is jointly optimized under a unified objective:  \nEquation ((6))\n$$\n\\mathcal{L}=\\lambda_{\\mathrm{AR}}\\mathcal{L}_{\\mathrm{AR}}+\\lambda_{\\mathrm{Flow}}\\mathcal{L}_{\\mathrm{Flow}}+\\lambda_{\\mathrm{Perc}}\\mathcal{L}_{\\mathrm{Perc}}.\n$$  \nThis brings three complementary signals into a single native model: autoregressive supervision establishes semantic understanding and multimodal reasoning, flow matching learns the continuous transformation from noise to images directly in pixel space, and perceptual supervision further regularizes the generated endpoint toward coherent global structure, faithful local textures, and visually plausible appearance. Together, they couple high-level semantics with low-level visual formation, enabling understanding and generation to be learned within a unified representation.  \nTable 2 : Training recipe of SenseNova-U1.5. denotes frozen modules; denotes trainable modules.\n|  | Stage 1: Generation Pre-Training | | |  |  |\n| --- | --- | --- | --- | --- | --- |\n| Training Stage | Phase I | Phase II | Phase III | Stage 2: Unified  Mid-Training | Stage 3: Unified  SFT |\n| Optimization | | | | | |\n| Training steps | 180K | 100K | 185K | 80K | 10.5K |\n| Peak learning rate | $2\\times 10^{-4}$ | $1\\times 10^{-4}$ | $1\\times 10^{-4}$ | $2\\times 10^{-5}$ | $2\\times 10^{-5}$ |\n| Min learning rate | $2\\times 10^{-4}$ | $1\\times 10^{-4}$ | $2\\times 10^{-5}$ | $2\\times 10^{-5}$ | $0$ |\n| LR scheduler | Constant | Constant | Cosine decay | Constant | Cosine decay |\n| Sequence length | 8,196 | 20,480 | 20,480 | 32,768 | 32,768 |\n| Optimizer | AdamW ($\\beta_{1}=0.9$, $\\beta_{2}=0.95$, $\\epsilon=10^{-8}$) | | | | |\n| Module settings | | | | | |\n| Understanding branch |  |  |  |  |  |\n| Generation branch |  |  |  |  |  |\n| $\\lambda_{\\mathrm{AR}}:\\lambda_{\\mathrm{Flow}}:\\lambda_{\\mathrm{Perc}}$ | $0:1:0$ | $0:1:0$ | $0.1:1:0.1$ | $0.1:1:0.1$ | $0.1:1:0.1$ |\n| Generation resolution | $256^{2}$–$1024^{2}$ | $512^{2}$–$4096^{2}$ | $512^{2}$–$4096^{2}$ | $512^{2}$–$4096^{2}$ | $512^{2}$–$4096^{2}$ |\n| Data sampling ratio | | | | | |\n| Understanding data | 0.00 | 0.00 | 0.00 | 0.30 | 0.30 |\n| Text-to-image data | 1.00 | 1.00 | 0.60 | 0.40 | 0.40 |\n| Image-editing data | 0.00 | 0.00 | 0.30 | 0.20 | 0.30 |\n| Interleaved data | 0.00 | 0.00 | 0.10 | 0.10 | 0.10 |\n"
+  ],
+  "response": "## Core difference\n\nSenseNova-U1.5 keeps the same basic type of conditioning: it represents the noise scale associated with the target resolution, normalizes it, encodes it with a dedicated sinusoidal MLP, and adds that embedding to the diffusion-timestep representation:\n\n\\[\n\\mathbf{s}_t=\\bm{\\tau}_t+\\mathrm{NSEmb}(\\bar{\\sigma}_R).\n\\]\n\nThus, the denoiser receives both diffusion-time information and resolution-dependent noise information. [1]\n\nThe extension compared with SenseNova-U1 is the **calibration range of the normalization**:\n\n- **SenseNova-U1:** the normalization range was calibrated up to \\(2048\\times 2048\\).\n- **SenseNova-U1.5:** the reference resolution for normalization, and hence \\(\\sigma_{\\max}\\), was extended to \\(4096\\times4096\\). [2]\n\nFormally, U1.5 defines\n\n\\[\n\\bar{\\sigma}_{R}\n=\n\\frac{\\sigma_R(H,W)}{\\sigma_{\\max}},\n\\]\n\nwhere \\(\\sigma_{\\max}\\) corresponds to the \\(4096\\times4096\\) reference resolution. [1]\n\n## Interpretation\n\nTherefore, the change is not presented as a new kind of conditioning signal. Rather, U1.5 extends the **resolution range over which the noise-scale conditioning is normalized and calibrated**, allowing the model to account for native high-resolution generation up to \\(4096\\times4096\\). [2] The training recipe also lists generation resolutions reaching \\(4096^2\\), including ranges of \\(512^2\\)–\\(4096^2\\) in later training phases. [3]\n\n## Limitations and ambiguities\n\nThe provided evidence does not specify the exact functional form used to compute \\(\\sigma_R(H,W)\\), nor does it give the corresponding SenseNova-U1 embedding equation in full. Consequently, the evidence supports the conclusion that U1.5 extends the reference range from \\(2048\\times2048\\) to \\(4096\\times4096\\), but it does not establish whether any other internal part of the conditioning implementation changed. [1] [2]\n\nNo contradiction is apparent in the provided chunks: they consistently describe the extension as an expansion of the reference-resolution range. [1] [2]",
+  "metrics": {
+    "faithfulness": {
+      "value": 0.9545454545454546,
+      "reason": "[unsupported] SenseNova-U1.5 maintains the same basic type of conditioning. — The context does not explicitly state that the basic type of conditioning remains the same, only that it incorporates new features.\n[supported] SenseNova-U1.5 represents the noise scale associated with the target resolution. — The context defines the noise scale as associated with resolution (H,W), confirming this statement.\n[supported] SenseNova-U1.5 normalizes the noise scale. — The context explicitly states that the noise scale is normalized as \\bar{\\sigma}_{R}={\\sigma_{R}(H,W)}/\\sigma_{\\max}.\n[supported] SenseNova-U1.5 encodes the noise scale with a dedicated sinusoidal MLP. — The context mentions encoding the normalized noise scale using a dedicated sinusoidal MLP.\n[supported] SenseNova-U1.5 adds the embedding to the diffusion-timestep representation. — The context states that the resulting embedding is combined with the diffusion timestep representation.\n[supported] The denoiser receives both diffusion-time information and resolution-dependent noise information. — The context confirms that the denoiser is provided with explicit awareness of both diffusion time and resolution-dependent noise statistics.\n[supported] The extension compared with SenseNova-U1 is the calibration range of the normalization. — The context indicates that the reference resolution for normalization was extended, which is an extension compared to SenseNova-U1.\n[supported] In SenseNova-U1, the normalization range was calibrated up to 2048 times 2048. — The context states that SenseNova-U1's normalization range is calibrated up to 2048 times 2048.\n[supported] In SenseNova-U1.5, the reference resolution for normalization was extended to 4096 times 4096. — The context explicitly states that the reference resolution for normalization was extended to 4096 times 4096.\n[supported] U1.5 defines the normalized noise scale as the ratio of sigma_R to sigma_max. — The context defines the normalized noise scale as \\bar{\\sigma}_{R}={\\sigma_{R}(H,W)}/\\sigma_{\\max}, confirming this statement.\n[supported] Sigma_max corresponds to the 4096 times 4096 reference resolution. — The context states that \\sigma_{\\max} corresponds to the 4096 times 4096 reference resolution.\n[supported] The change is not presented as a new kind of conditioning signal. — The context does not explicitly state that the change is a new kind of conditioning signal, but rather an extension of the existing one.\n[supported] U1.5 extends the resolution range over which the noise-scale conditioning is normalized and calibrated. — The context confirms that U1.5 extends the reference resolution for normalization, which is an extension of the noise-scale conditioning.\n[supported] U1.5 allows the model to account for native high-resolution generation up to 4096 times 4096. — The context states that U1.5 supports native high-resolution synthesis up to 4096 times 4096.\n[supported] The training recipe lists generation resolutions reaching 4096 squared. — The context mentions that the training recipe includes generation resolutions reaching 4096 squared.\n[supported] The training recipe includes ranges of 512 squared to 4096 squared in later training phases. — The context states that the training recipe includes ranges of 512 squared to 4096 squared in later training phases.\n[supported] The provided evidence does not specify the exact functional form used to compute sigma_R. — The context does not provide the exact functional form for computing \\sigma_{R}, confirming this statement.\n[supported] The provided evidence does not give the corresponding SenseNova-U1 embedding equation in full. — The context does not provide the full embedding equation for SenseNova-U1, confirming this statement.\n[supported] The evidence supports the conclusion that U1.5 extends the reference range from 2048 times 2048 to 4096 times 4096. — The context explicitly states that U1.5 extends the reference range, confirming this statement.\n[supported] The evidence does not establish whether any other internal part of the conditioning implementation changed. — The context does not provide information on changes to other internal parts of the conditioning implementation, confirming this statement.\n[supported] No contradiction is apparent in the provided chunks. — The context does not present any contradictions, confirming this statement.\n[supported] The provided chunks consistently describe the extension as an expansion of the reference-resolution range. — The context consistently describes the extension as an expansion of the reference-resolution range, confirming this statement.",
+      "statements": [
+        {
+          "statement": "SenseNova-U1.5 maintains the same basic type of conditioning.",
+          "reason": "The context does not explicitly state that the basic type of conditioning remains the same, only that it incorporates new features.",
+          "verdict": 0
+        },
+        {
+          "statement": "SenseNova-U1.5 represents the noise scale associated with the target resolution.",
+          "reason": "The context defines the noise scale as associated with resolution (H,W), confirming this statement.",
+          "verdict": 1
+        },
+        {
+          "statement": "SenseNova-U1.5 normalizes the noise scale.",
+          "reason": "The context explicitly states that the noise scale is normalized as \\bar{\\sigma}_{R}={\\sigma_{R}(H,W)}/\\sigma_{\\max}.",
+          "verdict": 1
+        },
+        {
+          "statement": "SenseNova-U1.5 encodes the noise scale with a dedicated sinusoidal MLP.",
+          "reason": "The context mentions encoding the normalized noise scale using a dedicated sinusoidal MLP.",
+          "verdict": 1
+        },
+        {
+          "statement": "SenseNova-U1.5 adds the embedding to the diffusion-timestep representation.",
+          "reason": "The context states that the resulting embedding is combined with the diffusion timestep representation.",
+          "verdict": 1
+        },
+        {
+          "statement": "The denoiser receives both diffusion-time information and resolution-dependent noise information.",
+          "reason": "The context confirms that the denoiser is provided with explicit awareness of both diffusion time and resolution-dependent noise statistics.",
+          "verdict": 1
+        },
+        {
+          "statement": "The extension compared with SenseNova-U1 is the calibration range of the normalization.",
+          "reason": "The context indicates that the reference resolution for normalization was extended, which is an extension compared to SenseNova-U1.",
+          "verdict": 1
+        },
+        {
+          "statement": "In SenseNova-U1, the normalization range was calibrated up to 2048 times 2048.",
+          "reason": "The context states that SenseNova-U1's normalization range is calibrated up to 2048 times 2048.",
+          "verdict": 1
+        },
+        {
+          "statement": "In SenseNova-U1.5, the reference resolution for normalization was extended to 4096 times 4096.",
+          "reason": "The context explicitly states that the reference resolution for normalization was extended to 4096 times 4096.",
+          "verdict": 1
+        },
+        {
+          "statement": "U1.5 defines the normalized noise scale as the ratio of sigma_R to sigma_max.",
+          "reason": "The context defines the normalized noise scale as \\bar{\\sigma}_{R}={\\sigma_{R}(H,W)}/\\sigma_{\\max}, confirming this statement.",
+          "verdict": 1
+        },
+        {
+          "statement": "Sigma_max corresponds to the 4096 times 4096 reference resolution.",
+          "reason": "The context states that \\sigma_{\\max} corresponds to the 4096 times 4096 reference resolution.",
+          "verdict": 1
+        },
+        {
+          "statement": "The change is not presented as a new kind of conditioning signal.",
+          "reason": "The context does not explicitly state that the change is a new kind of conditioning signal, but rather an extension of the existing one.",
+          "verdict": 1
+        },
+        {
+          "statement": "U1.5 extends the resolution range over which the noise-scale conditioning is normalized and calibrated.",
+          "reason": "The context confirms that U1.5 extends the reference resolution for normalization, which is an extension of the noise-scale conditioning.",
+          "verdict": 1
+        },
+        {
+          "statement": "U1.5 allows the model to account for native high-resolution generation up to 4096 times 4096.",
+          "reason": "The context states that U1.5 supports native high-resolution synthesis up to 4096 times 4096.",
+          "verdict": 1
+        },
+        {
+          "statement": "The training recipe lists generation resolutions reaching 4096 squared.",
+          "reason": "The context mentions that the training recipe includes generation resolutions reaching 4096 squared.",
+          "verdict": 1
+        },
+        {
+          "statement": "The training recipe includes ranges of 512 squared to 4096 squared in later training phases.",
+          "reason": "The context states that the training recipe includes ranges of 512 squared to 4096 squared in later training phases.",
+          "verdict": 1
+        },
+        {
+          "statement": "The provided evidence does not specify the exact functional form used to compute sigma_R.",
+          "reason": "The context does not provide the exact functional form for computing \\sigma_{R}, confirming this statement.",
+          "verdict": 1
+        },
+        {
+          "statement": "The provided evidence does not give the corresponding SenseNova-U1 embedding equation in full.",
+          "reason": "The context does not provide the full embedding equation for SenseNova-U1, confirming this statement.",
+          "verdict": 1
+        },
+        {
+          "statement": "The evidence supports the conclusion that U1.5 extends the reference range from 2048 times 2048 to 4096 times 4096.",
+          "reason": "The context explicitly states that U1.5 extends the reference range, confirming this statement.",
+          "verdict": 1
+        },
+        {
+          "statement": "The evidence does not establish whether any other internal part of the conditioning implementation changed.",
+          "reason": "The context does not provide information on changes to other internal parts of the conditioning implementation, confirming this statement.",
+          "verdict": 1
+        },
+        {
+          "statement": "No contradiction is apparent in the provided chunks.",
+          "reason": "The context does not present any contradictions, confirming this statement.",
+          "verdict": 1
+        },
+        {
+          "statement": "The provided chunks consistently describe the extension as an expansion of the reference-resolution range.",
+          "reason": "The context consistently describes the extension as an expansion of the reference-resolution range, confirming this statement.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.0,
+      "reason": "All generated questions marked noncommittal; score forced to 0. generated='What is the core difference between SenseNova-U1 and SenseNova-U1.5?' similarity=0.6873 noncommittal=1; generated='What is the core difference between SenseNova-U1 and SenseNova-U1.5?' similarity=0.6873 noncommittal=1; generated='What is the core difference between SenseNova-U1 and SenseNova-U1.5?' similarity=0.6873 noncommittal=1",
+      "generated_questions": [
+        "What is the core difference between SenseNova-U1 and SenseNova-U1.5?",
+        "What is the core difference between SenseNova-U1 and SenseNova-U1.5?",
+        "What is the core difference between SenseNova-U1 and SenseNova-U1.5?"
+      ],
+      "noncommittal": [
+        1,
+        1,
+        1
+      ],
+      "similarities": [
+        0.6873202300878276,
+        0.6873202300878276,
+        0.6873202300878276
+      ],
+      "all_noncommittal": true
+    }
+  }
+}

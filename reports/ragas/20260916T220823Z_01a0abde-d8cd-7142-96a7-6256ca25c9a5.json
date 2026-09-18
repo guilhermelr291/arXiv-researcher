@@ -1,0 +1,174 @@
+{
+  "scored_at": "2026-09-16T22:08:23Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abde-d8cd-7142-96a7-6256ca25c9a5",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "What sampling strategy and key hyperparameters were used to train the aesthetic RL expert, and how did the training avoid degrading text legibility? (2609.11929)",
+  "retrieved_contexts": [
+    "(1) Aesthetic Expert.\nOptimizing visual preference alone can improve global appearance at the expense of text legibility. We therefore train the aesthetic expert by interleaving aesthetic-preference and typography data across epochs. Samples from each partition are routed to task-specific rewards: HPSv3++ [76] evaluates perceptual quality and prompt-image alignment, while a bilingual OCR reward based on PaddleOCR [32] measures text fidelity. This routing avoids mixing rewards with different scales and semantics, while preserving typographic accuracy during preference optimization.  \nFor each prompt, we generate 16 candidates using a 30-step trajectory with guidance scale 4.0 and timestep shift 3. We adopt coefficients-preserving sampling (CPS) with $\\eta=0.7$ [121] to introduce stochastic exploration while reducing finite-step artifacts from conventional SDE sampling. At each update, we uniformly sample a contiguous five-step window from the first ten trajectory steps, focusing optimization on early denoising stages that largely determine global content and composition. Training uses dynamic resolutions and aspect ratios, a constant learning rate of $2\\times 10^{-5}$, and a reference-policy KL coefficient of $0.01$. To reduce this reward-induced drift, we freeze the final generation Transformer block, the flow-matching output head, and its output-normalization layer during the RL process.  \n(2) OCR Expert.\nThe OCR expert specializes the model for accurate bilingual text rendering. For each prompt, we extract the intended in-image text as the target and apply PaddleOCR [32] to recognize the generated content. We then compute a normalized multiset intersection-over-union score between the recognized and target text, matching English at the word level and Chinese at the character level. Compared with exact matching, this graded reward better captures partially correct generations while remaining sensitive to omissions, duplications, and rendering errors.",
+    "Aesthetic Reward.\nAesthetic quality is difficult to capture with hand-crafted objectives, as it jointly reflects composition, visual fidelity, semantic consistency, stylistic coherence, and broader human preference. We therefore adopt HPSv3++ [76] as the preference reward $R_{\\mathrm{HPSv3++}}$. Its capability- and iteration-aware training makes it particularly suitable for RL post-training, where the model distribution continuously shifts as generation quality improves. This provides more robust and adaptive preference supervision than scorers trained on a fixed generation distribution, helping the model pursue perceptual improvements without overfitting to a narrow reward landscape.  \nOCR Reward.\nPreference rewards alone are insufficient for typography, where visually plausible images may still contain missing, duplicated, or malformed text. We therefore introduce an explicit OCR reward. Target transcriptions are extracted from text spans specified in the prompt, while generated images are recognized using PaddleOCR [32]. After normalizing case, punctuation, and whitespace, English text is tokenized into words and Chinese text into characters. Let $g_{t}$ and $o_{t}$ denote the multiplicities of token $t$ in the target and OCR transcription, respectively. We define:  \nEquation ((7))\n$$\nR_{\\mathrm{ocr}}=\\frac{\\sum_{t}\\min(g_{t},o_{t})}{\\sum_{t}\\max(g_{t},o_{t})}.\n$$  \nThis multiset IoU rewards correct token occurrences while symmetrically penalizing omissions, hallucinations, and errors in repeated text. It is also robust to unreliable OCR reading order in dense or multi-region layouts. During post-training, aesthetic and OCR prompts use their respective rewards and are interleaved at the epoch level, avoiding the need to combine heterogeneous reward scales within each sample.  \nInfographic Reward.\nNote that we do not introduce an additional infographic-specific reward model. Instead, the infographic expert reuses the OCR and aesthetic rewards above through stage-conditioned and task-conditioned routing. Here, the first training stage is optimized exclusively with the OCR reward for warmup:  \nEquation ((8))\n$$\nR_{\\mathrm{info}}^{warmup}(\\hat{\\mathbf{x}}_{\\theta},\\mathbf{c})=R_{\\mathrm{ocr}}(\\hat{\\mathbf{x}}_{\\theta},\\mathbf{c}),\n$$  \nwhere $\\hat{\\mathbf{x}}_{\\theta}$ is a generated image and $\\mathbf{c}$ is its corresponding text prompt.\nIn the final training stage, let $m\\in\\{\\mathrm{ocr},\\mathrm{aesthetic}\\}$ identify the prompt partition. The reward is assigned as follows:  \nEquation ((9))\n$$\nR_{\\mathrm{info}}^{final}(\\hat{\\mathbf{x}}_{\\theta},\\mathbf{c},m)=\\begin{cases}R_{\\mathrm{ocr}}(\\hat{\\mathbf{x}}_{\\theta},\\mathbf{c}),&m=\\mathrm{ocr},\\\\\nR_{\\mathrm{HPSv3++}}(\\hat{\\mathbf{x}}_{\\theta},\\mathbf{c}),&m=\\mathrm{aesthetic}.\\end{cases}\n$$",
+    "We generate 16 candidates per prompt using a 30-step trajectory with guidance scale 4.0 and timestep shift 3, and sample a contiguous five-step optimization window from the first ten steps. Rollouts use Precise sampling with $\\eta=1.5$ [163], while GRPO-Guard [124] stabilizes optimization under sparse high OCR rewards. Training uses dynamic resolutions and aspect ratios, a constant learning rate of $2\\times 10^{-5}$, and a reference-policy KL coefficient of $0.02$. We also freeze the final generation Transformer block, flow-matching output head, and output-normalization layer during RL.  \n(3) Editing Expert.\nEffective image editing requires balancing three objectives: instruction adherence, preservation of unedited content, and the visual quality of edited regions [131, 123]. Under-editing can leave instructions only partially fulfilled, while over-editing may alter content that should remain unchanged. The editing expert must therefore learn what to modify, what to preserve, and how to integrate the requested changes naturally into the source image.  \nThe editing expert is trained with a constant learning rate of learning rate of $4\\times 10^{-5}$, KL coefficient of $0.01$, rollout size of 24, and noise scale of $0.7$, with an exponential moving average (EMA). We avoid SDE-based trajectory sampling, as excessive stochastic perturbations can introduce residual noise and visual artifacts. Under this setup, we further introduce two editing-specific strategies for targeted reward supervision and more effective optimization.  \n(i) Multi-dimensional reward.\nWe utilize a VLM-based reward framework that evaluates editing quality along five dimensions: instruction fulfillment, edit execution, overall visual quality, text-editing quality when applicable, and preservation of unedited regions. These complementary signals provide targeted supervision for distinct failure modes while jointly balancing edit accuracy, visual fidelity, and content preservation.  \n(ii) Progressive training.\nWe adopt a progressive sliding-window strategy, shifting optimization from early stages that establish semantics to later stages that refine textures. This coarse-to-fine progression first secures the intended structural change and then improves local fidelity and visual integration with the surrounding content.  \nInfographic Expert.",
+    "In the final training stage, let $m\\in\\{\\mathrm{ocr},\\mathrm{aesthetic}\\}$ identify the prompt partition. The reward is assigned as follows:  \nEquation ((9))  \nThe OCR and HPSv3++ scores are therefore not summed or normalized against one another. This routing preserves their distinct scales and semantics while providing complementary supervision for textual fidelity and perceptual quality.  \nEditing Reward.\nReinforcement learning for image editing requires reward signals that assess not only whether the requested change is successfully completed, but also whether the result is visually convincing and unrelated source content is preserved. A single holistic score can obscure these distinct failure modes, allowing strength in one aspect to compensate for critical errors in another. We therefore employ a set of dimension-specific rewards. (i) Instruction fulfillment measures the semantic correctness of the edited result and the completeness of the requested changes. (ii) Edit execution quality evaluates the visual quality of the target region and how naturally it integrates with the surrounding context. (iii) Overall visual quality captures global technical quality and coherence with the intended style. When visible text modification is required, (iv) text-editing quality further assesses textual correctness and rendering quality. (v) Unedited-region preservation compares the source and edited images and penalizes unintended semantic, structural, or visual changes outside the target region. For criteria with multiple sub-dimensions, we retain the minimum sub-dimension score to expose the weakest aspect. After normalization, the applicable scores are aggregated as  \nEquation ((10))\n$$\nR_{\\mathrm{edit}}=\\min\\!\\left(\\left\\{R_{\\mathrm{inst}},R_{\\mathrm{exec}},R_{\\mathrm{visual}},R_{\\mathrm{pres}}\\right\\}\\cup\\left\\{R_{\\mathrm{text}}\\ \\middle|\\ \\mathrm{text\\ edit\\ is\\ applicable}\\right\\}\\right).\n$$  \nThe text-editing criterion is omitted for instructions that do not involve text modification, while the edit-execution score is set to zero when no requested change is visibly realized. This bottleneck-style aggregation emphasizes the weakest aspect of each edit and prevents strong performance in one dimension from masking critical failures in another. As a result, the reward remains sensitive to incomplete edits, unintended modifications, and local quality defects, providing more balanced and reliable supervision for image-editing RL during the training process.",
+    "Infographic Expert.\nInfographic generation requires accurate text rendering, coherent dense layouts, clear information hierarchies, and strong overall visual quality. The infographic expert first undergoes a complete training process from infographic-oriented mid-training to task-specific RL, aiming to achieve more substantial improvements in small-text rendering and related capabilities. During mid-training, we introduce high-quality real and synthetic data and rebalance both the infographic subcategories and the mixture of infographic and other categories of data. This further improves small-text rendering, complex layout handling, information organization, and overall visual design quality.  \nHere, we further refine the infographic expert in three stages. The first improves text rendering using the same training data and text-fidelity reward as the OCR expert. The second applies direct preference optimization (DPO) [61] to curated preference pairs to enhance overall visual quality, using a constant learning rate of $5\\times 10^{-6}$, a DPO loss coefficient of $\\beta=10$, and one timestep sampled from steps 1–20 at each update. The final stage alternates text-rendering and aesthetic data, routing them separately to the text-fidelity reward and HPSv3++ [76], rather than merging the two scores.  \nThe first and final stages use group relative policy optimization (GRPO), generating 16 candidates per prompt over a 30-step trajectory with coefficients-preserving sampling (CPS) [121]. Classifier-free guidance is used only during rollout collection for reward evaluation, while the policy objective is computed from conditional predictions alone. Both stages use a constant learning rate of $2\\times 10^{-5}$ and a reference-policy KL coefficient of $0.01$.  \nStage 5: Multi-Expert On-Policy Distillation."
+  ],
+  "response": "## Aesthetic RL expert\n\n- **Sampling:** For each prompt, the method generated **16 candidates** along a **30-step trajectory**, with **guidance scale 4.0** and **timestep shift 3**. It used **coefficients-preserving sampling (CPS)** with \\(\\eta=0.7\\). At each update, it sampled one **contiguous five-step window from the first ten trajectory steps**, concentrating optimization on early denoising stages. [1]\n- **Training hyperparameters:** Training used **dynamic resolutions and aspect ratios**, a constant learning rate of \\(2\\times10^{-5}\\), and a reference-policy KL coefficient of **0.01**. The final generation Transformer block, flow-matching output head, and output-normalization layer were frozen during RL to reduce reward-induced drift. [1]\n\n## How text legibility was protected\n\nThe training did not optimize aesthetic preference alone. It **interleaved aesthetic-preference and typography data across epochs**: aesthetic samples were scored with **HPSv3++**, while typography samples were scored with a bilingual **PaddleOCR-based text-fidelity reward**. The two reward types were routed separately rather than mixed, preserving their different scales and meanings. [1]\n\nThe OCR reward compared recognized text with the prompt’s target text using a normalized multiset IoU: English was matched by words and Chinese by characters. This rewarded correct text occurrences while penalizing omissions, duplications, and malformed rendering. [1][2] Together, the typography data, explicit OCR reward, separate reward routing, and frozen late-generation layers limited deterioration in text legibility during aesthetic optimization. [1][2]\n\n## Contradiction and limitation in the supplied excerpts\n\nAnother excerpt reports **Precise sampling with \\(\\eta=1.5\\)**, a KL coefficient of **0.02**, and the same 16-candidate/30-step setup, but the excerpt does not clearly label the expert to which those values belong. [3] This conflicts with the explicitly labeled aesthetic-expert configuration in [1], which specifies **CPS with \\(\\eta=0.7\\)** and **KL \\(=0.01\\)**. Therefore, based on the supplied evidence, the aesthetic expert’s directly stated values are those in [1]; the excerpt does not establish that the alternative values in [3] apply to it.",
+  "metrics": {
+    "faithfulness": {
+      "value": 1.0,
+      "reason": "[supported] The aesthetic RL expert generated 16 candidates for each prompt along a 30-step trajectory. — The context explicitly states that for each prompt, 16 candidates are generated using a 30-step trajectory.\n[supported] The guidance scale used was 4.0. — The context mentions that a guidance scale of 4.0 is used during the generation process.\n[supported] The timestep shift used was 3. — The context specifies that a timestep shift of 3 is employed in the generation process.\n[supported] The method employed coefficients-preserving sampling (CPS) with \\(\\eta=0.7\\). — The context clearly states that coefficients-preserving sampling (CPS) with \\(\\eta=0.7\\) is adopted.\n[supported] At each update, the method sampled one contiguous five-step window from the first ten trajectory steps. — The context describes that at each update, a contiguous five-step window is uniformly sampled from the first ten trajectory steps.\n[supported] The optimization concentrated on early denoising stages. — The context indicates that the optimization focuses on early denoising stages that largely determine global content and composition.\n[supported] The training used dynamic resolutions and aspect ratios. — The context explicitly states that training uses dynamic resolutions and aspect ratios.\n[supported] The training employed a constant learning rate of \\(2\\times10^{-5}\\). — The context mentions that a constant learning rate of \\(2\\times10^{-5}\\) is used during training.\n[supported] The reference-policy KL coefficient used was 0.01. — The context specifies that a reference-policy KL coefficient of 0.01 is employed.\n[supported] The final generation Transformer block, flow-matching output head, and output-normalization layer were frozen during RL. — The context states that these layers are frozen during the RL process to reduce reward-induced drift.\n[supported] The freezing of layers aimed to reduce reward-induced drift. — The context explicitly states that the freezing of layers is intended to reduce reward-induced drift.\n[supported] The training did not optimize aesthetic preference alone. — The context indicates that the training interleaves aesthetic-preference and typography data across epochs, implying it does not focus solely on aesthetic preference.\n[supported] The training interleaved aesthetic-preference and typography data across epochs. — The context clearly states that aesthetic-preference and typography data are interleaved during training.\n[supported] Aesthetic samples were scored with HPSv3++. — The context mentions that aesthetic quality is evaluated using HPSv3++ as the preference reward.\n[supported] Typography samples were scored with a bilingual PaddleOCR-based text-fidelity reward. — The context states that typography samples are evaluated with a bilingual OCR reward based on PaddleOCR.\n[supported] The two reward types were routed separately rather than mixed. — The context specifies that the routing avoids mixing rewards with different scales and semantics.\n[supported] The separate routing preserved the different scales and meanings of the rewards. — The context indicates that separate routing helps preserve distinct scales and semantics of the rewards.\n[supported] The OCR reward compared recognized text with the prompt’s target text using a normalized multiset IoU. — The context describes how the OCR reward is computed by comparing recognized text with the target text using a normalized multiset intersection-over-union score.\n[supported] English was matched by words and Chinese by characters. — The context explicitly states that English text is matched at the word level and Chinese text at the character level.\n[supported] The reward system rewarded correct text occurrences while penalizing omissions, duplications, and malformed rendering. — The context mentions that the reward system captures correct token occurrences and penalizes various errors.\n[supported] The typography data, explicit OCR reward, separate reward routing, and frozen late-generation layers limited deterioration in text legibility during aesthetic optimization. — The context states that these measures help limit deterioration in text legibility during the optimization process.\n[supported] Another excerpt reports precise sampling with \\(\\eta=1.5\\), a KL coefficient of 0.02, and the same 16-candidate/30-step setup. — The context mentions another excerpt that reports these values, but it does not specify the expert.\n[supported] The excerpt does not clearly label the expert to which those values belong. — The context indicates that the excerpt does not specify which expert the values apply to.\n[supported] This conflicts with the explicitly labeled aesthetic-expert configuration which specifies CPS with \\(\\eta=0.7\\) and KL \\(=0.01\\). — The context states that the aesthetic expert's configuration is explicitly labeled with specific values.\n[supported] Based on the supplied evidence, the aesthetic expert’s directly stated values are those in the first source. — The context supports that the values for the aesthetic expert are directly stated in the first source.\n[supported] The excerpt does not establish that the alternative values apply to the aesthetic expert. — The context indicates that the alternative values are not clearly linked to the aesthetic expert.",
+      "statements": [
+        {
+          "statement": "The aesthetic RL expert generated 16 candidates for each prompt along a 30-step trajectory.",
+          "reason": "The context explicitly states that for each prompt, 16 candidates are generated using a 30-step trajectory.",
+          "verdict": 1
+        },
+        {
+          "statement": "The guidance scale used was 4.0.",
+          "reason": "The context mentions that a guidance scale of 4.0 is used during the generation process.",
+          "verdict": 1
+        },
+        {
+          "statement": "The timestep shift used was 3.",
+          "reason": "The context specifies that a timestep shift of 3 is employed in the generation process.",
+          "verdict": 1
+        },
+        {
+          "statement": "The method employed coefficients-preserving sampling (CPS) with \\(\\eta=0.7\\).",
+          "reason": "The context clearly states that coefficients-preserving sampling (CPS) with \\(\\eta=0.7\\) is adopted.",
+          "verdict": 1
+        },
+        {
+          "statement": "At each update, the method sampled one contiguous five-step window from the first ten trajectory steps.",
+          "reason": "The context describes that at each update, a contiguous five-step window is uniformly sampled from the first ten trajectory steps.",
+          "verdict": 1
+        },
+        {
+          "statement": "The optimization concentrated on early denoising stages.",
+          "reason": "The context indicates that the optimization focuses on early denoising stages that largely determine global content and composition.",
+          "verdict": 1
+        },
+        {
+          "statement": "The training used dynamic resolutions and aspect ratios.",
+          "reason": "The context explicitly states that training uses dynamic resolutions and aspect ratios.",
+          "verdict": 1
+        },
+        {
+          "statement": "The training employed a constant learning rate of \\(2\\times10^{-5}\\).",
+          "reason": "The context mentions that a constant learning rate of \\(2\\times10^{-5}\\) is used during training.",
+          "verdict": 1
+        },
+        {
+          "statement": "The reference-policy KL coefficient used was 0.01.",
+          "reason": "The context specifies that a reference-policy KL coefficient of 0.01 is employed.",
+          "verdict": 1
+        },
+        {
+          "statement": "The final generation Transformer block, flow-matching output head, and output-normalization layer were frozen during RL.",
+          "reason": "The context states that these layers are frozen during the RL process to reduce reward-induced drift.",
+          "verdict": 1
+        },
+        {
+          "statement": "The freezing of layers aimed to reduce reward-induced drift.",
+          "reason": "The context explicitly states that the freezing of layers is intended to reduce reward-induced drift.",
+          "verdict": 1
+        },
+        {
+          "statement": "The training did not optimize aesthetic preference alone.",
+          "reason": "The context indicates that the training interleaves aesthetic-preference and typography data across epochs, implying it does not focus solely on aesthetic preference.",
+          "verdict": 1
+        },
+        {
+          "statement": "The training interleaved aesthetic-preference and typography data across epochs.",
+          "reason": "The context clearly states that aesthetic-preference and typography data are interleaved during training.",
+          "verdict": 1
+        },
+        {
+          "statement": "Aesthetic samples were scored with HPSv3++.",
+          "reason": "The context mentions that aesthetic quality is evaluated using HPSv3++ as the preference reward.",
+          "verdict": 1
+        },
+        {
+          "statement": "Typography samples were scored with a bilingual PaddleOCR-based text-fidelity reward.",
+          "reason": "The context states that typography samples are evaluated with a bilingual OCR reward based on PaddleOCR.",
+          "verdict": 1
+        },
+        {
+          "statement": "The two reward types were routed separately rather than mixed.",
+          "reason": "The context specifies that the routing avoids mixing rewards with different scales and semantics.",
+          "verdict": 1
+        },
+        {
+          "statement": "The separate routing preserved the different scales and meanings of the rewards.",
+          "reason": "The context indicates that separate routing helps preserve distinct scales and semantics of the rewards.",
+          "verdict": 1
+        },
+        {
+          "statement": "The OCR reward compared recognized text with the prompt’s target text using a normalized multiset IoU.",
+          "reason": "The context describes how the OCR reward is computed by comparing recognized text with the target text using a normalized multiset intersection-over-union score.",
+          "verdict": 1
+        },
+        {
+          "statement": "English was matched by words and Chinese by characters.",
+          "reason": "The context explicitly states that English text is matched at the word level and Chinese text at the character level.",
+          "verdict": 1
+        },
+        {
+          "statement": "The reward system rewarded correct text occurrences while penalizing omissions, duplications, and malformed rendering.",
+          "reason": "The context mentions that the reward system captures correct token occurrences and penalizes various errors.",
+          "verdict": 1
+        },
+        {
+          "statement": "The typography data, explicit OCR reward, separate reward routing, and frozen late-generation layers limited deterioration in text legibility during aesthetic optimization.",
+          "reason": "The context states that these measures help limit deterioration in text legibility during the optimization process.",
+          "verdict": 1
+        },
+        {
+          "statement": "Another excerpt reports precise sampling with \\(\\eta=1.5\\), a KL coefficient of 0.02, and the same 16-candidate/30-step setup.",
+          "reason": "The context mentions another excerpt that reports these values, but it does not specify the expert.",
+          "verdict": 1
+        },
+        {
+          "statement": "The excerpt does not clearly label the expert to which those values belong.",
+          "reason": "The context indicates that the excerpt does not specify which expert the values apply to.",
+          "verdict": 1
+        },
+        {
+          "statement": "This conflicts with the explicitly labeled aesthetic-expert configuration which specifies CPS with \\(\\eta=0.7\\) and KL \\(=0.01\\).",
+          "reason": "The context states that the aesthetic expert's configuration is explicitly labeled with specific values.",
+          "verdict": 1
+        },
+        {
+          "statement": "Based on the supplied evidence, the aesthetic expert’s directly stated values are those in the first source.",
+          "reason": "The context supports that the values for the aesthetic expert are directly stated in the first source.",
+          "verdict": 1
+        },
+        {
+          "statement": "The excerpt does not establish that the alternative values apply to the aesthetic expert.",
+          "reason": "The context indicates that the alternative values are not clearly linked to the aesthetic expert.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.7815252818008719,
+      "reason": "generated='What are the training hyperparameters used for the aesthetic RL expert?' similarity=0.7815 noncommittal=0; generated='What are the training hyperparameters used for the aesthetic RL expert?' similarity=0.7815 noncommittal=0; generated='What are the training hyperparameters used for the aesthetic RL expert?' similarity=0.7815 noncommittal=0",
+      "generated_questions": [
+        "What are the training hyperparameters used for the aesthetic RL expert?",
+        "What are the training hyperparameters used for the aesthetic RL expert?",
+        "What are the training hyperparameters used for the aesthetic RL expert?"
+      ],
+      "noncommittal": [
+        0,
+        0,
+        0
+      ],
+      "similarities": [
+        0.7815252818008719,
+        0.7815252818008719,
+        0.7815252818008719
+      ],
+      "all_noncommittal": false
+    }
+  }
+}

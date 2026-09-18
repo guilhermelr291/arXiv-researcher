@@ -1,0 +1,112 @@
+{
+  "scored_at": "2026-09-16T20:25:29Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abd4-eb1f-7a72-a1a4-fbb70aba7277",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "What four sequential checks does each candidate chunk pass through in DocuSearch's per-chunk agentic evaluation loop? (2609.01617)",
+  "retrieved_contexts": [
+    "Each $c\\in\\mathcal{E}$ passes four sequential LLM-driven\nchecks, as shown in Figure[2](#S4.F2 \"Figure 2 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\"):  \n1. 1.  \nContext Need Detection. The LLM assesses\nwhether $c$ is a fragment that requires neighbours\n$c_{\\mathrm{prev}}$ or $c_{\\mathrm{next}}$ to make\nsense. If so, neighbours are fetched and appended,\nfor up to $L=2$ iterations.\n2. 2.  \nSufficiency Scoring. The expanded chunk\n$\\tilde{c}$ proceeds only if the LLM assigns a\nsufficiency score $\\sigma(\\tilde{c},q)\\geq\\tau=7$\non a $1$–$10$ scale. Chunks that do not clear this\nbar are skipped immediately.\n3. 3.  \nAnswer Generation. Given $\\tilde{c}$,\nthe query $q$, and the selected template $t^{\\*}$, the\nLLM generates candidate answer $\\hat{a}$ at temperature\n$T=0.0$ for reproducibility.\n4. 4.  \nGroundedness Verification. A separate\nLLM call checks whether $\\hat{a}$ is fully supported\nby $\\tilde{c}$. If it is, $a$ is set to $\\hat{a}$ and\nthe pipeline terminates (method=per_chunk).  \nWhen no chunk clears all four checks, the fallback merges\nall expanded contexts into $\\tilde{\\mathcal{E}}$, generates\na consolidated answer (method=fallback_merge),\nand runs one final groundedness check before anything is\nreturned to the user.",
+    "DocuSearch tackles the four sub-problems through a layered\nmulti-agent pipeline split into two phases, illustrated in\nFigure[1](#S4.F1 \"Figure 1 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\") and Figure[2](#S4.F2 \"Figure 2 ‣ IV High-Level Architecture ‣ Hybrid Retrieval-Augmented Generation with Knowledge Graph Expansion, RRF Fusion, and Per-Chunk Grounded Evaluation for Enterprise Document Search\").\nPre-MMR Phase. When a query $q$ arrives, a Template\nSelection agent first classifies it into one of five answer\ntemplates $\\mathcal{T}$. A BM25 Keyword agent then pulls\nout domain-specific terms, and a Vendor Detection agent\noptionally narrows all three retrieval signals to a specific\nvendor namespace $v\\in\\mathcal{V}$. Dense vector search,\nBM25 full-text search, and KG neighbour expansion run in\nparallel, and their ranked results are merged by weighted\nRRF, reranked by a cross-encoder, and filtered by MMR to\nproduce the evidence set $\\mathcal{E}$.\nPost-MMR Phase. Each chunk $c\\in\\mathcal{E}$ is\nevaluated individually by four sequential LLM-driven nodes:\ncontext need detection, sufficiency scoring against a\nthreshold $\\tau=7$, answer generation, and groundedness\nverification. The first chunk that clears all four checks\nproduces the final answer. When no individual chunk passes,\na fallback merges all expanded contexts, generates a\nconsolidated answer, and runs one final groundedness check\nbefore returning anything to the user.",
+    "Five aspects of DocuSearch distinguish it from existing\nRAG systems.\nPer-Chunk Agentic Evaluation Loop. Most RAG\npipelines concatenate all retrieved chunks and generate\none answer in a single forward pass. DocuSearch instead\nevaluates each $c\\in\\mathcal{E}$\nindependently through four sequential checks. A chunk\nmust score $\\sigma(\\tilde{c},q)\\geq\\tau=7$ before\ngeneration is even attempted, and the returned answer is\nexplicitly verified as grounded before being committed.\nThis eliminates a whole class of hallucinations that arise\nwhen an LLM is asked to synthesise an answer from a\nmixed bag of partially relevant context.\nWeighted Three-Signal RRF Fusion. Most hybrid RAG\nsystems stop at two signals — typically dense plus sparse.\nA third, KG neighbour expansion, is added as an explicit\nsignal in the RRF formula, with empirically tuned weights\n$w_{v}=0.50$, $w_{b}=0.35$, $w_{kg}=0.15$. The KG\nsignal’s contribution is modest but consistent: it reliably\nsurfaces structural neighbours that neither cosine\nsimilarity nor BM25 would rank highly on their own.\nDynamic Neighbour Context Expansion. Rather than\nusing larger fixed chunk sizes at indexing time (which\nreduces retrieval precision), DocuSearch detects\nfragmentation at query time. When a retrieved chunk is\nidentified as a fragment, up to $L=2$ levels of\nneighbouring chunks are fetched from the metadata database\non the fly, recovering coherent multi-step procedures\nwithout any pre-processing trade-offs.\nVendor-Aware Retrieval Scoping. A vendor\nregistry is built from the document metadata that maps each\n$v\\in\\mathcal{V}$ to its set of document identifiers.\nWhen the Vendor Detection agent identifies a vendor\nreference in the query, all three retrieval signals are\nscoped to that vendor’s documents. The noise reduction for\nvendor-specific configuration and troubleshooting queries\nis substantial.\nLangGraph-Orchestrated Agentic Pipeline. The\nentire pipeline runs as a stateful LangGraph DAG\n[5] with five explicitly defined nodes.\nEvery intermediate state is observable, serialisable, and\nindependently replaceable — which turned out to be\npractically important during development, since individual\ncomponents could be swapped without disturbing anything\nupstream or downstream."
+  ],
+  "response": "## Four sequential checks in DocuSearch\n\nFor each candidate chunk \\(c\\) in the evidence set, DocuSearch applies these checks in order:\n\n1. **Context Need Detection** — The LLM determines whether the chunk is fragmented and needs its previous or next neighbouring chunks. If necessary, neighbours are fetched and appended for up to two iterations. [1]\n\n2. **Sufficiency Scoring** — The expanded chunk \\(\\tilde{c}\\) must receive a sufficiency score of at least \\(\\tau=7\\) on a 1–10 scale. Chunks below this threshold are skipped. [1][2]\n\n3. **Answer Generation** — For a sufficient expanded chunk, the LLM uses \\(\\tilde{c}\\), the query \\(q\\), and the selected answer template to generate a candidate answer \\(\\hat{a}\\). [1]\n\n4. **Groundedness Verification** — A separate LLM call checks whether the generated answer is fully supported by the expanded chunk. If it is, the answer is accepted and the per-chunk process terminates. [1]\n\nThe first chunk that passes all four checks produces the final answer; if none does, DocuSearch uses a fallback that merges the expanded contexts and performs one final groundedness check. [2]",
+  "metrics": {
+    "faithfulness": {
+      "value": 1.0,
+      "reason": "[supported] DocuSearch applies four sequential checks to each candidate chunk in the evidence set. — The context explicitly states that each chunk is evaluated individually by four sequential checks.\n[supported] The first check is Context Need Detection. — The context clearly lists Context Need Detection as the first of the four checks.\n[supported] The LLM determines whether the chunk is fragmented and needs its previous or next neighboring chunks. — The context describes that the LLM assesses whether a chunk requires neighbors to make sense, indicating it determines fragmentation.\n[supported] If necessary, neighbors are fetched and appended for up to two iterations. — The context states that if a chunk is fragmented, neighbors are fetched and appended for up to two iterations.\n[supported] The second check is Sufficiency Scoring. — The context explicitly states that Sufficiency Scoring is the second check in the sequence.\n[supported] The expanded chunk must receive a sufficiency score of at least seven on a one to ten scale. — The context specifies that the LLM assigns a sufficiency score and that it must be at least seven.\n[supported] Chunks below this threshold are skipped. — The context mentions that chunks that do not clear the sufficiency score are skipped immediately.\n[supported] The third check is Answer Generation. — The context clearly states that Answer Generation is the third check in the evaluation process.\n[supported] For a sufficient expanded chunk, the LLM uses the expanded chunk, the query, and the selected answer template to generate a candidate answer. — The context describes that given a sufficient expanded chunk, the LLM generates a candidate answer using the expanded chunk, query, and template.\n[supported] The fourth check is Groundedness Verification. — The context explicitly states that Groundedness Verification is the fourth check.\n[supported] A separate LLM call checks whether the generated answer is fully supported by the expanded chunk. — The context mentions that a separate LLM call verifies if the generated answer is supported by the expanded chunk.\n[supported] If the generated answer is fully supported, the answer is accepted and the per-chunk process terminates. — The context states that if the generated answer is fully supported, it is accepted and the process terminates.\n[supported] The first chunk that passes all four checks produces the final answer. — The context indicates that the first chunk that clears all four checks produces the final answer.\n[supported] If no chunk passes all four checks, DocuSearch uses a fallback that merges the expanded contexts and performs one final groundedness check. — The context describes that if no chunk passes, a fallback merges expanded contexts and performs a final groundedness check.",
+      "statements": [
+        {
+          "statement": "DocuSearch applies four sequential checks to each candidate chunk in the evidence set.",
+          "reason": "The context explicitly states that each chunk is evaluated individually by four sequential checks.",
+          "verdict": 1
+        },
+        {
+          "statement": "The first check is Context Need Detection.",
+          "reason": "The context clearly lists Context Need Detection as the first of the four checks.",
+          "verdict": 1
+        },
+        {
+          "statement": "The LLM determines whether the chunk is fragmented and needs its previous or next neighboring chunks.",
+          "reason": "The context describes that the LLM assesses whether a chunk requires neighbors to make sense, indicating it determines fragmentation.",
+          "verdict": 1
+        },
+        {
+          "statement": "If necessary, neighbors are fetched and appended for up to two iterations.",
+          "reason": "The context states that if a chunk is fragmented, neighbors are fetched and appended for up to two iterations.",
+          "verdict": 1
+        },
+        {
+          "statement": "The second check is Sufficiency Scoring.",
+          "reason": "The context explicitly states that Sufficiency Scoring is the second check in the sequence.",
+          "verdict": 1
+        },
+        {
+          "statement": "The expanded chunk must receive a sufficiency score of at least seven on a one to ten scale.",
+          "reason": "The context specifies that the LLM assigns a sufficiency score and that it must be at least seven.",
+          "verdict": 1
+        },
+        {
+          "statement": "Chunks below this threshold are skipped.",
+          "reason": "The context mentions that chunks that do not clear the sufficiency score are skipped immediately.",
+          "verdict": 1
+        },
+        {
+          "statement": "The third check is Answer Generation.",
+          "reason": "The context clearly states that Answer Generation is the third check in the evaluation process.",
+          "verdict": 1
+        },
+        {
+          "statement": "For a sufficient expanded chunk, the LLM uses the expanded chunk, the query, and the selected answer template to generate a candidate answer.",
+          "reason": "The context describes that given a sufficient expanded chunk, the LLM generates a candidate answer using the expanded chunk, query, and template.",
+          "verdict": 1
+        },
+        {
+          "statement": "The fourth check is Groundedness Verification.",
+          "reason": "The context explicitly states that Groundedness Verification is the fourth check.",
+          "verdict": 1
+        },
+        {
+          "statement": "A separate LLM call checks whether the generated answer is fully supported by the expanded chunk.",
+          "reason": "The context mentions that a separate LLM call verifies if the generated answer is supported by the expanded chunk.",
+          "verdict": 1
+        },
+        {
+          "statement": "If the generated answer is fully supported, the answer is accepted and the per-chunk process terminates.",
+          "reason": "The context states that if the generated answer is fully supported, it is accepted and the process terminates.",
+          "verdict": 1
+        },
+        {
+          "statement": "The first chunk that passes all four checks produces the final answer.",
+          "reason": "The context indicates that the first chunk that clears all four checks produces the final answer.",
+          "verdict": 1
+        },
+        {
+          "statement": "If no chunk passes all four checks, DocuSearch uses a fallback that merges the expanded contexts and performs one final groundedness check.",
+          "reason": "The context describes that if no chunk passes, a fallback merges expanded contexts and performs a final groundedness check.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.735455190710645,
+      "reason": "generated='What are the four sequential checks applied in DocuSearch?' similarity=0.7355 noncommittal=0; generated='What are the four sequential checks applied in DocuSearch?' similarity=0.7355 noncommittal=0; generated='What are the four sequential checks applied in DocuSearch?' similarity=0.7355 noncommittal=0",
+      "generated_questions": [
+        "What are the four sequential checks applied in DocuSearch?",
+        "What are the four sequential checks applied in DocuSearch?",
+        "What are the four sequential checks applied in DocuSearch?"
+      ],
+      "noncommittal": [
+        0,
+        0,
+        0
+      ],
+      "similarities": [
+        0.735455190710645,
+        0.735455190710645,
+        0.735455190710645
+      ],
+      "all_noncommittal": false
+    }
+  }
+}

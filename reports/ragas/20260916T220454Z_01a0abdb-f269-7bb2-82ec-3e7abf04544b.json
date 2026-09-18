@@ -1,0 +1,75 @@
+{
+  "scored_at": "2026-09-16T22:04:54Z",
+  "project": "plan-based-researcher",
+  "langsmith_run_id": "01a0abdb-f269-7bb2-82ec-3e7abf04544b",
+  "judge_model": "gpt-4o-mini",
+  "embedding_model": "text-embedding-3-small",
+  "user_input": "What is the architectural configuration of SenseNova-U1.5 in terms of patch size, number of layers, attention heads, and parameter count? (2609.11929)",
+  "retrieved_contexts": [
+    "SenseNova-U1.5: Towards Native Unified Visual Intelligence > 3 Methodology > 3.1 Model architecture\nTable 1: Configurations of SenseNova-U1.5. It features a high spatial compression ratio, Pre-Buffer design, native RoPE for unified spatiotemporal encoding, and a Mixture-of-Transformers architecture for joint multimodal understanding and generation.\n| Configuration | Patch Size | Pre-Buffer | # Layers | # Heads (Q/KV) | Head Size (T/H/W) | Hidden Size | # Parameters (Und/Gen) |\n| --- | --- | --- | --- | --- | --- | --- | --- |\n| SenseNova-U1.5 | $32\\times 32$ | ✓ | 42 | 32 / 8 | 64 / 32 / 32 | 4,096 | 8.2B / 8.2B |\n"
+  ],
+  "response": "## SenseNova-U1.5 architecture\n\nAccording to Table 1:\n\n- **Patch size:** \\(32 \\times 32\\)\n- **Number of layers:** 42\n- **Attention heads:** 32 query heads / 8 key-value heads\n- **Parameter count:** 8.2B for understanding and 8.2B for generation [1]\n\nThe table reports the parameter counts separately as **8.2B / 8.2B**, so it does not explicitly state a single combined total for both configurations [1].",
+  "metrics": {
+    "faithfulness": {
+      "value": 1.0,
+      "reason": "[supported] The architectural configuration of SenseNova-U1.5 includes a patch size of 32 by 32. — The context explicitly states that the patch size for SenseNova-U1.5 is $32\\times 32$.\n[supported] SenseNova-U1.5 has 42 layers. — The context clearly mentions that SenseNova-U1.5 has 42 layers.\n[supported] SenseNova-U1.5 utilizes 32 query heads and 8 key-value heads for attention. — The context specifies that SenseNova-U1.5 has 32 query heads and 8 key-value heads.\n[supported] The parameter count for understanding in SenseNova-U1.5 is 8.2 billion. — The context states that the parameter count for understanding is 8.2 billion.\n[supported] The parameter count for generation in SenseNova-U1.5 is 8.2 billion. — The context states that the parameter count for generation is also 8.2 billion.\n[supported] The table reports the parameter counts separately as 8.2 billion for understanding and 8.2 billion for generation. — The context indicates that the parameter counts are reported separately as 8.2 billion for both understanding and generation.\n[supported] The table does not explicitly state a single combined total for both configurations. — The context does not provide a combined total for the parameter counts, only separate values.",
+      "statements": [
+        {
+          "statement": "The architectural configuration of SenseNova-U1.5 includes a patch size of 32 by 32.",
+          "reason": "The context explicitly states that the patch size for SenseNova-U1.5 is $32\\times 32$.",
+          "verdict": 1
+        },
+        {
+          "statement": "SenseNova-U1.5 has 42 layers.",
+          "reason": "The context clearly mentions that SenseNova-U1.5 has 42 layers.",
+          "verdict": 1
+        },
+        {
+          "statement": "SenseNova-U1.5 utilizes 32 query heads and 8 key-value heads for attention.",
+          "reason": "The context specifies that SenseNova-U1.5 has 32 query heads and 8 key-value heads.",
+          "verdict": 1
+        },
+        {
+          "statement": "The parameter count for understanding in SenseNova-U1.5 is 8.2 billion.",
+          "reason": "The context states that the parameter count for understanding is 8.2 billion.",
+          "verdict": 1
+        },
+        {
+          "statement": "The parameter count for generation in SenseNova-U1.5 is 8.2 billion.",
+          "reason": "The context states that the parameter count for generation is also 8.2 billion.",
+          "verdict": 1
+        },
+        {
+          "statement": "The table reports the parameter counts separately as 8.2 billion for understanding and 8.2 billion for generation.",
+          "reason": "The context indicates that the parameter counts are reported separately as 8.2 billion for both understanding and generation.",
+          "verdict": 1
+        },
+        {
+          "statement": "The table does not explicitly state a single combined total for both configurations.",
+          "reason": "The context does not provide a combined total for the parameter counts, only separate values.",
+          "verdict": 1
+        }
+      ]
+    },
+    "answer_relevancy": {
+      "value": 0.7268210827617588,
+      "reason": "generated='What are the key specifications of the SenseNova-U1.5 architecture?' similarity=0.7268 noncommittal=0; generated='What are the key specifications of the SenseNova-U1.5 architecture?' similarity=0.7268 noncommittal=0; generated='What are the key specifications of the SenseNova-U1.5 architecture?' similarity=0.7268 noncommittal=0",
+      "generated_questions": [
+        "What are the key specifications of the SenseNova-U1.5 architecture?",
+        "What are the key specifications of the SenseNova-U1.5 architecture?",
+        "What are the key specifications of the SenseNova-U1.5 architecture?"
+      ],
+      "noncommittal": [
+        0,
+        0,
+        0
+      ],
+      "similarities": [
+        0.7268210827617588,
+        0.7268210827617588,
+        0.7268210827617588
+      ],
+      "all_noncommittal": false
+    }
+  }
+}
