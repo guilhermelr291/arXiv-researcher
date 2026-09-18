@@ -1,0 +1,99 @@
+{
+  "schema": 1,
+  "promote_threshold": 2,
+  "window_days": 45,
+  "quarantine_threshold": 2,
+  "next_id": 6,
+  "lessons": [
+    {
+      "id": "L-001",
+      "key": "ac_gap::assert the encoder class name and the cache control and x accel buffering literals at the assertion not an sse body substring or a helper return map",
+      "text": "Assert the encoder class name and the Cache-Control and X-Accel-Buffering literals at the assertion, not an SSE body substring or a helper return map.",
+      "signal": "ac_gap",
+      "scope": "api",
+      "status": "candidate",
+      "features": [
+        "agui-frontend"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "C32 tests/test_agent_route.py:178 (api)"
+      ],
+      "created": "2026-09-17T18:53:55Z",
+      "last_seen": "2026-09-17T18:53:55Z"
+    },
+    {
+      "id": "L-002",
+      "key": "ac_gap::a screen that must call a named http method and path must assert that fetch not only that the input waits for rendered messages",
+      "text": "A screen that must call a named HTTP method and path must assert that fetch, not only that the input waits for rendered messages.",
+      "signal": "ac_gap",
+      "scope": "web",
+      "status": "candidate",
+      "features": [
+        "agui-frontend"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "C45 web/lib/desk.test.tsx:86 (web)"
+      ],
+      "created": "2026-09-17T18:53:55Z",
+      "last_seen": "2026-09-17T18:53:55Z"
+    },
+    {
+      "id": "L-003",
+      "key": "ac_gap::assert the token custom property the check names on the product component not a classname regex against fixture html",
+      "text": "Assert the token custom property the check names on the product component, not a className regex against fixture HTML.",
+      "signal": "ac_gap",
+      "scope": "web",
+      "status": "candidate",
+      "features": [
+        "agui-frontend"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "C51 web/lib/desk.test.tsx:196 (web)"
+      ],
+      "created": "2026-09-17T18:53:55Z",
+      "last_seen": "2026-09-17T18:53:55Z"
+    },
+    {
+      "id": "L-004",
+      "key": "ac_gap::assert overlay geometry the check names side stacking unchanged width a truthy computed style is not a layout proof",
+      "text": "Assert overlay geometry the check names (side, stacking, unchanged width); a truthy computed style is not a layout proof.",
+      "signal": "ac_gap",
+      "scope": "web",
+      "status": "candidate",
+      "features": [
+        "agui-frontend"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "C63 web/lib/desk.test.tsx:347 (web)"
+      ],
+      "created": "2026-09-17T18:53:55Z",
+      "last_seen": "2026-09-17T18:53:55Z"
+    },
+    {
+      "id": "L-005",
+      "key": "ac_gap::assert the token values and lengths the check names 2px accent 16px unboxed not only css class presence",
+      "text": "Assert the token values and lengths the check names (2px, --accent, 16px, unboxed), not only CSS class presence.",
+      "signal": "ac_gap",
+      "scope": "web",
+      "status": "candidate",
+      "features": [
+        "agui-frontend"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "C65 web/lib/desk.test.tsx:374 (web)"
+      ],
+      "created": "2026-09-17T18:53:55Z",
+      "last_seen": "2026-09-17T18:53:55Z"
+    }
+  ]
+}

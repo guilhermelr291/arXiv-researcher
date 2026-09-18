@@ -15,3 +15,4 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = 8001
     research_timeout_seconds: int = 120
+    web_origin: str = "http://localhost:3000"

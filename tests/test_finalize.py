@@ -84,6 +84,105 @@ class FinalizeTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(payloads[0]["event"], "error")
         self.assertEqual(payloads[0]["data"]["message"], "research failed boom")
 
+    def _turn_state(self, **overrides) -> dict:
+        state = {
+            "outcome": "done",
+            "writer_markdown": "Grounded answer [1]",
+            "writer_message_id": "msg-writer-1",
+            "gate": {
+                "in_domain": True,
+                "language": "en",
+                "reason": "in scope",
+            },
+            "plan": [
+                {"agent": "search", "task": "Find LoRA papers"},
+                {"agent": "writer", "task": "Write the answer"},
+            ],
+            "passed_steps": [0],
+            "eval_by_step": {
+                "0": {"status": "pass", "feedback": "ranking is usable"},
+            },
+            "steps_executed": 2,
+            "started_at_ms": 1_000,
+            "citations": [
+                {
+                    "n": 1,
+                    "chunk_id": "c1",
+                    "arxiv_id": "2401.00001",
+                    "title": "LoRA",
+                    "year": 2024,
+                    "url": "https://arxiv.org/abs/2401.00001",
+                    "excerpt": "low-rank",
+                }
+            ],
+        }
+        state.update(overrides)
+        return state
+
+    def _aimessage(self, update: dict):
+        messages = update.get("messages") or []
+        self.assertEqual(len(messages), 1)
+        return messages[0]
+
+    async def test_done_appends_aimessage_with_writer_id(self) -> None:
+        finalize = make_finalize_node()
+        with patch(_WRITER, _spy_stream_writer([])):
+            update = await finalize(self._turn_state())
+        message = self._aimessage(update)
+        self.assertEqual(getattr(message, "content", None), "Grounded answer [1]")
+        self.assertEqual(getattr(message, "id", None), "msg-writer-1")
+
+    async def test_non_done_appends_aimessage_with_reason(self) -> None:
+        cases = (
+            ("refused", "out of scope", {"gate": {"reason": "out of scope"}}),
+            (
+                "insufficient",
+                "not enough papers",
+                {"last_eval": {"feedback": "not enough papers"}},
+            ),
+            ("error", "boom", {"error_message": "boom"}),
+        )
+        finalize = make_finalize_node()
+        for outcome, reason, extra in cases:
+            with self.subTest(outcome=outcome):
+                with patch(_WRITER, _spy_stream_writer([])):
+                    update = await finalize(
+                        self._turn_state(
+                            outcome=outcome,
+                            writer_markdown="",
+                            writer_message_id=f"msg-{outcome}",
+                            **extra,
+                        )
+                    )
+                message = self._aimessage(update)
+                self.assertEqual(getattr(message, "content", None), reason)
+                metadata = getattr(message, "response_metadata", {}) or {}
+                self.assertEqual(metadata.get("outcome"), outcome)
+
+    async def test_aimessage_metadata_key_set(self) -> None:
+        finalize = make_finalize_node()
+        with patch(_WRITER, _spy_stream_writer([])):
+            update = await finalize(self._turn_state())
+        metadata = getattr(self._aimessage(update), "response_metadata", {}) or {}
+        self.assertEqual(
+            list(metadata),
+            ["outcome", "gate", "plan", "steps", "citations"],
+        )
+
+    async def test_plan_item_projection_fields(self) -> None:
+        finalize = make_finalize_node()
+        with patch(_WRITER, _spy_stream_writer([])):
+            update = await finalize(self._turn_state())
+        metadata = getattr(self._aimessage(update), "response_metadata", {}) or {}
+        self.assertTrue(metadata["plan"])
+        for item in metadata["plan"]:
+            self.assertEqual(
+                set(item),
+                {"index", "agent", "task", "status", "feedback"},
+            )
+        steps = metadata["steps"]
+        self.assertEqual(set(steps), {"count", "elapsed_ms"})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -6,7 +6,6 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 .env
-.chainlit/
 dist/
 build/
 /graph.png
@@ -15,3 +14,7 @@ _tmp_*
 .files/
 .tlc
 .playwright
+web/node_modules/
+web/.next/
+
+node_modules/

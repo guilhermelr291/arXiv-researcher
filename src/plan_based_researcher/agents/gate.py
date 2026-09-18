@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from langchain_openai import ChatOpenAI
 
+from plan_based_researcher.agents.history import format_transcript, last_exchanges
 from plan_based_researcher.agents.registry import REGISTRY
 from plan_based_researcher.api.schemas import GateDecision
+from plan_based_researcher.policy import Policy
 
 _SYSTEM_PROMPT = (
     "You are a domain gate for an AI/ML student researcher. "
@@ -27,10 +29,14 @@ class GateRunner:
         )
 
     async def run(self, state: dict) -> dict:
+        transcript = format_transcript(
+            last_exchanges(state.get("messages"), Policy.history_window_exchanges)
+        )
+        human = transcript or str(state.get("query") or "")
         decision = await self._structured.ainvoke(
             [
                 ("system", _SYSTEM_PROMPT),
-                ("human", state["query"]),
+                ("human", human),
             ]
         )
         return {

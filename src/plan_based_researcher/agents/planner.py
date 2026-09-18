@@ -6,8 +6,10 @@ import json
 
 from langchain_openai import ChatOpenAI
 
+from plan_based_researcher.agents.history import format_transcript, last_exchanges
 from plan_based_researcher.agents.registry import PLAN_AGENTS, REGISTRY, planner_prompt_abilities
 from plan_based_researcher.api.schemas import ResearchPlan
+from plan_based_researcher.policy import Policy
 
 __all__ = ["PlannerRunner"]
 
@@ -26,7 +28,16 @@ _ENGLISH_PLAN_LOCK = (
 def _papers_blob(papers: object) -> str:
     if not papers:
         return "(none)"
-    return json.dumps(papers, default=str)
+    if not isinstance(papers, list):
+        return json.dumps(papers, default=str)
+    lines: list[str] = []
+    for paper in papers:
+        if not isinstance(paper, dict):
+            continue
+        arxiv_id = paper.get("arxiv_id") or ""
+        title = paper.get("title") or ""
+        lines.append(f"{arxiv_id} {title}".strip())
+    return "\n".join(lines) if lines else json.dumps(papers, default=str)
 
 
 def _plan_steps(state: dict) -> list:
@@ -219,6 +230,9 @@ class PlannerRunner:
     async def run(self, state: dict) -> dict:
         query = state.get("query") or ""
         papers = state.get("papers") or []
+        transcript = format_transcript(
+            last_exchanges(state.get("messages"), Policy.history_window_exchanges)
+        )
         prompt = (
             "Produce an ordered executable plan. Each step is "
             "{agent, task, reasoning, historical}.\n"
@@ -234,6 +248,7 @@ class PlannerRunner:
             "- compare: one search per distinct topic (distinct task texts) → retrieve → writer.\n"
             "- same-thread follow-up with papers already on this thread: "
             "retrieve → writer (omit search).\n"
+            "A plan may omit search for an already admitted paper.\n"
             "Do not add extra searches for variants unless the student named them.\n"
             "Set historical=True when a step needs a foundational/original paper "
             "(original Transformer, original LoRA) so the 5-year filter is off. "
@@ -243,6 +258,7 @@ class PlannerRunner:
             "Available agents:\n"
             f"{planner_prompt_abilities()}\n\n"
             f"Query:\n{query}\n\n"
+            f"Conversation:\n{transcript or query}\n\n"
             f"{_ENGLISH_PLAN_LOCK}\n\n"
             f"Papers already on this thread:\n{_papers_blob(papers)}"
         )
@@ -270,6 +286,8 @@ class PlannerRunner:
             f"Admitted papers:\n{_papers_blob(papers)}\n\n"
             f"Failed step(s) + feedback:\n{_failed_blob(state)}\n\n"
             f"Leftover unpassed steps:\n{_leftover_steps(state)}\n\n"
-            f"Replan constraints:\n{_replan_constraints(state)}"
+            f"Replan constraints:\n{_replan_constraints(state)}\n\n"
+            "A plan may omit search for an already admitted paper."
         )
+        return await self._complete(prompt)
         return await self._complete(prompt)

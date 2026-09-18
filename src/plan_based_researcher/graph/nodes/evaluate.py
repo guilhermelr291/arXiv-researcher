@@ -234,6 +234,8 @@ def make_evaluate_node(
     retrieve_eval: RetrieveEvalStrategy,
 ):
     async def evaluate(state: GraphState) -> dict:
+        if state.get("outcome") in ("refused", "done", "insufficient", "error"):
+            return {"eval_next": "finalize", "outcome": state.get("outcome")}
         last_agent = state.get("last_agent") or ""
         if _use_search_wave(state, last_agent):
             writer = get_stream_writer()

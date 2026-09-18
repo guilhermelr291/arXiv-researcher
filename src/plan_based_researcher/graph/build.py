@@ -21,6 +21,7 @@ from plan_based_researcher.graph.nodes.planner import make_planner_node
 from plan_based_researcher.graph.nodes.replan import make_replan_node
 from plan_based_researcher.graph.nodes.search import make_search_node
 from plan_based_researcher.graph.state import GraphState
+from plan_based_researcher.graph.wrap import wrap_node
 
 __all__ = ["GraphDeps", "build_graph"]
 
@@ -56,21 +57,21 @@ def build_graph(
 ):
     """Compile gate → planner → dispatch → search|execute → evaluate → replan|finalize."""
     graph = StateGraph(GraphState)
-    graph.add_node("gate", make_gate_node(deps.factory))
-    graph.add_node("planner", make_planner_node(deps.factory))
+    graph.add_node("gate", wrap_node("gate", make_gate_node(deps.factory)))
+    graph.add_node("planner", wrap_node("planner", make_planner_node(deps.factory)))
     graph.add_node(
         "dispatch",
-        make_dispatch_node(halt_before_writer=halt_before_writer),
+        wrap_node("dispatch", make_dispatch_node(halt_before_writer=halt_before_writer)),
         destinations=("search", "execute", "finalize"),
     )
-    graph.add_node("search", make_search_node(deps.factory))
-    graph.add_node("execute", make_execute_node(deps.factory))
+    graph.add_node("search", wrap_node("search", make_search_node(deps.factory)))
+    graph.add_node("execute", wrap_node("execute", make_execute_node(deps.factory)))
     graph.add_node(
         "evaluate",
-        make_evaluate_node(deps.search_eval, deps.retrieve_eval),
+        wrap_node("evaluate", make_evaluate_node(deps.search_eval, deps.retrieve_eval)),
     )
-    graph.add_node("replan", make_replan_node(deps.factory))
-    graph.add_node("finalize", make_finalize_node())
+    graph.add_node("replan", wrap_node("replan", make_replan_node(deps.factory)))
+    graph.add_node("finalize", wrap_node("finalize", make_finalize_node()))
 
     graph.add_edge(START, "gate")
     graph.add_conditional_edges(

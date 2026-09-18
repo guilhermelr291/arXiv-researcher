@@ -56,6 +56,8 @@ class ResearchGraphTest(unittest.TestCase):
                 "hole_tasks",
                 "evidence_chunks",
                 "writer_markdown",
+                "writer_message_id",
+                "started_at_ms",
                 "citations",
                 "outcome",
                 "eval_next",
