@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react"
 
 import { applyEvent, applyReplay, emptyDesk, type DeskState } from "../lib/blocks"
-import { upsertRecent } from "../lib/recents"
 import { apiUrl, normalRunInput, postAgent, resumeRunInput } from "../lib/stream"
 import type { AguiMessage, SourceItem } from "../lib/types"
 import { Composer } from "./Composer"
@@ -40,6 +39,7 @@ export function Chat({ threadId: initialId, hydrate = false }: Props) {
   const [ready, setReady] = useState(!hydrate)
   const [source, setSource] = useState<SourceItem | null>(null)
   const [manualResume, setManualResume] = useState(false)
+  const [recentsTick, setRecentsTick] = useState(0)
   const autoResume = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -100,6 +100,7 @@ export function Chat({ threadId: initialId, hydrate = false }: Props) {
           setDesk((current) => applyEvent(current, event))
         },
         controller.signal,
+        () => setRecentsTick((tick) => tick + 1),
       )
       if (controller.signal.aborted) {
         setDesk((current) => ({ ...current, status: "idle" }))
@@ -149,6 +150,7 @@ export function Chat({ threadId: initialId, hydrate = false }: Props) {
         resumeRunInput(id),
         (event) => setDesk((current) => applyEvent(current, event)),
         controller.signal,
+        () => setRecentsTick((tick) => tick + 1),
       )
       if (controller.signal.aborted) {
         setDesk((current) => ({ ...current, status: "idle" }))
@@ -175,7 +177,6 @@ export function Chat({ threadId: initialId, hydrate = false }: Props) {
     if (!id) {
       id = crypto.randomUUID()
       setThreadId(id)
-      upsertRecent(id, text)
       history.replaceState(null, "", `/c/${id}`)
     }
     pinned.current = true
@@ -197,7 +198,7 @@ export function Chat({ threadId: initialId, hydrate = false }: Props) {
 
   return (
     <div className="desk">
-      <Sidebar activeId={threadId || null} />
+      <Sidebar activeId={threadId || null} refreshTick={recentsTick} />
       <SourcePanel source={source} onClose={() => setSource(null)} />
       <main className="stage">
         <header className="topbar">

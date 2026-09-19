@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-09-18
-**Current Work:** Feature `web-markdown-katex` — desk `react-markdown` + GFM + KaTeX (build, uncommitted).
+**Last Updated:** 2026-09-19
+**Current Work:** Feature `chat-state-transcript` — built locally (C1–C33 proofs green). Commits deferred until asked.
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-031: Product transcript is not the checkpointer (2026-09-19)
+
+**Decision:** Desk history lives in `threads` + `transcript_items` on the app Postgres pool. `GET /threads` lists `{threadId, title, updatedAt}`; `GET /threads/{id}` replays `AguiMessage[]` from items (not checkpoint `messages`). `status` still comes from checkpoint `next`. `POST /agent` dual-writes: `messages` still append for prompts; the adapter inserts `assistant_turn` before `RUN_FINISHED`/`RUN_ERROR`. Recents leave `localStorage`. No auth: the list is every thread on this database. No backfill. Summary/trim is a later slice.
+**Reason:** Grill-me 2026-09-19: a future summary must not erase the chat; today's checkpoint replay already last-writes `SOURCES` and drops step nodes. Plan `.specs/features/chat-state-transcript/plan.md`.
+**Trade-off:** Until auth, `GET /threads` leaks every local thread. Checkpoint-only threads 404.
+**Impact:** Amends AD-029's replay path (checkpoint `messages` → transcript) and the "recents in `localStorage` until auth" line. Does not change `POST /agent` consume path, `finalize` `AIMessage`, or prompt windows.
 
 ### AD-030: Desk assistant markdown is react-markdown + GFM + optional KaTeX (2026-09-18)
 

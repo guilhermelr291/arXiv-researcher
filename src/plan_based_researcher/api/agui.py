@@ -98,9 +98,12 @@ def _sources_items(citations: object) -> list[dict]:
 
 
 class AguiAdapter:
-    def __init__(self, graph, *, encoder: EventEncoder | None = None) -> None:
+    def __init__(
+        self, graph, *, encoder: EventEncoder | None = None, transcript=None
+    ) -> None:
         self._graph = graph
         self._encoder = encoder or EventEncoder()
+        self._transcript = transcript
 
     async def stream(
         self,
@@ -123,9 +126,44 @@ class AguiAdapter:
         plan_message_id: str | None = None
         last_plan_content: dict | None = None
         assistant_id: str | None = None
+        markdown = ""
         query_used = ""
+        step_nodes: list[dict] = []
+        started = time.monotonic()
         config = config or {"configurable": {"thread_id": thread_id}}
         stream = None
+
+        async def persist(outcome: str, reason: str | None) -> None:
+            if self._transcript is None:
+                return
+            projected = project_turn({**running, "outcome": outcome})
+            writer_id = str(running.get("writer_message_id") or "")
+            item_id = writer_id or assistant_id or run_id
+            gate = projected.get("gate") if isinstance(projected.get("gate"), dict) else {}
+            plan = projected.get("plan") if isinstance(projected.get("plan"), list) else []
+            citations = (
+                projected.get("citations")
+                if isinstance(projected.get("citations"), list)
+                else []
+            )
+            steps = projected.get("steps") if isinstance(projected.get("steps"), dict) else {}
+            elapsed = steps.get("elapsed_ms") or int(
+                max(0, (time.monotonic() - started) * 1000)
+            )
+            count = steps.get("count") or len(step_nodes)
+            payload = {
+                "outcome": outcome,
+                "content": markdown if outcome == "done" else str(reason or markdown or ""),
+                "gate": gate,
+                "plan": plan,
+                "steps": {
+                    "count": int(count or 0),
+                    "elapsed_ms": int(elapsed or 0),
+                    "nodes": [dict(node) for node in step_nodes],
+                },
+                "citations": citations,
+            }
+            await self._transcript.insert_assistant_turn(thread_id, str(item_id), payload)
         try:
             stream = self._graph.astream(
                 input,
@@ -137,6 +175,7 @@ class AguiAdapter:
             while True:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
+                    await persist("insufficient", "timeout")
                     yield encoder.encode(
                         RunFinishedEvent(
                             type=EventType.RUN_FINISHED,
@@ -149,6 +188,7 @@ class AguiAdapter:
                 try:
                     item = await asyncio.wait_for(anext(aiter, None), timeout=remaining)
                 except (TimeoutError, asyncio.TimeoutError):
+                    await persist("insufficient", "timeout")
                     yield encoder.encode(
                         RunFinishedEvent(
                             type=EventType.RUN_FINISHED,
@@ -195,6 +235,7 @@ class AguiAdapter:
                     data = {}
                 if event == "node_start":
                     name = str(data.get("node") or "")
+                    step_nodes.append({"name": name, "query_used": ""})
                     metadata = {
                         key: data[key]
                         for key in ("step_index", "agent", "task")
@@ -212,6 +253,8 @@ class AguiAdapter:
                     metadata = {}
                     if name in ("search", "execute") and query_used:
                         metadata["query_used"] = query_used
+                        if step_nodes and step_nodes[-1].get("name") == name:
+                            step_nodes[-1]["query_used"] = query_used
                     yield encoder.encode(
                         StepFinishedEvent(
                             type=EventType.STEP_FINISHED,
@@ -291,11 +334,13 @@ class AguiAdapter:
                 elif event == "answer_delta":
                     if assistant_id is None:
                         continue
+                    delta = str(data.get("text") or "")
+                    markdown += delta
                     yield encoder.encode(
                         TextMessageContentEvent(
                             type=EventType.TEXT_MESSAGE_CONTENT,
                             message_id=assistant_id,
-                            delta=str(data.get("text") or ""),
+                            delta=delta,
                         )
                     )
                 elif event == "citations":
@@ -326,6 +371,7 @@ class AguiAdapter:
                     else:
                         outcome = "error"
                         reason = data.get("message")
+                    await persist(outcome, None if reason is None else str(reason))
                     yield encoder.encode(
                         RunFinishedEvent(
                             type=EventType.RUN_FINISHED,
@@ -336,6 +382,7 @@ class AguiAdapter:
                     )
                     return
         except Exception as exc:
+            await persist("error", str(exc))
             yield encoder.encode(
                 RunErrorEvent(
                     type=EventType.RUN_ERROR,
