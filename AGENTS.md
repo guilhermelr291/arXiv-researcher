@@ -4,7 +4,7 @@ Product narrative: `README.md`. Numbers (caps, allowlist, splitter, hybrid, rera
 
 ## Product
 
-FastAPI SSE `POST /agent` runs a LangGraph loop: gate → planner → dispatch → search|execute → evaluate → retry / remaining-suffix replan → finalize. The Next.js desk in `web/` is an HTTP client of the API on 8001 (`GET /threads/{thread_id}` replays a checkpoint). Evidence is arXiv only.
+FastAPI SSE `POST /agent` runs a LangGraph loop: gate → planner → dispatch → search|execute → evaluate → retry / remaining-suffix replan → finalize. The Next.js desk in `web/` is an HTTP client of the API on 8001 (`GET /threads` lists recents; `GET /threads/{thread_id}` replays the product transcript). Evidence is arXiv only.
 
 ## Commands
 

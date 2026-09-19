@@ -1,4 +1,4 @@
-"""Replay checkpoint messages as AG-UI Message[] (messages channel only)."""
+"""Replay product transcript items (and leftover checkpoint messages) as AG-UI Message[]."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from ag_ui.core import ActivityMessage, AssistantMessage, UserMessage
 from plan_based_researcher.agents.history import message_content, message_id, message_role
 from plan_based_researcher.graph.project import project_turn
 
-__all__ = ["snapshot_status", "snapshot_to_agui_messages"]
+__all__ = ["snapshot_status", "snapshot_to_agui_messages", "items_to_agui_messages"]
 
 
 def snapshot_status(next_nodes: object) -> str:
@@ -123,4 +123,69 @@ def snapshot_to_agui_messages(messages: object) -> list:
                 suffix=f"{item_id}-outcome",
             )
         )
+    return out
+
+
+def _turn_messages(item_id: str, doc: dict) -> list:
+    out: list = []
+    outcome = str(doc.get("outcome") or "done")
+    gate = doc.get("gate") or {}
+    if not isinstance(gate, dict):
+        gate = {}
+    if gate or outcome == "done":
+        out.append(_activity("GATE", dict(gate), suffix=f"{item_id}-gate"))
+    if outcome == "done":
+        plan = doc.get("plan") or []
+        steps = doc.get("steps") or {}
+        citations = doc.get("citations") or []
+        if not isinstance(plan, list):
+            plan = []
+        if not isinstance(steps, dict):
+            steps = {}
+        if not isinstance(citations, list):
+            citations = []
+        out.append(_activity("PLAN", {"items": plan}, suffix=f"{item_id}-plan"))
+        out.append(_activity("STEPS", dict(steps), suffix=f"{item_id}-steps"))
+        out.append(
+            AssistantMessage(
+                id=item_id,
+                role="assistant",
+                content=str(doc.get("content") or ""),
+            )
+        )
+        out.append(
+            _activity("SOURCES", {"items": citations}, suffix=f"{item_id}-sources")
+        )
+        return out
+    out.append(
+        _activity(
+            "OUTCOME",
+            {"outcome": outcome, "reason": str(doc.get("content") or "")},
+            suffix=f"{item_id}-outcome",
+        )
+    )
+    return out
+
+
+def items_to_agui_messages(items: object) -> list:
+    out: list = []
+    if not isinstance(items, list):
+        return out
+    for item in items:
+        kind = getattr(item, "kind", None)
+        item_id = str(getattr(item, "id", "") or "")
+        payload = getattr(item, "payload", None)
+        if not isinstance(payload, dict):
+            payload = {}
+        if kind == "user":
+            out.append(
+                UserMessage(
+                    id=item_id,
+                    role="user",
+                    content=str(payload.get("content") or ""),
+                )
+            )
+            continue
+        if kind == "assistant_turn":
+            out.extend(_turn_messages(item_id, payload))
     return out

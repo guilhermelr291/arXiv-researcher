@@ -7,3 +7,7 @@ def get_graph(request: Request):
 
 def get_settings(request: Request):
     return request.app.state.settings
+
+
+def get_transcript(request: Request):
+    return request.app.state.transcript

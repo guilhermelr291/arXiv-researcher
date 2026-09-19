@@ -2,18 +2,38 @@
 
 import { useEffect, useState } from "react"
 
-import { loadRecents, type Recent } from "../lib/recents"
+import { apiUrl } from "../lib/stream"
+
+type Recent = {
+  threadId: string
+  title: string
+  updatedAt: string
+}
 
 type Props = {
   activeId?: string | null
+  refreshTick?: number
 }
 
-export function Sidebar({ activeId }: Props) {
+export function Sidebar({ activeId, refreshTick = 0 }: Props) {
   const [recents, setRecents] = useState<Recent[]>([])
 
   useEffect(() => {
-    setRecents(loadRecents())
-  }, [activeId])
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await fetch(apiUrl("/threads"))
+        if (!response.ok) return
+        const rows = (await response.json()) as Recent[]
+        if (!cancelled) setRecents(Array.isArray(rows) ? rows : [])
+      } catch {
+        if (!cancelled) setRecents([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [activeId, refreshTick])
 
   return (
     <aside className="sidebar" aria-label="Threads">

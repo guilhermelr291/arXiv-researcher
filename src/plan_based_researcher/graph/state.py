@@ -91,20 +91,37 @@ def merge_papers(
     return list(merged.values())[: Policy.max_papers]
 
 
+def _merge_or_clear(existing: dict | None, new: dict | None) -> dict:
+    """Merge by key, last write wins. An empty dict clears (new-turn reset)."""
+    if new is None:
+        return dict(existing or {})
+    if not new:
+        return {}
+    return {**(existing or {}), **new}
+
+
 def merge_search_artifacts(
     existing: dict[str, SearchArtifact] | None,
     new: dict[str, SearchArtifact] | None,
 ) -> dict[str, SearchArtifact]:
-    """Merge search artifacts by step key, last write wins."""
-    return {**(existing or {}), **(new or {})}
+    """Merge search artifacts by step key, last write wins.
+
+    Empty `new` clears the map so `initial_graph_state` resets scratchpads
+    between turns. Omit the key to leave the checkpoint unchanged. Non-empty
+    patches still merge for parallel `Send` and remaining replan.
+    """
+    return _merge_or_clear(existing, new)
 
 
 def merge_eval_by_step(
     existing: dict[str, dict] | None,
     new: dict[str, dict] | None,
 ) -> dict[str, dict]:
-    """Merge per-step eval records by step key, last write wins (LOOP-02)."""
-    return {**(existing or {}), **(new or {})}
+    """Merge per-step eval records by step key, last write wins (LOOP-02).
+
+    Empty `new` clears, same contract as `merge_search_artifacts`.
+    """
+    return _merge_or_clear(existing, new)
 
 
 def merge_hole_tasks(existing: object, extras: list | None = None) -> list[dict]:
