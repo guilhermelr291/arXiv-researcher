@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { Chat } from "../components/Chat"
@@ -11,14 +11,56 @@ import { PlanBlock } from "../components/PlanBlock"
 import { Renderers } from "../components/renderers"
 import { SourcePanel } from "../components/SourcePanel"
 import { StepRail } from "../components/StepRail"
-import { applyEvent, emptyDesk } from "../lib/blocks"
-import { upsertRecent } from "../lib/recents"
+import { applyEvent, applyReplay, emptyDesk } from "../lib/blocks"
 import { normalRunInput, resumeRunInput } from "../lib/stream"
 import type { SourceItem } from "../lib/types"
 
 function sse(events: object[]): Response {
   const body = events.map((event) => `data: ${JSON.stringify(event)}\n\n`).join("")
   return new Response(body, { headers: { "Content-Type": "text/event-stream" } })
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  })
+}
+
+function isThreadList(url: string) {
+  return /\/threads\/?$/.test(url.split("?")[0] ?? url)
+}
+
+function isThreadMember(url: string) {
+  return /\/threads\/[^/]+$/.test(url.split("?")[0] ?? url)
+}
+
+function stubFetch(options?: {
+  agent?: Response | ((init?: RequestInit) => Response | Promise<Response>)
+  threads?: unknown | ((listCall: number) => unknown)
+  thread?: unknown | Response
+}) {
+  let listCalls = 0
+  vi.mocked(fetch).mockImplementation((input, init) => {
+    const url = String(input)
+    if (url.includes("/agent")) {
+      const agent = options?.agent ?? sse([{ type: "RUN_FINISHED", result: { outcome: "done" } }])
+      return Promise.resolve(typeof agent === "function" ? agent(init) : agent)
+    }
+    if (isThreadMember(url)) {
+      const thread = options?.thread
+      if (thread instanceof Response) return Promise.resolve(thread)
+      if (thread !== undefined) return Promise.resolve(jsonResponse(thread))
+      return Promise.resolve(jsonResponse({ detail: "thread not found" }, 404))
+    }
+    if (isThreadList(url)) {
+      listCalls += 1
+      const rows =
+        typeof options?.threads === "function" ? options.threads(listCalls) : (options?.threads ?? [])
+      return Promise.resolve(jsonResponse(rows))
+    }
+    return Promise.reject(new Error(`unexpected fetch ${url}`))
+  })
 }
 
 const source: SourceItem = {
@@ -43,45 +85,59 @@ describe("desk", () => {
     vi.stubGlobal("fetch", vi.fn())
   })
 
-  it("home renders input and description without fetch", () => {
+  it("home renders input and description without fetch", async () => {
+    stubFetch()
     render(<Chat />)
     expect(screen.getByLabelText("Message")).toBeTruthy()
     expect(screen.getByText(/Ask an AI\/ML question/i)).toBeTruthy()
-    expect(fetch).not.toHaveBeenCalled()
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThan(0))
+    const urls = vi.mocked(fetch).mock.calls.map((call) => String(call[0]))
+    expect(urls.every((url) => isThreadList(url))).toBe(true)
+    expect(urls.every((url) => !url.includes("/agent") && !isThreadMember(url))).toBe(true)
   })
 
   it("first send posts agent and replaceState", async () => {
     const replace = vi.fn()
     vi.stubGlobal("history", { ...history, replaceState: replace })
-    vi.mocked(fetch).mockResolvedValue(sse([{ type: "RUN_FINISHED", result: { outcome: "done" } }]))
+    stubFetch()
     render(<Chat />)
     fireEvent.change(screen.getByLabelText("Message"), { target: { value: "What is LoRA?" } })
     fireEvent.submit(screen.getByLabelText("Message").closest("form")!)
-    await waitFor(() => expect(fetch).toHaveBeenCalled())
-    const url = String(vi.mocked(fetch).mock.calls[0][0])
-    expect(url).toContain("/agent")
+    await waitFor(() =>
+      expect(vi.mocked(fetch).mock.calls.some((call) => String(call[0]).includes("/agent"))).toBe(
+        true,
+      ),
+    )
     expect(replace).toHaveBeenCalled()
     expect(String(replace.mock.calls[0][2])).toMatch(/\/c\/[0-9a-f-]{36}/i)
   })
 
   it("same-tab first send skips get threads", async () => {
-    vi.mocked(fetch).mockResolvedValue(sse([{ type: "RUN_FINISHED", result: { outcome: "done" } }]))
+    stubFetch()
     render(<Chat />)
     fireEvent.change(screen.getByLabelText("Message"), { target: { value: "q" } })
     fireEvent.submit(screen.getByLabelText("Message").closest("form")!)
-    await waitFor(() => expect(fetch).toHaveBeenCalled())
+    await waitFor(() =>
+      expect(vi.mocked(fetch).mock.calls.some((call) => String(call[0]).includes("/agent"))).toBe(
+        true,
+      ),
+    )
     const urls = vi.mocked(fetch).mock.calls.map((call) => String(call[0]))
-    expect(urls.every((url) => !url.includes("/threads/"))).toBe(true)
+    expect(urls.every((url) => !isThreadMember(url))).toBe(true)
   })
 
   it("direct thread load waits for replay", async () => {
     let resolveFetch: (value: Response) => void = () => undefined
-    vi.mocked(fetch).mockImplementation(
-      () =>
-        new Promise((resolve) => {
+    vi.mocked(fetch).mockImplementation((input) => {
+      const url = String(input)
+      if (isThreadList(url)) return Promise.resolve(jsonResponse([]))
+      if (isThreadMember(url)) {
+        return new Promise((resolve) => {
           resolveFetch = resolve
-        }),
-    )
+        })
+      }
+      return Promise.reject(new Error(url))
+    })
     render(<Chat threadId="tid" hydrate />)
     expect(screen.getByLabelText("Message")).toBeDisabled()
     resolveFetch(
@@ -101,22 +157,118 @@ describe("desk", () => {
   it("thread 404 navigates home", async () => {
     const replace = vi.fn()
     vi.stubGlobal("location", { ...window.location, replace })
-    vi.mocked(fetch).mockResolvedValue(new Response("{}", { status: 404 }))
+    stubFetch({ thread: jsonResponse({}, 404) })
     render(<Chat threadId="missing" hydrate />)
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/"))
   })
 
-  it("recents upsert title eighty chars", () => {
-    const long = "x".repeat(100)
-    const rows = upsertRecent("tid", long)
-    expect(rows[0].title).toHaveLength(80)
-    expect(rows[0].threadId).toBe("tid")
-    expect(rows[0].updatedAt).toBeTruthy()
+  it("recents upsert title eighty chars", async () => {
+    const title = "x".repeat(80)
+    stubFetch({
+      threads: [{ threadId: "tid", title, updatedAt: "2026-09-19T12:00:00Z" }],
+    })
+    render(<Chat />)
+    await waitFor(() => expect(screen.getByText(title)).toBeTruthy())
+  })
+
+  it("sidebar fetches GET /threads and renders title", async () => {
+    stubFetch({
+      threads: [
+        { threadId: "tid-a", title: "LoRA notes", updatedAt: "2026-09-19T12:00:00Z" },
+      ],
+    })
+    render(<Chat />)
+    await waitFor(() => expect(screen.getByText("LoRA notes")).toBeTruthy())
+    const urls = vi.mocked(fetch).mock.calls.map((call) => String(call[0]))
+    expect(urls.some((url) => isThreadList(url))).toBe(true)
+  })
+
+  it("empty GET /threads shows recents empty copy", async () => {
+    stubFetch({ threads: [] })
+    render(<Chat />)
+    await waitFor(() => expect(screen.getByText("Threads you start appear here.")).toBeTruthy())
+  })
+
+  it("first assistant cite uses first turn sources not second", () => {
+    const first = { ...source, excerpt: "first-excerpt" }
+    const second = { ...source, excerpt: "second-excerpt", arxiv_id: "2401.00002", chunk_id: "c2" }
+    const state = applyReplay([
+      { id: "a1", role: "assistant", content: "See [1]" },
+      { id: "s1", role: "activity", activityType: "SOURCES", content: { items: [first] } },
+      { id: "a2", role: "assistant", content: "Also [1]" },
+      { id: "s2", role: "activity", activityType: "SOURCES", content: { items: [second] } },
+    ])
+    const opened: SourceItem[] = []
+    const { container } = render(
+      <Renderers blocks={state.blocks} sources={state.sources} onOpenSource={(item) => opened.push(item)} />,
+    )
+    const firstCite = container.querySelectorAll(".assistant-text")[0]?.querySelector(
+      'button[aria-label="Source 1"]',
+    )
+    expect(firstCite).toBeTruthy()
+    fireEvent.click(firstCite!)
+    expect(opened[0]?.excerpt).toBe("first-excerpt")
+    expect(opened[0]?.excerpt).not.toBe("second-excerpt")
+  })
+
+  it("empty first-turn sources stay empty instead of using the second turn", () => {
+    const second = { ...source, excerpt: "second-excerpt", arxiv_id: "2401.00002", chunk_id: "c2" }
+    const state = applyReplay([
+      { id: "a1", role: "assistant", content: "See [1]" },
+      { id: "s1", role: "activity", activityType: "SOURCES", content: { items: [] } },
+      { id: "a2", role: "assistant", content: "Also [1]" },
+      { id: "s2", role: "activity", activityType: "SOURCES", content: { items: [second] } },
+    ])
+    const { container } = render(
+      <Renderers blocks={state.blocks} sources={state.sources} onOpenSource={() => undefined} />,
+    )
+    const firstCite = container.querySelectorAll(".assistant-text")[0]?.querySelector(
+      'button[aria-label="Source 1"]',
+    )
+    expect(firstCite).toBeNull()
+    expect(
+      container.querySelectorAll(".assistant-text")[1]?.querySelector('button[aria-label="Source 1"]'),
+    ).toBeTruthy()
+  })
+
+  it("sidebar lists the thread after POST /agent starts", async () => {
+    stubFetch({
+      threads: (listCall) =>
+        listCall < 3
+          ? []
+          : [{ threadId: "tid-new", title: "sidebar-new-thread", updatedAt: "2026-09-19T12:00:00Z" }],
+    })
+    render(<Chat />)
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "q" } })
+    fireEvent.submit(screen.getByLabelText("Message").closest("form")!)
+    const sidebar = screen.getByLabelText("Threads")
+    await waitFor(() => expect(within(sidebar).getByText("sidebar-new-thread")).toBeTruthy())
+  })
+
+  it("replay steps nodes appear in collapsed rail expand", () => {
+    const state = applyReplay([
+      {
+        id: "steps-1",
+        role: "activity",
+        activityType: "STEPS",
+        content: {
+          count: 2,
+          elapsed_ms: 1000,
+          nodes: [{ name: "search" }, { name: "execute" }],
+        },
+      },
+    ])
+    render(<Renderers blocks={state.blocks} sources={[]} onOpenSource={() => undefined} />)
+    fireEvent.click(screen.getByText("2 steps · 1s"))
+    expect(screen.getByText("search")).toBeTruthy()
+    expect(screen.getByText("execute")).toBeTruthy()
   })
 
   it("stop aborts fetch and input stays enabled", async () => {
     let aborted = false
-    vi.mocked(fetch).mockImplementation((_url, init) => {
+    vi.mocked(fetch).mockImplementation((input, init) => {
+      const url = String(input)
+      if (isThreadList(url)) return Promise.resolve(jsonResponse([]))
       return new Promise((_, reject) => {
         init?.signal?.addEventListener("abort", () => {
           aborted = true
@@ -135,29 +287,26 @@ describe("desk", () => {
   })
 
   it("dropped stream refetches thread", async () => {
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(sse([]))
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            threadId: "tid",
-            status: "idle",
-            messages: [{ id: "u", role: "user", content: "replayed" }],
-          }),
-        ),
-      )
+    stubFetch({
+      agent: sse([]),
+      thread: {
+        threadId: "tid",
+        status: "idle",
+        messages: [{ id: "u", role: "user", content: "replayed" }],
+      },
+    })
     render(<Chat />)
     fireEvent.change(screen.getByLabelText("Message"), { target: { value: "q" } })
     fireEvent.submit(screen.getByLabelText("Message").closest("form")!)
-    await waitFor(() => expect(vi.mocked(fetch).mock.calls.length).toBeGreaterThan(1))
-    expect(String(vi.mocked(fetch).mock.calls[1][0])).toContain("/threads/")
+    await waitFor(() => expect(vi.mocked(fetch).mock.calls.some((call) => isThreadMember(String(call[0])))).toBe(true))
     await waitFor(() => expect(screen.getByText("replayed")).toBeTruthy())
   })
 
   it("dropped stream with failed replay stays idle", async () => {
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(sse([]))
-      .mockResolvedValueOnce(new Response("nope", { status: 500 }))
+    stubFetch({
+      agent: sse([]),
+      thread: new Response("nope", { status: 500 }),
+    })
     render(<Chat />)
     fireEvent.change(screen.getByLabelText("Message"), { target: { value: "q" } })
     fireEvent.submit(screen.getByLabelText("Message").closest("form")!)
@@ -167,32 +316,32 @@ describe("desk", () => {
 
   it("interrupted auto-resumes once then shows resume", async () => {
     vi.useFakeTimers()
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(sse([]))
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ status: "interrupted", messages: [] })),
-      )
-      .mockResolvedValueOnce(sse([]))
+    stubFetch({
+      agent: sse([]),
+      thread: { status: "interrupted", messages: [] },
+    })
     render(<Chat />)
     fireEvent.change(screen.getByLabelText("Message"), { target: { value: "q" } })
     fireEvent.submit(screen.getByLabelText("Message").closest("form")!)
-    for (let i = 0; i < 25 && vi.mocked(fetch).mock.calls.length < 2; i += 1) {
+    const agentCalls = () =>
+      vi.mocked(fetch).mock.calls.filter((call) => String(call[0]).includes("/agent")).length
+    for (let i = 0; i < 25 && agentCalls() < 1; i += 1) {
       await act(async () => {
         await Promise.resolve()
         await vi.advanceTimersByTimeAsync(0)
       })
     }
-    expect(vi.mocked(fetch).mock.calls.length).toBe(2)
+    expect(agentCalls()).toBe(1)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(1000)
     })
-    for (let i = 0; i < 25 && vi.mocked(fetch).mock.calls.length < 3; i += 1) {
+    for (let i = 0; i < 25 && agentCalls() < 2; i += 1) {
       await act(async () => {
         await Promise.resolve()
         await vi.advanceTimersByTimeAsync(0)
       })
     }
-    expect(vi.mocked(fetch).mock.calls.length).toBe(3)
+    expect(agentCalls()).toBe(2)
     expect(screen.getByText("Resume")).toBeTruthy()
   })
 

@@ -18,6 +18,7 @@ export type Block =
       id: string
       content: string
       streaming: boolean
+      sources?: SourceItem[]
     }
   | { kind: "outcome"; id: string; outcome: string; reason: string }
   | { kind: "error"; id: string; message: string }
@@ -59,6 +60,17 @@ function upsert(blocks: Block[], block: Block): Block[] {
   return copy
 }
 
+function bindSources(blocks: Block[], items: SourceItem[]): Block[] {
+  const next = blocks.slice()
+  for (let index = next.length - 1; index >= 0; index -= 1) {
+    if (next[index].kind === "assistant") {
+      next[index] = { ...next[index], sources: items }
+      break
+    }
+  }
+  return next
+}
+
 export function applyReplay(messages: AguiMessage[]): DeskState {
   let state = emptyDesk()
   for (const message of messages) {
@@ -77,7 +89,7 @@ export function applyReplay(messages: AguiMessage[]): DeskState {
         ...state,
         blocks: [
           ...state.blocks,
-          { kind: "assistant", id: message.id, content: message.content, streaming: false },
+          { kind: "assistant", id: message.id, content: message.content, streaming: false, sources: [] },
         ],
       }
       continue
@@ -113,6 +125,14 @@ export function applyReplay(messages: AguiMessage[]): DeskState {
     } else if (type === "STEPS") {
       const count = Number(content.count ?? 0)
       const elapsed = Number(content.elapsed_ms ?? content.elapsedMs ?? 0)
+      const rawNodes = Array.isArray(content.nodes) ? content.nodes : []
+      const nodes: StepNode[] = rawNodes.map((node) => {
+        const row = node as { name?: string; query_used?: string; queryUsed?: string }
+        return {
+          name: String(row.name ?? ""),
+          queryUsed: row.query_used ?? row.queryUsed,
+        }
+      })
       state = {
         ...state,
         blocks: [
@@ -120,7 +140,7 @@ export function applyReplay(messages: AguiMessage[]): DeskState {
           {
             kind: "steps",
             id: message.id,
-            nodes: [],
+            nodes,
             live: false,
             count,
             seconds: Math.round(elapsed / 100) / 10,
@@ -128,7 +148,8 @@ export function applyReplay(messages: AguiMessage[]): DeskState {
         ],
       }
     } else if (type === "SOURCES") {
-      state = { ...state, sources: (content.items as SourceItem[]) ?? [] }
+      const items = (content.items as SourceItem[]) ?? []
+      state = { ...state, blocks: bindSources(state.blocks, items), sources: items }
     } else if (type === "OUTCOME") {
       state = {
         ...state,
@@ -255,6 +276,7 @@ export function applyEvent(state: DeskState, event: AguiEvent): DeskState {
         id: event.messageId ?? "assistant",
         content: "",
         streaming: true,
+        sources: [],
       }),
     }
   }
@@ -269,6 +291,7 @@ export function applyEvent(state: DeskState, event: AguiEvent): DeskState {
         id: event.messageId ?? current?.id ?? "assistant",
         content: (current?.content ?? "") + (event.delta ?? ""),
         streaming: true,
+        sources: current?.sources ?? [],
       }),
     }
   }
@@ -280,7 +303,8 @@ export function applyEvent(state: DeskState, event: AguiEvent): DeskState {
     return { ...state, blocks: upsert(state.blocks, { ...current, streaming: false }) }
   }
   if (event.type === "ACTIVITY_SNAPSHOT" && event.activityType === "SOURCES") {
-    return { ...state, sources: (event.content?.items as SourceItem[]) ?? [] }
+    const items = (event.content?.items as SourceItem[]) ?? []
+    return { ...state, blocks: bindSources(state.blocks, items), sources: items }
   }
   if (event.type === "RUN_FINISHED") {
     const outcome = event.result?.outcome ?? "done"

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import unittest
+import unittest.mock
 from types import SimpleNamespace
 
 from fastapi import FastAPI
@@ -11,9 +12,12 @@ from fastapi.testclient import TestClient
 
 from plan_based_researcher.api.agui import AguiAdapter, stream_headers
 from plan_based_researcher.api.cors import DEFAULT_WEB_ORIGIN, install_cors
-from plan_based_researcher.api.deps import get_graph, get_settings
+from ag_ui.encoder import EventEncoder
+
+from plan_based_researcher.api.deps import get_graph, get_settings, get_transcript
 from plan_based_researcher.api.routes import router
 from plan_based_researcher.main import create_app
+from tests.transcript_memory import MemoryTranscriptStore
 
 
 def parse_sse(text: str) -> list[dict]:
@@ -40,6 +44,11 @@ def _body(**overrides) -> dict:
     return payload
 
 
+def _event_type_name(event: object) -> str:
+    raw = getattr(event, "type", "")
+    return str(getattr(raw, "value", raw) or "")
+
+
 class RecordingGraph:
     def __init__(self, items=(), next_nodes=(), raise_exc=None, hang=False) -> None:
         self.items = list(items)
@@ -47,6 +56,8 @@ class RecordingGraph:
         self.raise_exc = raise_exc
         self.hang = hang
         self.recorded = None
+        self.transcript: MemoryTranscriptStore | None = None
+        self.items_at_astream = None
 
     def initial_graph_state(self, query: str) -> dict:
         return {"query": query, "messages": [{"role": "user", "content": query}]}
@@ -56,6 +67,8 @@ class RecordingGraph:
 
     def astream(self, input, config=None, **kwargs):
         self.recorded = {"input": input, "config": config, **kwargs}
+        if self.transcript is not None:
+            self.items_at_astream = list(self.transcript.items)
         graph = self
 
         class Stream:
@@ -76,7 +89,7 @@ class RecordingGraph:
         return Stream()
 
 
-def _client(graph=None, timeout=30):
+def _client(graph=None, timeout=30, store=None):
     app = FastAPI()
     install_cors(app, DEFAULT_WEB_ORIGIN)
     app.include_router(router)
@@ -85,13 +98,16 @@ def _client(graph=None, timeout=30):
     async def health():
         return {"status": "ok"}
 
+    fake_store = store if store is not None else MemoryTranscriptStore()
     fake = graph or RecordingGraph(
         [("custom", {"event": "done", "data": {"outcome": "done"}})]
     )
+    fake.transcript = fake_store
     app.dependency_overrides[get_graph] = lambda: fake
     app.dependency_overrides[get_settings] = lambda: SimpleNamespace(
         research_timeout_seconds=timeout
     )
+    app.dependency_overrides[get_transcript] = lambda: fake_store
     return TestClient(app), fake
 
 
@@ -222,3 +238,144 @@ class AgentRouteTest(unittest.TestCase):
         text = inspect.getsource(factory)
         self.assertIn("/health", text)
         self.assertNotIn("/research", text)
+
+    def test_post_uses_body_thread_id_as_store_and_checkpoint_id(self) -> None:
+        client, fake = _client()
+        response = client.post("/agent", json=_body(threadId="tid-1"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            fake.recorded["config"]["configurable"]["thread_id"], "tid-1"
+        )
+        self.assertEqual(fake.transcript.threads["tid-1"].thread_id, "tid-1")
+        self.assertTrue(
+            all(item.thread_id == "tid-1" for item in fake.transcript.items)
+        )
+
+    def test_non_resume_inserts_user_before_astream(self) -> None:
+        client, fake = _client()
+        response = client.post("/agent", json=_body())
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(fake.items_at_astream)
+        users = [
+            item for item in fake.items_at_astream if item.kind == "user"
+        ]
+        self.assertEqual(len(users), 1)
+        self.assertEqual(users[0].id, "u1")
+        self.assertEqual(users[0].payload["content"], "What is LoRA?")
+
+    def test_first_user_title_is_eighty_chars(self) -> None:
+        for length in (80, 100):
+            with self.subTest(length=length):
+                store = MemoryTranscriptStore()
+                content = "x" * length
+                client, fake = _client(store=store)
+                response = client.post(
+                    "/agent",
+                    json=_body(
+                        threadId=f"tid-{length}",
+                        messages=[{"id": "u1", "role": "user", "content": content}],
+                    ),
+                )
+                self.assertEqual(response.status_code, 200)
+                title = fake.transcript.threads[f"tid-{length}"].title
+                self.assertEqual(title, content[:80])
+                self.assertEqual(len(title), 80)
+
+    def test_resume_does_not_insert_user(self) -> None:
+        client, fake = _client(
+            RecordingGraph(
+                items=[("custom", {"event": "done", "data": {"outcome": "done"}})],
+                next_nodes=("execute",),
+            )
+        )
+        response = client.post(
+            "/agent",
+            json=_body(messages=[], forwardedProps={"resume": True}),
+        )
+        self.assertEqual(response.status_code, 200)
+        users = [item for item in fake.transcript.items if item.kind == "user"]
+        self.assertEqual(users, [])
+
+    def test_assistant_turn_exists_before_run_finished(self) -> None:
+        store = MemoryTranscriptStore()
+        orig_encode = EventEncoder.encode
+
+        def encode(self, event):
+            if _event_type_name(event) == "RUN_FINISHED":
+                store.log.append("run_finished")
+            return orig_encode(self, event)
+
+        client, _fake = _client(store=store)
+        with unittest.mock.patch.object(EventEncoder, "encode", encode):
+            response = client.post("/agent", json=_body())
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("assistant_turn", store.log)
+        self.assertIn("run_finished", store.log)
+        self.assertLess(store.log.index("assistant_turn"), store.log.index("run_finished"))
+
+    def test_assistant_turn_exists_before_run_error(self) -> None:
+        store = MemoryTranscriptStore()
+        orig_encode = EventEncoder.encode
+
+        def encode(self, event):
+            if _event_type_name(event) == "RUN_ERROR":
+                store.log.append("run_error")
+            return orig_encode(self, event)
+
+        client, _fake = _client(
+            RecordingGraph(raise_exc=RuntimeError("boom")), store=store
+        )
+        with unittest.mock.patch.object(EventEncoder, "encode", encode):
+            response = client.post("/agent", json=_body())
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("assistant_turn", store.log)
+        self.assertIn("run_error", store.log)
+        self.assertLess(store.log.index("assistant_turn"), store.log.index("run_error"))
+
+    def test_assistant_turn_id_is_writer_message_id(self) -> None:
+        client, fake = _client(
+            RecordingGraph(
+                items=[
+                    (
+                        "updates",
+                        {"execute": {"writer_message_id": "msg-writer-1"}},
+                    ),
+                    (
+                        "custom",
+                        {
+                            "event": "answer_start",
+                            "data": {"message_id": "msg-writer-1"},
+                        },
+                    ),
+                    (
+                        "custom",
+                        {"event": "done", "data": {"outcome": "done"}},
+                    ),
+                ]
+            )
+        )
+        response = client.post("/agent", json=_body())
+        self.assertEqual(response.status_code, 200)
+        turns = [
+            item
+            for item in fake.transcript.items
+            if item.kind == "assistant_turn"
+        ]
+        self.assertEqual(len(turns), 1)
+        self.assertEqual(turns[0].id, "msg-writer-1")
+
+    def test_timeout_assistant_turn_id_is_run_id(self) -> None:
+        client, fake = _client(RecordingGraph(hang=True), timeout=0.05)
+        response = client.post("/agent", json=_body(runId="run-timeout"))
+        events = parse_sse(response.text)
+        finished = next(e for e in events if e["type"] == "RUN_FINISHED")
+        self.assertEqual(finished["result"]["outcome"], "insufficient")
+        self.assertEqual(finished["result"]["reason"], "timeout")
+        turns = [
+            item
+            for item in fake.transcript.items
+            if item.kind == "assistant_turn"
+        ]
+        self.assertEqual(len(turns), 1)
+        self.assertEqual(turns[0].id, "run-timeout")
+        self.assertEqual(turns[0].payload["outcome"], "insufficient")

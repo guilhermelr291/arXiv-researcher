@@ -46,6 +46,7 @@ class ResearchGraph:
             "retry_count": 0,
             "replan_used": False,
             "steps_executed": 0,
+            # Empty dicts clear merge channels (wave scratchpads of the prior turn).
             "search_artifacts": {},
             "last_agent": "",
             "last_eval": {},

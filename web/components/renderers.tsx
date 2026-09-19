@@ -51,7 +51,12 @@ function renderBlock(block: Block, sources: SourceItem[], onOpenSource: Props["o
             source={block.content}
             math={!block.streaming}
             cite={(n, key) => (
-              <Citation key={key} sources={sources} n={n} onOpen={onOpenSource} />
+              <Citation
+                key={key}
+                sources={block.sources ?? sources}
+                n={n}
+                onOpen={onOpenSource}
+              />
             )}
           />
           {block.streaming ? <span className="cursor" aria-hidden="true" /> : null}

@@ -44,6 +44,7 @@ export async function postAgent(
   input: RunAgentInput,
   onEvent: (event: AguiEvent) => void,
   signal?: AbortSignal,
+  onStarted?: () => void,
 ): Promise<{ terminal: "finished" | "error" | "dropped" }> {
   const response = await fetch(apiUrl("/agent"), {
     method: "POST",
@@ -51,6 +52,7 @@ export async function postAgent(
     body: JSON.stringify(input),
     signal,
   })
+  onStarted?.()
   return consumeSse(response, onEvent, signal)
 }
 
