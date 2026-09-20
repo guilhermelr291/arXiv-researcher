@@ -45,9 +45,14 @@ class Policy:
     retrieve_hop_rrf_k: int = 60
     history_window_exchanges: int = 6
     writer_history_exchanges: int = 2
+    writer_calculator_rounds: int = 8
+    writer_calculator_expression_max: int = 200
     GROUNDING_RULE: str = (
         "every technical claim has a real [n] citation that resolves to a "
-        "chunk packed in this thread"
+        "chunk packed in this thread; a number obtained by arithmetic on "
+        "operands that each have a real [n] is a derived result: cite the "
+        "operands; do not invent a citation for the result; do not treat "
+        "the result as a new source"
     )
     HOLE_RULE: str = (
         'an absence sentence ("no usable paper was found for {topic}") needs no [n]; '

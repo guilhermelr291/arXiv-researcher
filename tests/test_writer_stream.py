@@ -39,7 +39,41 @@ def _llm(*contents: object, error: BaseException | None = None) -> MagicMock:
             raise error
 
     llm.astream = astream
+    llm.bind_tools.return_value = llm
     return llm
+
+
+class _QueuedLLM:
+    def __init__(self, turns: list[list[object]]) -> None:
+        self._turns = list(turns)
+        self.bind_calls: list[list] = []
+        self.astream_payloads: list[object] = []
+
+    def bind_tools(self, tools: object, **_kwargs: object) -> _QueuedLLM:
+        self.bind_calls.append(list(tools))
+        return self
+
+    async def astream(self, messages: object):
+        self.astream_payloads.append(messages)
+        for chunk in self._turns.pop(0):
+            yield chunk
+
+
+def _tool_chunk(name: str, args: dict, call_id: str = "call-1") -> SimpleNamespace:
+    return SimpleNamespace(
+        content="",
+        tool_call_chunks=[
+            {
+                "name": name,
+                "args": args,
+                "id": call_id,
+                "index": 0,
+            }
+        ],
+        tool_calls=[
+            {"name": name, "args": args, "id": call_id, "type": "tool_call"}
+        ],
+    )
 
 
 def _spy_stream_writer(payloads: list[dict]):
@@ -205,6 +239,103 @@ class WriterRunnerStreamTest(unittest.IsolatedAsyncioTestCase):
         for field in fields:
             with self.subTest(field=field):
                 self.assertIn(field, citations[0])
+
+    async def test_tool_call_round_with_visible_text_is_not_answer_delta(self) -> None:
+        payloads: list[dict] = []
+        mixed = SimpleNamespace(
+            content="Let me compute. ",
+            tool_call_chunks=[
+                {
+                    "name": "calculator",
+                    "args": {"expression": "2+3*4"},
+                    "id": "call-1",
+                    "index": 0,
+                }
+            ],
+            tool_calls=[
+                {
+                    "name": "calculator",
+                    "args": {"expression": "2+3*4"},
+                    "id": "call-1",
+                    "type": "tool_call",
+                }
+            ],
+        )
+        llm = _QueuedLLM(
+            [
+                [mixed],
+                [SimpleNamespace(content="Hello [1]")],
+            ]
+        )
+        with (
+            patch(_CHAT, return_value=llm),
+            patch(_GET_WRITER, _spy_stream_writer(payloads)),
+        ):
+            result = await WriterRunner(api_key="sk-test").run(
+                {"query": "q", "evidence_chunks": [_chunk()]}
+            )
+        delta_texts = [p["data"]["text"] for p in payloads if p["event"] == "answer_delta"]
+        self.assertEqual(delta_texts, ["Hello [1]"])
+        self.assertEqual("".join(delta_texts), result["writer_markdown"])
+        self.assertNotIn("Let me compute", result["writer_markdown"])
+
+    async def test_tool_call_chunk_without_text_emits_no_answer_delta(self) -> None:
+        payloads: list[dict] = []
+        llm = _QueuedLLM(
+            [
+                [_tool_chunk("calculator", {"expression": "2+3*4"})],
+                [SimpleNamespace(content="Hello [1]")],
+            ]
+        )
+        with (
+            patch(_CHAT, return_value=llm),
+            patch(_GET_WRITER, _spy_stream_writer(payloads)),
+        ):
+            await WriterRunner(api_key="sk-test").run(
+                {"query": "q", "evidence_chunks": [_chunk()]}
+            )
+        deltas = [p for p in payloads if p["event"] == "answer_delta"]
+        self.assertEqual(len(deltas), 1)
+        self.assertEqual(deltas[0]["data"]["text"], "Hello [1]")
+
+    async def test_calculator_then_markdown_deltas_equal_writer_markdown(self) -> None:
+        payloads: list[dict] = []
+        llm = _QueuedLLM(
+            [
+                [_tool_chunk("calculator", {"expression": "2+3*4"})],
+                [SimpleNamespace(content="Hello [1]")],
+            ]
+        )
+        with (
+            patch(_CHAT, return_value=llm),
+            patch(_GET_WRITER, _spy_stream_writer(payloads)),
+        ):
+            result = await WriterRunner(api_key="sk-test").run(
+                {"query": "q", "evidence_chunks": [_chunk()]}
+            )
+        delta_texts = [p["data"]["text"] for p in payloads if p["event"] == "answer_delta"]
+        self.assertEqual("".join(delta_texts), result["writer_markdown"])
+        self.assertEqual(result["writer_markdown"], "Hello [1]")
+
+    async def test_writer_events_only_answer_start_delta_citations(self) -> None:
+        payloads: list[dict] = []
+        llm = _QueuedLLM(
+            [
+                [_tool_chunk("calculator", {"expression": "2+3*4"})],
+                [SimpleNamespace(content="Hello [1]")],
+            ]
+        )
+        with (
+            patch(_CHAT, return_value=llm),
+            patch(_GET_WRITER, _spy_stream_writer(payloads)),
+        ):
+            await WriterRunner(api_key="sk-test").run(
+                {"query": "q", "evidence_chunks": [_chunk()]}
+            )
+        allowed = {"answer_start", "answer_delta", "citations"}
+        names = {p["event"] for p in payloads}
+        self.assertTrue(names <= allowed)
+        self.assertEqual(names, allowed)
 
 
 if __name__ == "__main__":

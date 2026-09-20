@@ -78,10 +78,11 @@ REGISTRY: dict[str, AgentSpec] = {
             "Write a didactic student answer in the student query language, "
             "citing only provided [n] chunks. State contradictions. No extra "
             "sources. Hole rule: no parametric fill; announce missing topics; "
-            "do not teach missing methods from model weights."
+            "do not teach missing methods from model weights. May compute "
+            "arithmetic on numbers present in packed chunks."
         ),
         model=_PLANNER_WRITER_MODEL,
-        tools=(),
+        tools=("calculator",),
         role="writer",
     ),
 }

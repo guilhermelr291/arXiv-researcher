@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-09-19
-**Current Work:** Feature `chat-state-transcript` — built locally (C1–C33 proofs green). Commits deferred until asked.
+**Last Updated:** 2026-09-20
+**Current Work:** Feature `writer-calculator` — built locally (C1–C36 proofs). Commits deferred until asked.
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-032: Writer inner ToolNode loop; calculator is not a plan agent (2026-09-20)
+
+**Decision:** The Writer may run an inner `StateGraph` (writer model → `tools_condition` → `ToolNode` named `tools` with `handle_tool_errors=True` → writer) compiled with `checkpointer=None`. The calculator tool (`expression` string, ast arithmetic, `handle_tool_error=True`, `handle_validation_error=True`) is bound on the Writer only. Planner abilities name the capability (compute arithmetic on packed-chunk numbers) and omit the substring `calculator`. `PLAN_AGENTS` stays `{search, retrieve, writer}`. The product graph in `graph/build.py` has no `calculator` or `tools` node. A number obtained by arithmetic on operands that each have a real `[n]` is a derived result: cite the operands; do not invent a citation for the result; do not treat the result as a new source. Student wire stays `answer_start` / `answer_delta` / `citations`. Caps: `Policy.writer_calculator_rounds=8`, `Policy.writer_calculator_expression_max=200`.
+**Reason:** Grill-me 2026-09-20: papers report FLOPs and ratios; the model mis-multiplies packed figures; a planner-scheduled calculator step cannot see the pack. Plan `.specs/features/writer-calculator/plan.md`.
+**Trade-off:** Inner ReAct rounds add Writer-model calls; errors become `ToolMessage`s so the student still gets markdown. No desk tool trace.
+**Impact:** Amends invariant 6 / AD-022 only by the derived-arithmetic carve-out. Writer remains one-shot at the research graph (no Writer eval/retry). Does not change AG-UI consume path (AD-029) or `REGISTRY[].tools` as PaperPort names for search/retrieve.
 
 ### AD-031: Product transcript is not the checkpointer (2026-09-19)
 
