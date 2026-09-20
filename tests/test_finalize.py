@@ -159,6 +159,25 @@ class FinalizeTest(unittest.IsolatedAsyncioTestCase):
                 metadata = getattr(message, "response_metadata", {}) or {}
                 self.assertEqual(metadata.get("outcome"), outcome)
 
+    async def test_refused_aimessage_id_is_writer_message_id(self) -> None:
+        finalize = make_finalize_node()
+        with patch(_WRITER, _spy_stream_writer([])):
+            update = await finalize(
+                self._turn_state(
+                    outcome="refused",
+                    writer_markdown="",
+                    writer_message_id="msg-refused",
+                    gate={"reason": "out of scope"},
+                )
+            )
+        messages = update.get("messages") or []
+        self.assertEqual(len(messages), 1)
+        message = messages[0]
+        self.assertEqual(getattr(message, "content", None), "out of scope")
+        self.assertEqual(getattr(message, "id", None), "msg-refused")
+        metadata = getattr(message, "response_metadata", {}) or {}
+        self.assertEqual(metadata.get("outcome"), "refused")
+
     async def test_aimessage_metadata_key_set(self) -> None:
         finalize = make_finalize_node()
         with patch(_WRITER, _spy_stream_writer([])):

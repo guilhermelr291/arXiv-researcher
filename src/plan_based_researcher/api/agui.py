@@ -126,6 +126,7 @@ class AguiAdapter:
         plan_message_id: str | None = None
         last_plan_content: dict | None = None
         assistant_id: str | None = None
+        text_open = False
         markdown = ""
         query_used = ""
         step_nodes: list[dict] = []
@@ -266,18 +267,6 @@ class AguiAdapter:
                 elif event == "step_end":
                     query_used = str(data.get("query_used") or "")
                 elif event == "gate":
-                    yield encoder.encode(
-                        ActivitySnapshotEvent(
-                            type=EventType.ACTIVITY_SNAPSHOT,
-                            message_id=str(uuid.uuid4()),
-                            activity_type="GATE",
-                            content={
-                                "in_domain": data.get("in_domain"),
-                                "language": data.get("language"),
-                                "reason": data.get("reason"),
-                            },
-                        )
-                    )
                     running["gate"] = data
                 elif event == "plan":
                     items = _pending_plan_items(data.get("steps"))
@@ -324,6 +313,7 @@ class AguiAdapter:
                     last_plan_content = plan_content
                 elif event == "answer_start":
                     assistant_id = str(data.get("message_id") or uuid.uuid4())
+                    text_open = True
                     yield encoder.encode(
                         TextMessageStartEvent(
                             type=EventType.TEXT_MESSAGE_START,
@@ -344,7 +334,8 @@ class AguiAdapter:
                         )
                     )
                 elif event == "citations":
-                    if assistant_id is not None:
+                    if assistant_id is not None and text_open:
+                        text_open = False
                         yield encoder.encode(
                             TextMessageEndEvent(
                                 type=EventType.TEXT_MESSAGE_END,
@@ -362,6 +353,14 @@ class AguiAdapter:
                         )
                     )
                 elif event in ("done", "insufficient", "error"):
+                    if assistant_id is not None and text_open:
+                        text_open = False
+                        yield encoder.encode(
+                            TextMessageEndEvent(
+                                type=EventType.TEXT_MESSAGE_END,
+                                message_id=assistant_id,
+                            )
+                        )
                     if event == "done":
                         outcome = str(data.get("outcome") or "done")
                         reason = None if outcome == "done" else data.get("reason")

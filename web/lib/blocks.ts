@@ -325,7 +325,11 @@ export function applyEvent(state: DeskState, event: AguiEvent): DeskState {
       })
     }
     blocks = blocks.map((b) => (b.kind === "plan" && !b.collapsed ? { ...b, collapsed: true } : b))
-    if (outcome === "refused" || outcome === "insufficient") {
+    if (outcome === "refused") {
+      blocks = blocks.map((b) =>
+        b.kind === "assistant" ? { ...b, streaming: false } : b,
+      )
+    } else if (outcome === "insufficient") {
       blocks = [
         ...blocks.filter((b) => b.kind !== "assistant"),
         {
