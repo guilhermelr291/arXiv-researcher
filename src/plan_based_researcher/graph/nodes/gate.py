@@ -1,6 +1,8 @@
-"""Gate graph node: domain check then custom `gate` event (GATE-01, GATE-02)."""
+"""Gate graph node: domain check; refuse uses Writer text events."""
 
 from __future__ import annotations
+
+import uuid
 
 from langgraph.config import get_stream_writer
 
@@ -13,7 +15,16 @@ def make_gate_node(factory: AgentFactory):
         writer = get_stream_writer()
         update = await factory.create("gate").run(state)
         data = update.get("gate") or {}
-        writer({"event": "gate", "data": data})
-        return update
+        if data.get("in_domain"):
+            return update
+        message_id = str(uuid.uuid4())
+        writer({"event": "answer_start", "data": {"message_id": message_id}})
+        writer(
+            {
+                "event": "answer_delta",
+                "data": {"text": str(data.get("reason") or "")},
+            }
+        )
+        return {**update, "writer_message_id": message_id}
 
     return gate

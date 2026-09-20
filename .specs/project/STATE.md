@@ -1,11 +1,18 @@
 # State
 
-**Last Updated:** 2026-09-19
-**Current Work:** Feature `chat-state-transcript` — built locally (C1–C33 proofs green). Commits deferred until asked.
+**Last Updated:** 2026-09-20
+**Current Work:** Feature `out-of-domain-question-response` — built locally (C1–C20 proofs pending commit). Commits deferred until asked.
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-032: GATE is not a desk surface; refuse uses Writer text (2026-09-20)
+
+**Decision:** The domain gate is not a student-visible activity. The gate node does not emit custom `event: "gate"`; the AG-UI adapter never emits `ACTIVITY_SNAPSHOT` `GATE`; both replay mappers omit `ActivityMessage` `GATE` for every outcome. Out of domain, the gate node emits Writer `answer_start` / one `answer_delta` (`text` = `gate.reason`), sets `writer_message_id` to that `message_id`, and still routes to `finalize`. `finalize` still appends one `AIMessage` (`id` = `writer_message_id`, `content` = `reason`, `outcome=refused`). The adapter maps those events to `TEXT_MESSAGE_*`, emits `TEXT_MESSAGE_END` before `RUN_FINISHED` when citations did not close the text, and `RUN_FINISHED` stays `{outcome: refused, reason}`. The desk keeps the assistant block on `refused` and does not add `kind: "outcome"`; `insufficient` / `error` stay outcome chips.
+**Reason:** The student asked a question and previously got a classifier verdict. Grill-me 2026-09-20 + `.specs/features/out-of-domain-question-response/plan.md`.
+**Trade-off:** `writer_message_id` now also means “gate refuse streamed on the Writer text channel”. Leftover `event: "gate"` chunks are ignored on the wire.
+**Impact:** Amends AD-029 GATE/OUTCOME live and replay mapping and AD-031 refused replay (`AssistantMessage` instead of `OUTCOME`). Does not change gate allowlist, `GateDecision`, or `finalize` as the persist hop.
 
 ### AD-031: Product transcript is not the checkpointer (2026-09-19)
 
