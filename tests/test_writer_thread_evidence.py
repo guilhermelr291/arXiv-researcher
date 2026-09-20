@@ -54,6 +54,7 @@ class WriterThreadEvidenceTest(unittest.IsolatedAsyncioTestCase):
             yield SimpleNamespace(content="Uses [1] and [2].")
 
         llm.astream = astream
+        llm.bind_tools.return_value = llm
         with patch(_CHAT, return_value=llm):
             result = await WriterRunner(api_key="sk-test").run(
                 {

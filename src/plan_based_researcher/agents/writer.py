@@ -5,9 +5,19 @@ from __future__ import annotations
 import re
 import uuid
 
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
+)
 from langchain_openai import ChatOpenAI
 from langgraph.config import get_stream_writer
+from langgraph.graph import START, MessagesState, StateGraph
+from langgraph.prebuilt import ToolNode, tools_condition
 
+from plan_based_researcher.agents.calculator import calculator
 from plan_based_researcher.agents.history import (
     format_transcript,
     last_exchanges,
@@ -314,7 +324,9 @@ def _system_prompt() -> str:
         "didactic register. Plan tasks and evaluator feedback are English; do "
         "not switch the answer to English because of them. "
         "If chunks disagree or conflict, include a limitations/contradictions section; "
-        "do not pick a silent winner. State both sides with their [n] citations."
+        "do not pick a silent winner. State both sides with their [n] citations. "
+        "For exact arithmetic on packed numbers, call calculator with expression "
+        "(numeric literals only); cite operand [n], not the result."
     )
 
 
@@ -352,6 +364,51 @@ class WriterRunner:
         if api_key is not None:
             kwargs["api_key"] = api_key
         self._llm = ChatOpenAI(**kwargs)
+        self._tools_node = ToolNode([calculator], handle_tool_errors=True)
+        graph = StateGraph(MessagesState)
+        graph.add_node("writer", self._call_model)
+        graph.add_edge(START, "writer")
+        graph.add_conditional_edges("writer", tools_condition)
+        graph.add_node("tools", self._tools_node)
+        graph.add_edge("tools", "writer")
+        self._inner = graph.compile(checkpointer=None)
+
+    async def _call_model(self, state: MessagesState) -> dict:
+        messages = state["messages"]
+        used = sum(
+            isinstance(m, ToolMessage) and m.name == "calculator" for m in messages
+        )
+        llm = (
+            self._llm.bind_tools([calculator])
+            if used < Policy.writer_calculator_rounds
+            else self._llm
+        )
+        parts: list[str] = []
+        last: object | None = None
+        try:
+            async for chunk in llm.astream(messages):
+                last = last + chunk if isinstance(last, AIMessageChunk) else chunk
+                text = _visible_text(chunk)
+                if text:
+                    parts.append(text)
+        except Exception:
+            if not list(getattr(last, "tool_calls", None) or []):
+                for text in parts:
+                    _emit_custom("answer_delta", {"text": text})
+            raise
+        tool_calls = list(getattr(last, "tool_calls", None) or [])
+        if not tool_calls:
+            for text in parts:
+                _emit_custom("answer_delta", {"text": text})
+        content = last.content if isinstance(last, AIMessageChunk) else "".join(parts)
+        return {
+            "messages": [
+                AIMessage(
+                    content=content,
+                    tool_calls=tool_calls,
+                )
+            ]
+        }
 
     async def run(self, state: GraphState) -> dict:
         chunks: list[EvidenceChunk] = list(state.get("evidence_chunks") or [])
@@ -362,23 +419,26 @@ class WriterRunner:
                     "outcome": "insufficient",
                     "last_eval": {"feedback": "no evidence on this thread"},
                 }
-        formatted = _format_chunks(chunks)
-        messages = [
-            {"role": "system", "content": _system_prompt()},
-            {"role": "user", "content": _user_prompt(state, formatted)},
-        ]
         message_id = str(uuid.uuid4())
         _emit_custom("answer_start", {"message_id": message_id})
-        pieces: list[str] = []
-        async for chunk in self._llm.astream(messages):
-            text = _visible_text(chunk)
-            if not text:
-                continue
-            pieces.append(text)
-            _emit_custom("answer_delta", {"text": text})
-        markdown = "".join(pieces)
-        used_ns = _used_citation_ns(markdown, chunks)
-        citations = _citations_from_chunks(chunks, used_ns)
+        out = await self._inner.ainvoke(
+            {
+                "messages": [
+                    SystemMessage(content=_system_prompt()),
+                    HumanMessage(content=_user_prompt(state, _format_chunks(chunks))),
+                ]
+            }
+        )
+        final = next(
+            (
+                m
+                for m in reversed(out["messages"])
+                if isinstance(m, AIMessage) and not m.tool_calls
+            ),
+            None,
+        )
+        markdown = _visible_text(final) if final else ""
+        citations = _citations_from_chunks(chunks, _used_citation_ns(markdown, chunks))
         _emit_custom("citations", {"citations": citations})
         return {
             "writer_markdown": markdown,

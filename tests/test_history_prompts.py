@@ -115,6 +115,7 @@ class HistoryPromptsTest(unittest.IsolatedAsyncioTestCase):
                 yield None
 
         llm.astream = astream
+        llm.bind_tools.return_value = llm
         with patch(_WRITER_LLM, return_value=llm):
             await WriterRunner(api_key="sk-test").run(state)
         blob = "\n".join(seen)

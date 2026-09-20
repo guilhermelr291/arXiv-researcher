@@ -1,12 +1,19 @@
 # State
 
 **Last Updated:** 2026-09-20
+**Current Work:** Feature `writer-calculator` — built locally (C1–C36 proofs). Commits deferred until asked.
 **Current Work:** Feature `out-of-domain-question-response` — built locally (C1–C20 proofs pending commit). Commits deferred until asked.
 
 ---
 
 ## Recent Decisions (Last 60 days)
 
+### AD-032: Writer inner ToolNode loop; calculator is not a plan agent (2026-09-20)
+
+**Decision:** The Writer may run an inner `StateGraph` (writer model → `tools_condition` → `ToolNode` named `tools` with `handle_tool_errors=True` → writer) compiled with `checkpointer=None`. The calculator tool (`expression` string, ast arithmetic, `handle_tool_error=True`, `handle_validation_error=True`) is bound on the Writer only. Planner abilities name the capability (compute arithmetic on packed-chunk numbers) and omit the substring `calculator`. `PLAN_AGENTS` stays `{search, retrieve, writer}`. The product graph in `graph/build.py` has no `calculator` or `tools` node. A number obtained by arithmetic on operands that each have a real `[n]` is a derived result: cite the operands; do not invent a citation for the result; do not treat the result as a new source. Student wire stays `answer_start` / `answer_delta` / `citations`. Caps: `Policy.writer_calculator_rounds=8`, `Policy.writer_calculator_expression_max=200`.
+**Reason:** Grill-me 2026-09-20: papers report FLOPs and ratios; the model mis-multiplies packed figures; a planner-scheduled calculator step cannot see the pack. Plan `.specs/features/writer-calculator/plan.md`.
+**Trade-off:** Inner ReAct rounds add Writer-model calls; errors become `ToolMessage`s so the student still gets markdown. No desk tool trace.
+**Impact:** Amends invariant 6 / AD-022 only by the derived-arithmetic carve-out. Writer remains one-shot at the research graph (no Writer eval/retry). Does not change AG-UI consume path (AD-029) or `REGISTRY[].tools` as PaperPort names for search/retrieve.
 ### AD-032: GATE is not a desk surface; refuse uses Writer text (2026-09-20)
 
 **Decision:** The domain gate is not a student-visible activity. The gate node does not emit custom `event: "gate"`; the AG-UI adapter never emits `ACTIVITY_SNAPSHOT` `GATE`; both replay mappers omit `ActivityMessage` `GATE` for every outcome. Out of domain, the gate node emits Writer `answer_start` / one `answer_delta` (`text` = `gate.reason`), sets `writer_message_id` to that `message_id`, and still routes to `finalize`. `finalize` still appends one `AIMessage` (`id` = `writer_message_id`, `content` = `reason`, `outcome=refused`). The adapter maps those events to `TEXT_MESSAGE_*`, emits `TEXT_MESSAGE_END` before `RUN_FINISHED` when citations did not close the text, and `RUN_FINISHED` stays `{outcome: refused, reason}`. The desk keeps the assistant block on `refused` and does not add `kind: "outcome"`; `insufficient` / `error` stay outcome chips.
