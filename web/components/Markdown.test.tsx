@@ -177,8 +177,111 @@ describe("Markdown", () => {
     expect(container.textContent ?? "").not.toMatch(/\[\s*s_/)
   })
 
+  it("indented backslash-bracket display math renders katex-display", () => {
+    const source = [
+      "eligible only if",
+      "   \\[",
+      "   \\sigma(\\tilde{c},q)\\geq 7.",
+      "   \\]",
+      "Chunks below this threshold are skipped. [1]",
+    ].join("\n")
+    const { container } = render(<Markdown source={source} math cite={cite} />)
+    expect(container.querySelector(".katex-display")).toBeTruthy()
+    expect(container.querySelector(".katex-error")).toBeNull()
+    expect(container.querySelector('button[aria-label="Source 1"]')).toBeTruthy()
+  })
+
   it("backslash-paren inline math renders katex", () => {
     const { container } = render(<Markdown source={"\\( a+b \\)"} math />)
     expect(container.querySelector(".katex")).toBeTruthy()
+  })
+
+  it("bare tex command run renders katex", () => {
+    const { container } = render(
+      <Markdown source={"\\sigma(\\tilde{c},q)\\geq 7."} math />,
+    )
+    expect(container.querySelector(".katex")).toBeTruthy()
+    expect(container.querySelector(".katex-error")).toBeNull()
+  })
+
+  it("bare tex before a citation stays a source button", () => {
+    const { container } = render(
+      <Markdown source={"\\sigma(\\tilde{c},q)\\geq 7. [1]"} math cite={cite} />,
+    )
+    expect(container.querySelector(".katex")).toBeTruthy()
+    expect(container.querySelector('button[aria-label="Source 1"]')).toBeTruthy()
+  })
+
+  it("bare tex attached identifier renders katex", () => {
+    const { container } = render(<Markdown source={"c\\in\\mathcal{E}"} math />)
+    expect(container.querySelector(".katex")).toBeTruthy()
+    expect(container.querySelector(".katex-error")).toBeNull()
+  })
+
+  it("already dollar-wrapped tex is not double wrapped", () => {
+    const { container } = render(
+      <Markdown source={"$\\sigma(\\tilde{c},q)\\geq 7$"} math />,
+    )
+    expect(container.querySelectorAll(".katex").length).toBe(1)
+    expect(container.querySelector(".katex-error")).toBeNull()
+  })
+
+  it("inline code tex is not katex", () => {
+    const { container } = render(<Markdown source={"Use `\\sigma` here"} math />)
+    expect(container.querySelector("code")?.textContent).toContain("\\sigma")
+    expect(container.querySelector(".katex")).toBeNull()
+  })
+
+  it("math false leaves bare tex without katex", () => {
+    const { container } = render(
+      <Markdown source={"\\sigma(\\tilde{c},q)\\geq 7."} math={false} />,
+    )
+    expect(container.querySelector(".katex")).toBeNull()
+    expect(container.textContent).toContain("\\sigma")
+  })
+
+  it("streaming assistant does not wrap bare tex", () => {
+    const { container } = render(
+      <Renderers
+        blocks={[
+          {
+            kind: "assistant",
+            id: "a",
+            content: "\\sigma(\\tilde{c},q)\\geq 7.",
+            streaming: true,
+          },
+        ]}
+        sources={[]}
+        onOpenSource={() => undefined}
+      />,
+    )
+    expect(container.querySelector(".katex")).toBeNull()
+  })
+
+  it("finished assistant wraps bare tex as katex", () => {
+    const { container } = render(
+      <Renderers
+        blocks={[
+          {
+            kind: "assistant",
+            id: "a",
+            content: "\\sigma(\\tilde{c},q)\\geq 7.",
+            streaming: false,
+          },
+        ]}
+        sources={[]}
+        onOpenSource={() => undefined}
+      />,
+    )
+    expect(container.querySelector(".katex")).toBeTruthy()
+    expect(container.querySelector(".katex-error")).toBeNull()
+  })
+
+  it("latex environment inner tex renders katex-display", () => {
+    const { container } = render(
+      <Markdown source={"\\begin{equation}\\sigma(\\tilde{c},q)\\end{equation}"} math />,
+    )
+    expect(container.querySelector(".katex-display")).toBeTruthy()
+    expect(container.querySelector(".katex-error")).toBeNull()
   })
 })
