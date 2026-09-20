@@ -15,10 +15,13 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
 from plan_based_researcher.api.deps import get_graph, get_settings, get_transcript
-from plan_based_researcher.api.replay import snapshot_to_agui_messages
+from plan_based_researcher.api.replay import (
+    items_to_agui_messages,
+    snapshot_to_agui_messages,
+)
 from plan_based_researcher.api.routes import router
 from plan_based_researcher.graph.project import project_turn
-from tests.transcript_memory import MemoryTranscriptStore
+from tests.transcript_memory import MemoryItem, MemoryTranscriptStore
 
 
 class TinyState(TypedDict):
@@ -198,7 +201,8 @@ class ThreadsRouteTest(unittest.IsolatedAsyncioTestCase):
             m.activity_type for m in mapped if getattr(m, "role", None) == "activity"
         ]
         roles = [m.role for m in mapped]
-        self.assertEqual(activity_types, ["GATE", "PLAN", "STEPS", "SOURCES"])
+        self.assertEqual(activity_types, ["PLAN", "STEPS", "SOURCES"])
+        self.assertNotIn("GATE", activity_types)
         self.assertEqual(roles.count("assistant"), 1)
         order = []
         for m in mapped[1:]:
@@ -206,7 +210,7 @@ class ThreadsRouteTest(unittest.IsolatedAsyncioTestCase):
                 order.append(m.activity_type)
             else:
                 order.append(m.role)
-        self.assertEqual(order, ["GATE", "PLAN", "STEPS", "assistant", "SOURCES"])
+        self.assertEqual(order, ["PLAN", "STEPS", "assistant", "SOURCES"])
         assistant = next(m for m in mapped if m.role == "assistant")
         self.assertEqual(assistant.id, "ai-done")
         self.assertEqual(assistant.content, "answer [1]")
@@ -215,7 +219,7 @@ class ThreadsRouteTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(steps.content["elapsed_ms"], 40)
 
     async def test_non_done_replay_is_outcome_not_assistant(self) -> None:
-        for outcome in ("refused", "insufficient", "error"):
+        for outcome in ("insufficient", "error"):
             with self.subTest(outcome=outcome):
                 ai = AIMessage(
                     id=f"ai-{outcome}",
@@ -226,7 +230,7 @@ class ThreadsRouteTest(unittest.IsolatedAsyncioTestCase):
                 roles = [m.role for m in mapped]
                 self.assertNotIn("assistant", roles)
                 types = [m.activity_type for m in mapped if m.role == "activity"]
-                self.assertEqual(types[0], "GATE")
+                self.assertNotIn("GATE", types)
                 self.assertEqual(types[-1], "OUTCOME")
                 outcome_msg = mapped[-1]
                 self.assertEqual(outcome_msg.content["outcome"], outcome)
@@ -408,12 +412,12 @@ class ThreadsRouteTest(unittest.IsolatedAsyncioTestCase):
             for row in messages
         ]
         expected = [
-            ("activity", "GATE"),
             ("activity", "PLAN"),
             ("activity", "STEPS"),
             ("assistant", None),
             ("activity", "SOURCES"),
         ]
+        self.assertNotIn(("activity", "GATE"), sequence)
         self.assertEqual(sequence, expected)
         assistant = next(row for row in messages if row["role"] == "assistant")
         self.assertEqual(assistant["id"], "ai-done")
@@ -421,7 +425,7 @@ class ThreadsRouteTest(unittest.IsolatedAsyncioTestCase):
 
     async def test_non_done_turn_replay_is_outcome_not_assistant(self) -> None:
         compiled = await self._done_refused_graph()
-        for outcome in ("refused", "insufficient", "error"):
+        for outcome in ("insufficient", "error"):
             with self.subTest(outcome=outcome):
                 store = MemoryTranscriptStore()
                 await store.insert_assistant_turn(
@@ -437,11 +441,72 @@ class ThreadsRouteTest(unittest.IsolatedAsyncioTestCase):
                 roles = [row["role"] for row in messages]
                 self.assertNotIn("assistant", roles)
                 types = _activity_types(messages)
-                self.assertEqual(types[0], "GATE")
+                self.assertNotIn("GATE", types)
                 self.assertEqual(types[-1], "OUTCOME")
                 outcome_msg = messages[-1]
                 self.assertEqual(outcome_msg["content"]["outcome"], outcome)
                 self.assertEqual(outcome_msg["content"]["reason"], f"{outcome} because")
+
+    def _assert_refused_assistant(self, mapped: list, turn_id: str) -> None:
+        types = [
+            m.activity_type for m in mapped if getattr(m, "role", None) == "activity"
+        ]
+        self.assertNotIn("GATE", types)
+        self.assertNotIn("OUTCOME", types)
+        assistants = [m for m in mapped if getattr(m, "role", None) == "assistant"]
+        self.assertEqual(len(assistants), 1)
+        self.assertEqual(assistants[0].id, turn_id)
+        self.assertEqual(assistants[0].content, "out of scope")
+
+    async def test_refused_replay_is_assistant_not_gate_or_outcome(self) -> None:
+        ai = AIMessage(
+            id="ai-refused",
+            content="out of scope",
+            response_metadata=_projection("refused"),
+        )
+        self._assert_refused_assistant(
+            snapshot_to_agui_messages([ai]), "ai-refused"
+        )
+        item = MemoryItem(
+            id="ai-refused",
+            thread_id="tid-refused",
+            kind="assistant_turn",
+            payload=_assistant_doc(outcome="refused", content="out of scope"),
+        )
+        self._assert_refused_assistant(
+            items_to_agui_messages([item]), "ai-refused"
+        )
+
+    async def test_insufficient_error_replay_is_outcome_not_gate(self) -> None:
+        for outcome in ("insufficient", "error"):
+            with self.subTest(outcome=outcome):
+                reason = f"{outcome} because"
+                ai = AIMessage(
+                    id=f"ai-{outcome}",
+                    content=reason,
+                    response_metadata=_projection(outcome),
+                )
+                snapshot = snapshot_to_agui_messages([ai])
+                item = MemoryItem(
+                    id=f"ai-{outcome}",
+                    thread_id=f"tid-{outcome}",
+                    kind="assistant_turn",
+                    payload=_assistant_doc(outcome=outcome, content=reason),
+                )
+                items = items_to_agui_messages([item])
+                for mapped in (snapshot, items):
+                    roles = [getattr(m, "role", None) for m in mapped]
+                    types = [
+                        m.activity_type
+                        for m in mapped
+                        if getattr(m, "role", None) == "activity"
+                    ]
+                    self.assertNotIn("assistant", roles)
+                    self.assertNotIn("GATE", types)
+                    self.assertEqual(types[-1], "OUTCOME")
+                    outcome_msg = mapped[-1]
+                    self.assertEqual(outcome_msg.content["outcome"], outcome)
+                    self.assertEqual(outcome_msg.content["reason"], reason)
 
     async def test_status_from_checkpoint_next(self) -> None:
         interrupted_graph = StateGraph(TinyState)

@@ -357,15 +357,41 @@ describe("desk", () => {
     expect(screen.getByLabelText("Message")).not.toBeDisabled()
   })
 
-  it("refused and insufficient render reason only", () => {
-    for (const outcome of ["refused", "insufficient"] as const) {
-      const next = applyEvent(emptyDesk(), {
-        type: "RUN_FINISHED",
-        result: { outcome, reason: `${outcome} because` },
-      })
-      expect(next.blocks.some((b) => b.kind === "outcome" && b.reason === `${outcome} because`)).toBe(true)
-      expect(next.blocks.some((b) => b.kind === "assistant")).toBe(false)
-    }
+  it("refused run finished keeps assistant not outcome", () => {
+    let state = applyEvent(emptyDesk(), { type: "TEXT_MESSAGE_START", messageId: "ai-1" })
+    state = applyEvent(state, {
+      type: "TEXT_MESSAGE_CONTENT",
+      messageId: "ai-1",
+      delta: "out of scope",
+    })
+    state = applyEvent(state, {
+      type: "RUN_FINISHED",
+      result: { outcome: "refused", reason: "out of scope" },
+    })
+    const assistant = state.blocks.find((b) => b.kind === "assistant")
+    expect(assistant?.kind === "assistant" && assistant.content).toBe("out of scope")
+    expect(assistant?.kind === "assistant" && assistant.streaming).toBe(false)
+    expect(state.blocks.some((b) => b.kind === "outcome")).toBe(false)
+  })
+
+  it("insufficient run finished is outcome chip not assistant", () => {
+    const next = applyEvent(emptyDesk(), {
+      type: "RUN_FINISHED",
+      result: { outcome: "insufficient", reason: "not enough papers" },
+    })
+    expect(
+      next.blocks.some((b) => b.kind === "outcome" && b.reason === "not enough papers"),
+    ).toBe(true)
+    expect(next.blocks.some((b) => b.kind === "assistant")).toBe(false)
+  })
+
+  it("applyReplay refused assistant is markdown block", () => {
+    const state = applyReplay([
+      { id: "ai-refused", role: "assistant", content: "out of scope" },
+    ])
+    const assistant = state.blocks.find((b) => b.kind === "assistant")
+    expect(assistant?.kind === "assistant" && assistant.id).toBe("ai-refused")
+    expect(assistant?.kind === "assistant" && assistant.content).toBe("out of scope")
   })
 
   it("run finished measures seconds since run started", () => {

@@ -89,11 +89,15 @@ def snapshot_to_agui_messages(messages: object) -> list:
         projected["citations"] = meta.get("citations") or projected["citations"]
         projected["gate"] = meta.get("gate") or projected["gate"]
         outcome = str(projected.get("outcome") or "done")
-        gate = projected.get("gate") or {}
-        if gate:
+        if outcome == "refused":
             out.append(
-                _activity("GATE", dict(gate), suffix=f"{item_id}-gate")
+                AssistantMessage(
+                    id=item_id,
+                    role="assistant",
+                    content=message_content(item),
+                )
             )
+            continue
         if outcome == "done":
             out.append(
                 _activity("PLAN", {"items": projected["plan"]}, suffix=f"{item_id}-plan")
@@ -129,11 +133,15 @@ def snapshot_to_agui_messages(messages: object) -> list:
 def _turn_messages(item_id: str, doc: dict) -> list:
     out: list = []
     outcome = str(doc.get("outcome") or "done")
-    gate = doc.get("gate") or {}
-    if not isinstance(gate, dict):
-        gate = {}
-    if gate or outcome == "done":
-        out.append(_activity("GATE", dict(gate), suffix=f"{item_id}-gate"))
+    if outcome == "refused":
+        out.append(
+            AssistantMessage(
+                id=item_id,
+                role="assistant",
+                content=str(doc.get("content") or ""),
+            )
+        )
+        return out
     if outcome == "done":
         plan = doc.get("plan") or []
         steps = doc.get("steps") or {}

@@ -191,7 +191,7 @@ class AguiAdapterTest(unittest.IsolatedAsyncioTestCase):
         indexes = {e["metadata"]["step_index"] for e in started}
         self.assertEqual(indexes, {0, 1})
 
-    async def test_gate_event_is_activity_snapshot(self) -> None:
+    async def test_leftover_gate_chunk_is_not_activity_snapshot(self) -> None:
         graph = FakeGraph(
             [
                 (
@@ -208,16 +208,12 @@ class AguiAdapterTest(unittest.IsolatedAsyncioTestCase):
             ]
         )
         events = await collect(AguiAdapter(graph), {"query": "q"})
-        snap = next(e for e in events if e.get("activityType") == "GATE")
-        self.assertEqual(snap["type"], "ACTIVITY_SNAPSHOT")
-        self.assertEqual(
-            snap["content"],
-            {"inDomain": True, "language": "en", "reason": "ok"}
-            if "inDomain" in snap["content"]
-            else {"in_domain": True, "language": "en", "reason": "ok"},
+        self.assertFalse(
+            any(
+                e.get("type") == "ACTIVITY_SNAPSHOT" and e.get("activityType") == "GATE"
+                for e in events
+            )
         )
-        self.assertEqual(snap["content"]["reason"], "ok")
-        self.assertIn("in_domain", snap["content"] | {"in_domain": snap["content"].get("inDomain")})
 
     async def test_plan_event_is_pending_snapshot(self) -> None:
         graph = FakeGraph(
@@ -383,6 +379,54 @@ class AguiAdapterTest(unittest.IsolatedAsyncioTestCase):
             with self.subTest(field=field):
                 self.assertIn(field, item)
                 self.assertEqual(item[field], citation[field])
+
+    async def test_refused_text_end_before_run_finished(self) -> None:
+        mid = str(uuid.uuid4())
+        graph = FakeGraph(
+            [
+                ("custom", {"event": "answer_start", "data": {"message_id": mid}}),
+                (
+                    "custom",
+                    {"event": "answer_delta", "data": {"text": "out of scope"}},
+                ),
+                (
+                    "custom",
+                    {
+                        "event": "done",
+                        "data": {"outcome": "refused", "reason": "out of scope"},
+                    },
+                ),
+            ]
+        )
+        events = await collect(AguiAdapter(graph), {})
+        types = [e["type"] for e in events]
+        end_i = types.index("TEXT_MESSAGE_END")
+        finished_i = types.index("RUN_FINISHED")
+        self.assertLess(end_i, finished_i)
+        self.assertEqual(events[end_i]["messageId"], mid)
+
+    async def test_refused_run_finished_reason(self) -> None:
+        mid = str(uuid.uuid4())
+        graph = FakeGraph(
+            [
+                ("custom", {"event": "answer_start", "data": {"message_id": mid}}),
+                (
+                    "custom",
+                    {"event": "answer_delta", "data": {"text": "out of scope"}},
+                ),
+                (
+                    "custom",
+                    {
+                        "event": "done",
+                        "data": {"outcome": "refused", "reason": "out of scope"},
+                    },
+                ),
+            ]
+        )
+        events = await collect(AguiAdapter(graph), {})
+        finished = next(e for e in events if e["type"] == "RUN_FINISHED")
+        self.assertEqual(finished["result"]["outcome"], "refused")
+        self.assertEqual(finished["result"]["reason"], "out of scope")
 
     async def test_run_finished_reason_null_when_done(self) -> None:
         graph = FakeGraph(

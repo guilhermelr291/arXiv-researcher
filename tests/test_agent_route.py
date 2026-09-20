@@ -112,6 +112,31 @@ def _client(graph=None, timeout=30, store=None):
 
 
 class AgentRouteTest(unittest.TestCase):
+    def test_in_domain_sse_has_no_gate_activity(self) -> None:
+        client, _fake = _client(
+            RecordingGraph(
+                items=[
+                    (
+                        "custom",
+                        {
+                            "event": "plan",
+                            "data": {"steps": [{"agent": "search", "task": "Find"}]},
+                        },
+                    ),
+                    ("custom", {"event": "done", "data": {"outcome": "done"}}),
+                ]
+            )
+        )
+        response = client.post("/agent", json=_body())
+        self.assertEqual(response.status_code, 200)
+        events = parse_sse(response.text)
+        self.assertFalse(
+            any(
+                e.get("type") == "ACTIVITY_SNAPSHOT" and e.get("activityType") == "GATE"
+                for e in events
+            )
+        )
+
     def test_valid_run_starts_with_run_started(self) -> None:
         client, _fake = _client()
         response = client.post("/agent", json=_body())
