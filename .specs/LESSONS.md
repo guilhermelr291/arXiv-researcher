@@ -50,6 +50,18 @@ Seen once or not yet corroborated. Tracked, not trusted.
 - evidence: verification.md C1-C20 no evidence (web)
 - last seen: 2026-09-18T18:49:02Z
 
+### L-007 - Assert the check's concrete counts, statuses, and identifiers in the assertion expression, not only inside a helper the assertion never reads.
+- signal: `spec_precision_gap` · recurrence: 1 feature(s) · scope: `compaction` · harmful: 0
+- features: chat-messages-trimming-and-summarization
+- evidence: C5 (compaction)
+- last seen: 2026-09-21T19:37:02Z
+
+### L-008 - Assert a missing write on the dependency the subject is constructed with; an unused stand-in that stays empty does not prove the subject wrote nothing.
+- signal: `ac_gap` · recurrence: 1 feature(s) · scope: `compaction` · harmful: 0
+- features: chat-messages-trimming-and-summarization
+- evidence: C35 (compaction)
+- last seen: 2026-09-21T19:37:02Z
+
 ## Quarantined (failed when applied - ignore)
 
 A confirmed lesson that recurred alongside failure. Kept for the maintainer to review.

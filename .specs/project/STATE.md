@@ -1,12 +1,18 @@
 # State
 
-**Last Updated:** 2026-09-20
-**Current Work:** Feature `writer-calculator` — built locally (C1–C36 proofs). Commits deferred until asked.
-**Current Work:** Feature `out-of-domain-question-response` — built locally (C1–C20 proofs pending commit). Commits deferred until asked.
+**Last Updated:** 2026-09-21
+**Current Work:** Feature `chat-messages-trimming-and-summarization` — C1–C40 proofs committed locally. Not pushed.
 
 ---
 
 ## Recent Decisions (Last 60 days)
+
+### AD-033: Compaction trims checkpoint messages only (2026-09-21)
+
+**Decision:** Checkpoint `messages` may be trimmed for the planner. `transcript_items` may not. One compaction row per `thread_id` on the app Postgres pool; a successful summary overwrites that row and a failure leaves the previous text. Only the graph apply step removes messages, and only through the checkpoint message id fixed when the job started. The planner reads `conversation_summary` plus the messages still in state. The gate reads the last 3 exchanges and not the summary. The writer stays at 2 exchanges. No synchronous trim when the summary is not ready. No new per-thread lock: the desk already replaces Send with Stop while a run streams.
+**Reason:** Grill-me 2026-09-21. Plan `.specs/features/chat-messages-trimming-and-summarization/plan.md`.
+**Trade-off:** Until the summary is ready, the planner still sees the full message list. A context-window error is a turn error.
+**Impact:** Amends AD-031 "Summary/trim is a later slice" and "prompt windows stay". Does not change `GET /threads` replay, transcript kinds, or `finalize` appending `AIMessage`.
 
 ### AD-032: Writer inner ToolNode loop; calculator is not a plan agent (2026-09-20)
 
