@@ -23,6 +23,7 @@ from plan_based_researcher.eval.strategies import (
 from plan_based_researcher.graph.build import GraphDeps
 from plan_based_researcher.graph.research_graph import ResearchGraph
 from plan_based_researcher.repo.chunks import PgChunkRepository
+from plan_based_researcher.repo.compaction import PgCompactionStore
 from plan_based_researcher.repo.transcript import PgTranscriptStore
 from plan_based_researcher.selector_loop import require_psycopg_compatible_loop
 
@@ -43,6 +44,8 @@ async def lifespan(app: FastAPI):
     await repo.ensure_schema()
     transcript = PgTranscriptStore(pool)
     await transcript.ensure_schema()
+    compaction = PgCompactionStore(pool)
+    await compaction.ensure_schema()
     embeddings = VoyageEmbeddingAdapter(api_key=settings.voyage_api_key)
     papers = ArxivPaperAdapter(mock_arxiv_id=settings.mock_arxiv_id or None)
     hybrid = HybridRetrieveAdapter(repo, embeddings)
@@ -61,7 +64,9 @@ async def lifespan(app: FastAPI):
     )
     app.state.settings = settings
     app.state.pool = pool
-    app.state.graph = ResearchGraph(deps, checkpointer=checkpointer)
+    app.state.graph = ResearchGraph(
+        deps, checkpointer=checkpointer, compaction=compaction
+    )
     app.state.transcript = transcript
     yield
     await pool.close()

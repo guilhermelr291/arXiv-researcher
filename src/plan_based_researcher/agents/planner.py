@@ -6,10 +6,9 @@ import json
 
 from langchain_openai import ChatOpenAI
 
-from plan_based_researcher.agents.history import format_transcript, last_exchanges
+from plan_based_researcher.agents.history import format_transcript
 from plan_based_researcher.agents.registry import PLAN_AGENTS, REGISTRY, planner_prompt_abilities
 from plan_based_researcher.api.schemas import ResearchPlan
-from plan_based_researcher.policy import Policy
 
 __all__ = ["PlannerRunner"]
 
@@ -230,8 +229,12 @@ class PlannerRunner:
     async def run(self, state: dict) -> dict:
         query = state.get("query") or ""
         papers = state.get("papers") or []
-        transcript = format_transcript(
-            last_exchanges(state.get("messages"), Policy.history_window_exchanges)
+        transcript = format_transcript(state.get("messages"))
+        summary = str(state.get("conversation_summary") or "").strip()
+        summary_block = (
+            f"<conversation_summary>\n{summary}\n</conversation_summary>\n\n"
+            if summary
+            else ""
         )
         prompt = (
             "Produce an ordered executable plan. Each step is "
@@ -257,6 +260,7 @@ class PlannerRunner:
             "search for that method is enough; do not demand the original paper.\n\n"
             "Available agents:\n"
             f"{planner_prompt_abilities()}\n\n"
+            f"{summary_block}"
             f"Query:\n{query}\n\n"
             f"Conversation:\n{transcript or query}\n\n"
             f"{_ENGLISH_PLAN_LOCK}\n\n"

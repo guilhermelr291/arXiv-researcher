@@ -15,11 +15,13 @@ class ResearchGraph:
         checkpointer: Any | None = None,
         *,
         halt_before_writer: bool = False,
+        compaction: Any | None = None,
     ):
         self._compiled = build_graph(
             deps,
             checkpointer=checkpointer,
             halt_before_writer=halt_before_writer,
+            compaction=compaction,
         )
 
     def astream(self, input, config=None, **kwargs):
@@ -69,4 +71,6 @@ class ResearchGraph:
             "gate": {},
             "error_message": "",
             "reuse_existing_papers": False,
+            "conversation_summary": "",
+            "applied_watermark": "",
         }

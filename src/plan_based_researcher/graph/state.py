@@ -179,3 +179,5 @@ class GraphState(TypedDict):
     gate: dict
     error_message: str
     reuse_existing_papers: bool
+    conversation_summary: NotRequired[str]
+    applied_watermark: NotRequired[str]
