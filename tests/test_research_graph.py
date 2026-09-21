@@ -65,6 +65,8 @@ class ResearchGraphTest(unittest.TestCase):
                 "gate",
                 "error_message",
                 "reuse_existing_papers",
+                "conversation_summary",
+                "applied_watermark",
             },
         )
         messages = state["messages"]
@@ -78,6 +80,11 @@ class ResearchGraphTest(unittest.TestCase):
         now_ms = int(time.time() * 1000)
         self.assertGreater(state["started_at_ms"], 0)
         self.assertLessEqual(abs(state["started_at_ms"] - now_ms), 5_000)
+
+    def test_initial_state_summary_and_watermark_empty(self) -> None:
+        state = ResearchGraph(_stub_deps()).initial_graph_state("q")
+        self.assertEqual(state["conversation_summary"], "")
+        self.assertEqual(state["applied_watermark"], "")
 
     def test_compiles_with_stub_factory_no_postgres(self) -> None:
         graph = ResearchGraph(_stub_deps())
