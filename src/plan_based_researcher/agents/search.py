@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from langchain_openai import ChatOpenAI
+from plan_based_researcher.llm import openai_chat as ChatOpenAI
 
 from plan_based_researcher.agents.query_schema import (
     FormulatedQuery,

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from langchain_openai import ChatOpenAI
+from plan_based_researcher.llm import openai_chat as ChatOpenAI
 
 from plan_based_researcher.agents.history import format_transcript
 from plan_based_researcher.agents.registry import PLAN_AGENTS, REGISTRY, planner_prompt_abilities

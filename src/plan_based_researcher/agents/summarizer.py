@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from langchain_openai import ChatOpenAI
+from plan_based_researcher.llm import openai_chat as ChatOpenAI
 from pydantic import BaseModel, Field
 
 from plan_based_researcher.agents.registry import REGISTRY

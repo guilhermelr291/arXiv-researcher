@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from langchain_openai import ChatOpenAI
+from plan_based_researcher.llm import openai_chat as ChatOpenAI
 from langsmith import trace
 
 from plan_based_researcher.adapters.hybrid import HybridResult, HybridRetrievePort
