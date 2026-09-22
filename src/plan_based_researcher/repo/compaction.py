@@ -152,3 +152,41 @@ class PgCompactionStore:
                     row.failed_at,
                 ),
             )
+
+    async def update_open_job(self, row: CompactionRow, *, watermark: str) -> bool:
+        """Write the job result only while this watermark is still running or failed."""
+        check_status(row.status)
+        async with self._pool.connection() as conn:
+            cursor = await conn.execute(
+                """
+                UPDATE compaction SET
+                  status = %s,
+                  summary = %s,
+                  error = %s,
+                  token_count_before = %s,
+                  estimated_token_count_after = %s,
+                  summary_token_count = %s,
+                  summarizer_input_tokens = %s,
+                  summarizer_output_tokens = %s,
+                  running_started_at = %s,
+                  failed_at = %s
+                WHERE thread_id = %s
+                  AND watermark = %s
+                  AND status IN ('running', 'failed')
+                """,
+                (
+                    row.status,
+                    row.summary,
+                    row.error,
+                    row.token_count_before,
+                    row.estimated_token_count_after,
+                    row.summary_token_count,
+                    row.summarizer_input_tokens,
+                    row.summarizer_output_tokens,
+                    row.running_started_at,
+                    row.failed_at,
+                    row.thread_id,
+                    watermark,
+                ),
+            )
+            return cursor.rowcount == 1

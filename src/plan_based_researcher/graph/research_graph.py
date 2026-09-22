@@ -71,6 +71,6 @@ class ResearchGraph:
             "gate": {},
             "error_message": "",
             "reuse_existing_papers": False,
-            "conversation_summary": "",
-            "applied_watermark": "",
+            # Leave these off the input. A follow-up replaces any channel it
+            # names, and the checkpoint copy is what the next planner reads.
         }

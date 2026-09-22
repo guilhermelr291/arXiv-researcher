@@ -118,8 +118,9 @@ Proof: `uv run python -m unittest tests.test_compaction_apply -k test_remove_mes
 Proof: `uv run python -m unittest tests.test_compaction_graph -k test_missing_store_enters_gate`
 Proof: `uv run python -m unittest tests.test_compaction_graph -k test_recall_script_has_no_compaction_store`
 
-**C36** - `initial_graph_state("q")` includes `conversation_summary` `""` and an empty applied watermark (door 2)
-Proof: `uv run python -m unittest tests.test_research_graph -k test_initial_state_summary_and_watermark_empty`
+**C36** - `initial_graph_state("q")` omits `conversation_summary` and the applied watermark, and a follow-up input leaves a checkpointed summary `KEEP` and watermark `m2` in place (door 2)
+Proof: `uv run python -m unittest tests.test_research_graph -k test_initial_state_omits_summary_and_watermark`
+Proof: `uv run python -m unittest tests.test_compaction_graph -k test_follow_up_input_keeps_checkpoint_summary`
 
 ### S3 - A failed job stays off the chat · ~8 KB · ~2k
 
@@ -155,7 +156,7 @@ Proof: `uv run python -m unittest tests.test_compaction_apply -k test_summarizer
 | late job result (2) | ready C39 · failed C40 | - |
 | stale running (4) | C38, table-driven over all 4 | - |
 | door 1 summary text (2) | overwrite C6 · keep previous C11 | - |
-| door 2 state fields (3) | summary on cut C15 · watermark on cut C16 · empty at init C36 | - |
+| door 2 state fields (3) | summary on cut C15 · watermark on cut C16 · omitted from follow-up input C36 | - |
 | removed ids (2) | m1 C34 · m2 C34 | - |
 
 - `POST /agent` keeps its current statuses. C23 crosses resume: `astream` input `None`, and the resume stream has no `compact` update. This feature adds no HTTP status.

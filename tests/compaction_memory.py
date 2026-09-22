@@ -20,3 +20,15 @@ class MemoryCompactionStore:
     async def upsert(self, row: CompactionRow) -> None:
         check_status(row.status)
         self.rows[row.thread_id] = row
+
+    async def update_open_job(self, row: CompactionRow, *, watermark: str) -> bool:
+        check_status(row.status)
+        current = self.rows.get(row.thread_id)
+        if (
+            current is None
+            or current.watermark != watermark
+            or current.status not in {"running", "failed"}
+        ):
+            return False
+        self.rows[row.thread_id] = row
+        return True

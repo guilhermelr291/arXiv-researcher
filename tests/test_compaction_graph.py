@@ -60,6 +60,25 @@ class CompactionGraphTest(unittest.IsolatedAsyncioTestCase):
         await stream.aclose()
         return nodes
 
+    async def test_follow_up_input_keeps_checkpoint_summary(self) -> None:
+        graph = ResearchGraph(_deps(), checkpointer=MemorySaver())
+        config = {"configurable": {"thread_id": "tid-keep-summary"}}
+        await graph._compiled.aupdate_state(
+            config,
+            {"conversation_summary": "KEEP", "applied_watermark": "m2"},
+        )
+        await self._nodes_until(
+            graph.astream(
+                graph.initial_graph_state("follow up"),
+                config,
+                stream_mode="updates",
+            ),
+            "gate",
+        )
+        snapshot = await graph.aget_state(config)
+        self.assertEqual(snapshot.values["conversation_summary"], "KEEP")
+        self.assertEqual(snapshot.values["applied_watermark"], "m2")
+
     async def test_fresh_run_visits_compact_before_gate(self) -> None:
         graph = ResearchGraph(_deps())
         state = graph.initial_graph_state("q")

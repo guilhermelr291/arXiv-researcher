@@ -444,6 +444,76 @@ class CompactionApplyTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(row.summary, "OLD-SUMMARY")
         self.assertEqual(state["outcome"], "pending")
 
+    async def test_late_success_does_not_replace_a_newer_watermark(self) -> None:
+        messages = [
+            _msg("wm-1", "assistant", 8000),
+            _msg("keep", "user", 40001),
+        ]
+        state = {
+            "messages": messages,
+            "conversation_summary": "",
+            "applied_watermark": "",
+            "outcome": "pending",
+        }
+        store = MemoryCompactionStore()
+        hold = _Hold(SummaryResult(text="OLD-JOB", input_tokens=1, output_tokens=1))
+        result = await plan_compact(
+            state, store, thread_id="t-1", summarizer=hold, now=_Clock()
+        )
+        await hold.started.wait()
+        await store.upsert(
+            CompactionRow(
+                thread_id="t-1",
+                status="running",
+                watermark="wm-2",
+                summary="NEWER",
+                running_started_at=1.0,
+            )
+        )
+        hold.release.set()
+        assert result.job is not None
+        await result.job
+        row = await store.get("t-1")
+        assert row is not None
+        self.assertEqual(row.status, "running")
+        self.assertEqual(row.watermark, "wm-2")
+        self.assertEqual(row.summary, "NEWER")
+
+    async def test_late_failure_does_not_fail_a_newer_watermark(self) -> None:
+        messages = [
+            _msg("wm-1", "assistant", 8000),
+            _msg("keep", "user", 40001),
+        ]
+        state = {
+            "messages": messages,
+            "conversation_summary": "",
+            "applied_watermark": "",
+            "outcome": "pending",
+        }
+        store = MemoryCompactionStore()
+        hold = _Hold(error=RuntimeError("boom"))
+        result = await plan_compact(
+            state, store, thread_id="t-1", summarizer=hold, now=_Clock()
+        )
+        await hold.started.wait()
+        await store.upsert(
+            CompactionRow(
+                thread_id="t-1",
+                status="running",
+                watermark="wm-2",
+                summary="NEWER",
+            )
+        )
+        hold.release.set()
+        assert result.job is not None
+        await result.job
+        row = await store.get("t-1")
+        assert row is not None
+        self.assertEqual(row.status, "running")
+        self.assertEqual(row.watermark, "wm-2")
+        self.assertEqual(row.summary, "NEWER")
+        self.assertEqual(row.error, "")
+
 
 if __name__ == "__main__":
     unittest.main()

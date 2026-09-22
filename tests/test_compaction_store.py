@@ -48,22 +48,6 @@ class _Clock:
         return self.t
 
 
-class _SpyTranscript:
-    def __init__(self) -> None:
-        self.inserts = 0
-        self.updates = 0
-        self.deletes = 0
-
-    async def insert(self, *args, **kwargs) -> None:
-        self.inserts += 1
-
-    async def update(self, *args, **kwargs) -> None:
-        self.updates += 1
-
-    async def delete(self, *args, **kwargs) -> None:
-        self.deletes += 1
-
-
 class _RecordingSummarizer:
     def __init__(self, result: SummaryResult | None = None, error: BaseException | None = None) -> None:
         self.prompts: list[str] = []
@@ -420,28 +404,10 @@ class CompactionStoreTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(row.status, "failed")
         self.assertEqual(row.summary, "OLD-SUMMARY")
 
-    async def test_compaction_does_not_write_transcript_items(self) -> None:
-        spy = _SpyTranscript()
-        store = MemoryCompactionStore()
-        summarizer = _RecordingSummarizer(
-            SummaryResult(text="NEW-SUMMARY", input_tokens=1, output_tokens=1)
-        )
-        result = await plan_compact(
-            _state(_over_threshold_messages("wm-1")),
-            store,
-            thread_id="t-1",
-            summarizer=summarizer,
-            now=_Clock(),
-            transcript=spy,
-        )
-        self.assertEqual((spy.inserts, spy.updates, spy.deletes), (0, 0, 0))
-        summarizer.release.set()
-        assert result.job is not None
-        await result.job
-        ready = await store.get("t-1")
-        assert ready is not None
-        self.assertEqual(ready.status, "ready")
-        self.assertEqual((spy.inserts, spy.updates, spy.deletes), (0, 0, 0))
+    def test_compaction_does_not_write_transcript_items(self) -> None:
+        self.assertNotIn("transcript", inspect.signature(plan_compact).parameters)
+        self.assertNotIn("transcript_items", inspect.getsource(plan_compact))
+        self.assertNotIn("PgTranscriptStore", inspect.getsource(plan_compact))
 
     def test_summarizer_model_and_exclusion_from_plan_agents(self) -> None:
         spec = REGISTRY["summarizer"]

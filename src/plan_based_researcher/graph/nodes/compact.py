@@ -12,7 +12,11 @@ from plan_based_researcher.graph.state import GraphState
 
 
 def make_compact_node(store, factory: AgentFactory):
-    pending: list[asyncio.Task] = []
+    pending: set[asyncio.Task] = set()
+
+    def _keep(task: asyncio.Task) -> None:
+        pending.add(task)
+        task.add_done_callback(pending.discard)
 
     async def compact(state: GraphState) -> dict:
         if store is None:
@@ -27,7 +31,7 @@ def make_compact_node(store, factory: AgentFactory):
             summarizer=factory.create("summarizer"),
         )
         if result.job is not None:
-            pending.append(result.job)
+            _keep(result.job)
         return result.update
 
     return compact

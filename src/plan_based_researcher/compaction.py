@@ -156,6 +156,14 @@ def _error_text(exc: BaseException) -> str:
     return text or type(exc).__name__
 
 
+def _job_still_open(row: CompactionRow | None, watermark: str) -> bool:
+    return (
+        row is not None
+        and row.watermark == watermark
+        and row.status in {"running", "failed"}
+    )
+
+
 async def commit_ready(
     store,
     thread_id: str,
@@ -194,6 +202,7 @@ async def _finish_job(
     summarizer,
     prompt: str,
     *,
+    watermark: str,
     suffix_tokens: int,
     clock,
 ) -> None:
@@ -206,32 +215,36 @@ async def _finish_job(
         )
     except Exception as exc:
         failed = await store.get(thread_id)
-        if failed is None:
+        if not _job_still_open(failed, watermark):
             return
-        await store.upsert(
+        await store.update_open_job(
             replace(
                 failed,
                 status="failed",
                 error=_error_text(exc),
                 summary=previous,
                 failed_at=float(clock()),
-            )
+            ),
+            watermark=watermark,
         )
         return
     ready = await store.get(thread_id)
-    if ready is None:
+    if not _job_still_open(ready, watermark):
         return
     summary_tokens = count_text(result.text)
-    await commit_ready(
-        store,
-        thread_id,
-        summary=result.text,
-        watermark=ready.watermark,
-        token_count_before=ready.token_count_before,
-        estimated_token_count_after=summary_tokens + suffix_tokens,
-        summary_token_count=summary_tokens,
-        summarizer_input_tokens=int(result.input_tokens),
-        summarizer_output_tokens=int(result.output_tokens),
+    await store.update_open_job(
+        replace(
+            ready,
+            status="ready",
+            summary=result.text,
+            error="",
+            token_count_before=ready.token_count_before,
+            estimated_token_count_after=summary_tokens + suffix_tokens,
+            summary_token_count=summary_tokens,
+            summarizer_input_tokens=int(result.input_tokens),
+            summarizer_output_tokens=int(result.output_tokens),
+        ),
+        watermark=watermark,
     )
 
 
@@ -254,7 +267,6 @@ async def plan_compact(
     thread_id: str,
     summarizer=None,
     now=None,
-    transcript=None,
 ) -> CompactResult:
     """One compaction pass. The summary job is not awaited."""
     clock = now or time.time
@@ -337,6 +349,7 @@ async def plan_compact(
             thread_id,
             summarizer,
             prompt,
+            watermark=choice.watermark_id,
             suffix_tokens=choice.suffix_tokens,
             clock=clock,
         )
