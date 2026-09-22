@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import unittest
 from types import SimpleNamespace
+from typing import TypedDict
 from unittest.mock import MagicMock, patch
+
+from langgraph.graph import START, StateGraph
 
 from plan_based_researcher.agents.writer import (
     WriterRunner,
@@ -336,6 +339,33 @@ class WriterRunnerStreamTest(unittest.IsolatedAsyncioTestCase):
         names = {p["event"] for p in payloads}
         self.assertTrue(names <= allowed)
         self.assertEqual(names, allowed)
+
+    async def test_parent_execute_stream_receives_writer_deltas(self) -> None:
+        class Parent(TypedDict, total=False):
+            n: int
+
+        with patch(_CHAT, return_value=_llm("Hello ", "world")):
+            runner = WriterRunner(api_key="sk-test")
+
+            async def execute(_state: Parent) -> dict:
+                await runner.run({"query": "q", "evidence_chunks": [_chunk()]})
+                return {"n": 1}
+
+            graph = StateGraph(Parent)
+            graph.add_node("execute", execute)
+            graph.add_edge(START, "execute")
+            app = graph.compile()
+            events = []
+            async for mode, chunk in app.astream({}, stream_mode=["custom", "updates"]):
+                if mode == "custom":
+                    events.append(chunk)
+        kinds = [event["event"] for event in events]
+        self.assertEqual(
+            kinds,
+            ["answer_start", "answer_delta", "answer_delta", "citations"],
+        )
+        texts = [event["data"]["text"] for event in events if event["event"] == "answer_delta"]
+        self.assertEqual(texts, ["Hello ", "world"])
 
 
 if __name__ == "__main__":
