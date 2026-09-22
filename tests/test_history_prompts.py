@@ -39,51 +39,48 @@ def _human_blob(payload: object) -> str:
 
 
 class HistoryPromptsTest(unittest.IsolatedAsyncioTestCase):
-    async def test_gate_and_planner_window_is_six(self) -> None:
-        self.assertEqual(Policy.history_window_exchanges, 6)
+    async def test_gate_window_is_three_exchanges_and_planner_sees_all(self) -> None:
+        self.assertEqual(Policy.history_window_exchanges, 3)
         messages = _exchanges(8)
         state = {"query": "user-8", "messages": messages, "papers": []}
 
-        for agent in ("gate", "planner"):
-            with self.subTest(agent=agent):
-                captured: list[str] = []
-                if agent == "gate":
-                    structured = MagicMock()
+        captured: list[str] = []
+        structured = MagicMock()
 
-                    async def ainvoke(payload):
-                        captured.append(_human_blob(payload))
-                        decision = MagicMock()
-                        decision.in_domain = True
-                        decision.model_dump.return_value = {
-                            "in_domain": True,
-                            "language": "en",
-                            "reason": "ok",
-                        }
-                        return decision
+        async def gate_invoke(payload):
+            captured.append(_human_blob(payload))
+            decision = MagicMock()
+            decision.in_domain = True
+            decision.model_dump.return_value = {
+                "in_domain": True,
+                "language": "en",
+                "reason": "ok",
+            }
+            return decision
 
-                    structured.ainvoke = ainvoke
-                    llm = MagicMock()
-                    llm.with_structured_output.return_value = structured
-                    with patch(_GATE_LLM, return_value=llm):
-                        await GateRunner(api_key="sk-test").run(state)
-                else:
-                    structured = MagicMock()
+        structured.ainvoke = gate_invoke
+        llm = MagicMock()
+        llm.with_structured_output.return_value = structured
+        with patch(_GATE_LLM, return_value=llm):
+            await GateRunner(api_key="sk-test").run(state)
+        blob = "\n".join(captured)
+        for i in range(6, 9):
+            self.assertIn(f"user-{i}", blob)
+        for i in range(1, 6):
+            self.assertNotIn(f"user-{i}", blob)
 
-                    async def ainvoke(payload):
-                        captured.append(_human_blob(payload))
-                        return ResearchPlan(steps=[])
+        captured.clear()
 
-                    structured.ainvoke = ainvoke
-                    llm = MagicMock()
-                    llm.with_structured_output.return_value = structured
-                    with patch(_PLANNER_LLM, return_value=llm):
-                        await PlannerRunner(api_key="sk-test").run(state)
+        async def plan_invoke(payload):
+            captured.append(_human_blob(payload))
+            return ResearchPlan(steps=[])
 
-                blob = "\n".join(captured)
-                for i in range(3, 9):
-                    self.assertIn(f"user-{i}", blob)
-                self.assertNotIn("user-1", blob)
-                self.assertNotIn("user-2", blob)
+        structured.ainvoke = plan_invoke
+        with patch(_PLANNER_LLM, return_value=llm):
+            await PlannerRunner(api_key="sk-test").run(state)
+        blob = "\n".join(captured)
+        self.assertIn("user-1", blob)
+        self.assertIn("user-8", blob)
 
     async def test_writer_window_is_two_plus_evidence(self) -> None:
         self.assertEqual(Policy.writer_history_exchanges, 2)
@@ -156,6 +153,156 @@ class HistoryPromptsTest(unittest.IsolatedAsyncioTestCase):
         self.assertIn("QLoRA", blob)
         self.assertIn("omit search", blob.lower())
         self.assertIn("already admitted", blob.lower())
+
+    async def test_planner_summary_before_query_and_all_messages(self) -> None:
+        captured: list[str] = []
+        structured = MagicMock()
+
+        async def ainvoke(payload):
+            captured.append(_human_blob(payload))
+            return ResearchPlan(steps=[])
+
+        structured.ainvoke = ainvoke
+        llm = MagicMock()
+        llm.with_structured_output.return_value = structured
+        state = {
+            "query": "user-8",
+            "messages": _exchanges(8),
+            "papers": [],
+            "conversation_summary": "GOAL-42",
+        }
+        with patch(_PLANNER_LLM, return_value=llm):
+            await PlannerRunner(api_key="sk-test").run(state)
+        blob = "\n".join(captured)
+        tag = blob.index("<conversation_summary>")
+        query = blob.index("Query:")
+        self.assertLess(tag, query)
+        self.assertIn("Produce an ordered executable plan", blob[:tag])
+        self.assertIn("GOAL-42", blob[tag:query])
+        self.assertIn("user-1", blob)
+
+    async def test_planner_omits_summary_tag_when_empty(self) -> None:
+        for summary in ("", None):
+            with self.subTest(summary=summary):
+                captured: list[str] = []
+                structured = MagicMock()
+
+                async def ainvoke(payload):
+                    captured.append(_human_blob(payload))
+                    return ResearchPlan(steps=[])
+
+                structured.ainvoke = ainvoke
+                llm = MagicMock()
+                llm.with_structured_output.return_value = structured
+                state = {
+                    "query": "hello",
+                    "messages": [{"role": "user", "content": "hello"}],
+                    "papers": [],
+                }
+                if summary is not None:
+                    state["conversation_summary"] = summary
+                with patch(_PLANNER_LLM, return_value=llm):
+                    await PlannerRunner(api_key="sk-test").run(state)
+                blob = "\n".join(captured)
+                self.assertNotIn("<conversation_summary>", blob)
+
+    async def test_gate_last_six_messages_omit_summary(self) -> None:
+        messages = [{"role": "user", "content": f"msg-{i}"} for i in range(8)]
+        state = {
+            "query": "msg-7",
+            "messages": messages,
+            "conversation_summary": "GOAL-42",
+        }
+        captured: list[str] = []
+        structured = MagicMock()
+
+        async def ainvoke(payload):
+            captured.append(_human_blob(payload))
+            decision = MagicMock()
+            decision.in_domain = True
+            decision.model_dump.return_value = {
+                "in_domain": True,
+                "language": "en",
+                "reason": "ok",
+            }
+            return decision
+
+        structured.ainvoke = ainvoke
+        llm = MagicMock()
+        llm.with_structured_output.return_value = structured
+        with patch(_GATE_LLM, return_value=llm):
+            await GateRunner(api_key="sk-test").run(state)
+        blob = "\n".join(captured)
+        for i in range(2, 8):
+            self.assertIn(f"msg-{i}", blob)
+        self.assertNotIn("msg-0", blob)
+        self.assertNotIn("msg-1", blob)
+        self.assertNotIn("<conversation_summary>", blob)
+        self.assertNotIn("GOAL-42", blob)
+
+    async def test_writer_two_exchanges_omit_summary(self) -> None:
+        state = {
+            "query": "user-4",
+            "messages": _exchanges(4),
+            "conversation_summary": "GOAL-42",
+            "evidence_chunks": [
+                {
+                    "chunk_id": "c1",
+                    "n": 1,
+                    "arxiv_id": "2401.00001",
+                    "title": "LoRA",
+                    "year": 2024,
+                    "url": "https://arxiv.org/abs/2401.00001",
+                    "excerpt": "excerpt",
+                }
+            ],
+            "plan": [{"agent": "writer", "task": "Write"}],
+            "step_index": 0,
+            "gate": {"language": "en"},
+        }
+        llm = MagicMock()
+        seen: list[str] = []
+
+        async def astream(payload):
+            seen.append(_human_blob(payload))
+            if False:
+                yield None
+
+        llm.astream = astream
+        llm.bind_tools.return_value = llm
+        with patch(_WRITER_LLM, return_value=llm):
+            await WriterRunner(api_key="sk-test").run(state)
+        blob = "\n".join(seen)
+        self.assertIn("user-3", blob)
+        self.assertIn("user-4", blob)
+        self.assertNotIn("user-1", blob)
+        self.assertNotIn("user-2", blob)
+        self.assertNotIn("<conversation_summary>", blob)
+        self.assertNotIn("GOAL-42", blob)
+
+    async def test_replan_remaining_omits_summary(self) -> None:
+        captured: list[str] = []
+        structured = MagicMock()
+
+        async def ainvoke(payload):
+            captured.append(_human_blob(payload))
+            return ResearchPlan(steps=[])
+
+        structured.ainvoke = ainvoke
+        llm = MagicMock()
+        llm.with_structured_output.return_value = structured
+        state = {
+            "query": "follow up",
+            "messages": [{"role": "user", "content": "follow up"}],
+            "papers": [],
+            "plan": [],
+            "conversation_summary": "GOAL-42",
+        }
+        with patch(_PLANNER_LLM, return_value=llm):
+            await PlannerRunner(api_key="sk-test").replan_remaining(state)
+        blob = "\n".join(captured)
+        self.assertNotIn("<conversation_summary>", blob)
+        self.assertNotIn("GOAL-42", blob)
 
 
 if __name__ == "__main__":

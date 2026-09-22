@@ -43,7 +43,15 @@ class Policy:
     retrieve_hop_cap: int = 6
     retrieve_hop_voyage_docs: int = 15
     retrieve_hop_rrf_k: int = 60
-    history_window_exchanges: int = 6
+    history_window_exchanges: int = 3
+    history_token_encoding: str = "o200k_base"
+    compaction_trigger_tokens: int = 48000
+    compaction_min_prefix_tokens: int = 8000
+    compaction_min_suffix_tokens: int = 16000
+    compaction_failed_cooldown_seconds: int = 30
+    compaction_timeout_seconds: int = 90
+    summarizer_reasoning_effort: str = "medium"
+    summarizer_max_completion_tokens: int = 2500
     writer_history_exchanges: int = 2
     writer_calculator_rounds: int = 8
     writer_calculator_expression_max: int = 200

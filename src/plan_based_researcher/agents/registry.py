@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-Role = Literal["gate", "planner", "search", "retrieve", "writer"]
+Role = Literal["gate", "planner", "search", "retrieve", "writer", "summarizer"]
 
 _PLANNER_WRITER_MODEL = "gpt-5.6-luna"
 _MINI_MODEL = "gpt-5.6-luna"
@@ -84,6 +84,16 @@ REGISTRY: dict[str, AgentSpec] = {
         model=_PLANNER_WRITER_MODEL,
         tools=("calculator",),
         role="writer",
+    ),
+    "summarizer": AgentSpec(
+        name="summarizer",
+        abilities=(
+            "Write an English summary of the applied conversation prefix "
+            "for the planner. No tools. Not a plan step."
+        ),
+        model=_PLANNER_WRITER_MODEL,
+        tools=(),
+        role="summarizer",
     ),
 }
 

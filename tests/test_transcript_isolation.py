@@ -13,7 +13,7 @@ _RECENTS = _ROOT / "web" / "lib" / "recents.ts"
 class TranscriptIsolationTest(unittest.TestCase):
     def test_graph_nodes_do_not_import_transcript(self) -> None:
         files = sorted(path for path in _NODES.glob("*.py"))
-        self.assertEqual(len(files), 9)
+        self.assertEqual(len(files), 10)
         for path in files:
             with self.subTest(name=path.name):
                 for line in path.read_text(encoding="utf-8").splitlines():

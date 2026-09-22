@@ -12,6 +12,7 @@ from plan_based_researcher.eval.strategies import (
     RetrieveEvalStrategy,
     SearchEvalStrategy,
 )
+from plan_based_researcher.graph.nodes.compact import make_compact_node
 from plan_based_researcher.graph.nodes.dispatch import make_dispatch_node
 from plan_based_researcher.graph.nodes.evaluate import make_evaluate_node
 from plan_based_researcher.graph.nodes.execute import make_execute_node
@@ -54,9 +55,14 @@ def build_graph(
     checkpointer: Any | None = None,
     *,
     halt_before_writer: bool = False,
+    compaction: Any | None = None,
 ):
-    """Compile gate → planner → dispatch → search|execute → evaluate → replan|finalize."""
+    """Compile compact → gate → planner → dispatch → search|execute → evaluate → replan|finalize."""
     graph = StateGraph(GraphState)
+    graph.add_node(
+        "compact",
+        wrap_node("compact", make_compact_node(compaction, deps.factory)),
+    )
     graph.add_node("gate", wrap_node("gate", make_gate_node(deps.factory)))
     graph.add_node("planner", wrap_node("planner", make_planner_node(deps.factory)))
     graph.add_node(
@@ -73,7 +79,8 @@ def build_graph(
     graph.add_node("replan", wrap_node("replan", make_replan_node(deps.factory)))
     graph.add_node("finalize", wrap_node("finalize", make_finalize_node()))
 
-    graph.add_edge(START, "gate")
+    graph.add_edge(START, "compact")
+    graph.add_edge("compact", "gate")
     graph.add_conditional_edges(
         "gate",
         _after_gate,

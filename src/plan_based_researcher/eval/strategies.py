@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal, Protocol
 
-from langchain_openai import ChatOpenAI
+from plan_based_researcher.llm import openai_chat as ChatOpenAI
 
 from plan_based_researcher.agents.registry import REGISTRY
 from plan_based_researcher.eval.types import (

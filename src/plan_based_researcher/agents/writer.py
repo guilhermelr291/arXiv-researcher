@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import uuid
+from contextvars import ContextVar
 
 from langchain_core.messages import (
     AIMessage,
@@ -12,7 +13,7 @@ from langchain_core.messages import (
     SystemMessage,
     ToolMessage,
 )
-from langchain_openai import ChatOpenAI
+from plan_based_researcher.llm import openai_chat as ChatOpenAI
 from langgraph.config import get_stream_writer
 from langgraph.graph import START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
@@ -32,6 +33,9 @@ from plan_based_researcher.policy import Policy
 __all__ = ["WriterRunner", "living_and_missing"]
 
 _CITATION_RE = re.compile(r"\[(\d+)\]")
+# The inner writer graph replaces get_stream_writer() with a no-op. run()
+# captures the execute-node writer here so answer_delta still reaches POST /agent.
+_parent_stream: ContextVar[object | None] = ContextVar("writer_parent_stream", default=None)
 
 
 def _visible_text(chunk: object) -> str:
@@ -53,9 +57,24 @@ def _visible_text(chunk: object) -> str:
     return ""
 
 
+def _has_tool_call(message: object | None) -> bool:
+    if message is None:
+        return False
+    if list(getattr(message, "tool_calls", None) or []):
+        return True
+    return bool(list(getattr(message, "tool_call_chunks", None) or []))
+
+
 def _emit_custom(event: str, data: object) -> None:
+    payload = {"event": event, "data": data}
+    parent = _parent_stream.get()
+    if parent is None:
+        try:
+            parent = get_stream_writer()
+        except RuntimeError:
+            return
     try:
-        get_stream_writer()({"event": event, "data": data})
+        parent(payload)
     except RuntimeError:
         return
 
@@ -385,21 +404,14 @@ class WriterRunner:
         )
         parts: list[str] = []
         last: object | None = None
-        try:
-            async for chunk in llm.astream(messages):
-                last = last + chunk if isinstance(last, AIMessageChunk) else chunk
-                text = _visible_text(chunk)
-                if text:
-                    parts.append(text)
-        except Exception:
-            if not list(getattr(last, "tool_calls", None) or []):
-                for text in parts:
-                    _emit_custom("answer_delta", {"text": text})
-            raise
-        tool_calls = list(getattr(last, "tool_calls", None) or [])
-        if not tool_calls:
-            for text in parts:
+        async for chunk in llm.astream(messages):
+            last = last + chunk if isinstance(last, AIMessageChunk) else chunk
+            text = _visible_text(chunk)
+            if text:
+                parts.append(text)
+            if text and not _has_tool_call(last):
                 _emit_custom("answer_delta", {"text": text})
+        tool_calls = list(getattr(last, "tool_calls", None) or [])
         content = last.content if isinstance(last, AIMessageChunk) else "".join(parts)
         return {
             "messages": [
@@ -411,6 +423,17 @@ class WriterRunner:
         }
 
     async def run(self, state: GraphState) -> dict:
+        try:
+            parent = get_stream_writer()
+        except RuntimeError:
+            parent = None
+        token = _parent_stream.set(parent)
+        try:
+            return await self._run(state)
+        finally:
+            _parent_stream.reset(token)
+
+    async def _run(self, state: GraphState) -> dict:
         chunks: list[EvidenceChunk] = list(state.get("evidence_chunks") or [])
         if not chunks:
             chunks = prior_citation_chunks(state)

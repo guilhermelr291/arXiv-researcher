@@ -3,7 +3,7 @@
   "promote_threshold": 2,
   "window_days": 45,
   "quarantine_threshold": 2,
-  "next_id": 7,
+  "next_id": 9,
   "lessons": [
     {
       "id": "L-001",
@@ -112,6 +112,42 @@
       ],
       "created": "2026-09-18T18:49:02Z",
       "last_seen": "2026-09-18T18:49:02Z"
+    },
+    {
+      "id": "L-007",
+      "key": "spec_precision_gap::assert the check s concrete counts statuses and identifiers in the assertion expression not only inside a helper the assertion never reads",
+      "text": "Assert the check's concrete counts, statuses, and identifiers in the assertion expression, not only inside a helper the assertion never reads.",
+      "signal": "spec_precision_gap",
+      "scope": "compaction",
+      "status": "candidate",
+      "features": [
+        "chat-messages-trimming-and-summarization"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "C5 (compaction)"
+      ],
+      "created": "2026-09-21T19:37:02Z",
+      "last_seen": "2026-09-21T19:37:02Z"
+    },
+    {
+      "id": "L-008",
+      "key": "ac_gap::assert a missing write on the dependency the subject is constructed with an unused stand in that stays empty does not prove the subject wrote nothing",
+      "text": "Assert a missing write on the dependency the subject is constructed with; an unused stand-in that stays empty does not prove the subject wrote nothing.",
+      "signal": "ac_gap",
+      "scope": "compaction",
+      "status": "candidate",
+      "features": [
+        "chat-messages-trimming-and-summarization"
+      ],
+      "recurrence": 1,
+      "harmful": 0,
+      "evidence": [
+        "C35 (compaction)"
+      ],
+      "created": "2026-09-21T19:37:02Z",
+      "last_seen": "2026-09-21T19:37:02Z"
     }
   ]
 }

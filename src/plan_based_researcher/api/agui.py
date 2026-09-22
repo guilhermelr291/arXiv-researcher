@@ -133,6 +133,17 @@ class AguiAdapter:
         started = time.monotonic()
         config = config or {"configurable": {"thread_id": thread_id}}
         stream = None
+        finished: tuple[str, str | None] | None = None
+
+        def finish_frame(outcome: str, reason: str | None) -> str:
+            return encoder.encode(
+                RunFinishedEvent(
+                    type=EventType.RUN_FINISHED,
+                    thread_id=thread_id,
+                    run_id=run_id,
+                    result={"outcome": outcome, "reason": reason},
+                )
+            )
 
         async def persist(outcome: str, reason: str | None) -> None:
             if self._transcript is None:
@@ -176,30 +187,24 @@ class AguiAdapter:
             while True:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
-                    await persist("insufficient", "timeout")
-                    yield encoder.encode(
-                        RunFinishedEvent(
-                            type=EventType.RUN_FINISHED,
-                            thread_id=thread_id,
-                            run_id=run_id,
-                            result={"outcome": "insufficient", "reason": "timeout"},
-                        )
-                    )
+                    if finished is None:
+                        await persist("insufficient", "timeout")
+                        yield finish_frame("insufficient", "timeout")
+                    else:
+                        yield finish_frame(*finished)
                     return
                 try:
                     item = await asyncio.wait_for(anext(aiter, None), timeout=remaining)
                 except (TimeoutError, asyncio.TimeoutError):
-                    await persist("insufficient", "timeout")
-                    yield encoder.encode(
-                        RunFinishedEvent(
-                            type=EventType.RUN_FINISHED,
-                            thread_id=thread_id,
-                            run_id=run_id,
-                            result={"outcome": "insufficient", "reason": "timeout"},
-                        )
-                    )
+                    if finished is None:
+                        await persist("insufficient", "timeout")
+                        yield finish_frame("insufficient", "timeout")
+                    else:
+                        yield finish_frame(*finished)
                     return
                 if item is None:
+                    if finished is not None:
+                        yield finish_frame(*finished)
                     return
                 mode, chunk = item
                 if mode == "updates":
@@ -353,6 +358,8 @@ class AguiAdapter:
                         )
                     )
                 elif event in ("done", "insufficient", "error"):
+                    if finished is not None:
+                        continue
                     if assistant_id is not None and text_open:
                         text_open = False
                         yield encoder.encode(
@@ -371,15 +378,9 @@ class AguiAdapter:
                         outcome = "error"
                         reason = data.get("message")
                     await persist(outcome, None if reason is None else str(reason))
-                    yield encoder.encode(
-                        RunFinishedEvent(
-                            type=EventType.RUN_FINISHED,
-                            thread_id=thread_id,
-                            run_id=run_id,
-                            result={"outcome": outcome, "reason": reason},
-                        )
-                    )
-                    return
+                    # The AIMessage is applied after this event, at the step
+                    # boundary. Keep reading until the graph stream ends.
+                    finished = (outcome, None if reason is None else str(reason))
         except Exception as exc:
             await persist("error", str(exc))
             yield encoder.encode(

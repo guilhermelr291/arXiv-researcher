@@ -79,6 +79,11 @@ class ResearchGraphTest(unittest.TestCase):
         self.assertGreater(state["started_at_ms"], 0)
         self.assertLessEqual(abs(state["started_at_ms"] - now_ms), 5_000)
 
+    def test_initial_state_omits_summary_and_watermark(self) -> None:
+        state = ResearchGraph(_stub_deps()).initial_graph_state("q")
+        self.assertNotIn("conversation_summary", state)
+        self.assertNotIn("applied_watermark", state)
+
     def test_compiles_with_stub_factory_no_postgres(self) -> None:
         graph = ResearchGraph(_stub_deps())
         self.assertIsNotNone(graph._compiled)

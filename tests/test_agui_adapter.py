@@ -8,8 +8,11 @@ import unittest
 import uuid
 from typing import Annotated, TypedDict
 
+from langchain_core.messages import AIMessage
+from langgraph.checkpoint.memory import MemorySaver
 from langgraph.config import get_stream_writer
 from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
 from langgraph.types import Command, Send
 
 from plan_based_researcher.api import agui as agui_mod
@@ -436,3 +439,31 @@ class AguiAdapterTest(unittest.IsolatedAsyncioTestCase):
         finished = next(e for e in events if e["type"] == "RUN_FINISHED")
         self.assertEqual(finished["result"]["outcome"], "done")
         self.assertIsNone(finished["result"].get("reason"))
+
+    async def test_terminal_event_checkpoints_finalize_message(self) -> None:
+        class State(TypedDict):
+            messages: Annotated[list, add_messages]
+
+        async def finalize(state):
+            get_stream_writer()({"event": "done", "data": {"outcome": "done"}})
+            return {"messages": [AIMessage(content="ANSWER", id="m-answer")]}
+
+        graph = StateGraph(State)
+        graph.add_node("finalize", wrap_node("finalize", finalize))
+        graph.add_edge(START, "finalize")
+        graph.add_edge("finalize", END)
+        compiled = graph.compile(checkpointer=MemorySaver())
+        config = {"configurable": {"thread_id": "tid-answer"}}
+        events = await collect(
+            AguiAdapter(compiled),
+            {"messages": [{"role": "user", "content": "q", "id": "m-user"}]},
+            thread_id="tid-answer",
+            config=config,
+        )
+        self.assertEqual(events[-1]["type"], "RUN_FINISHED")
+        snapshot = await compiled.aget_state(config)
+        contents = [
+            message.content if hasattr(message, "content") else message["content"]
+            for message in snapshot.values["messages"]
+        ]
+        self.assertEqual(contents, ["q", "ANSWER"])

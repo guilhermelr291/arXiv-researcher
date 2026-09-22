@@ -7,6 +7,7 @@ from typing import Protocol
 from plan_based_researcher.adapters.hybrid import HybridRetrievePort
 from plan_based_researcher.agents.gate import GateRunner
 from plan_based_researcher.agents.planner import PlannerRunner
+from plan_based_researcher.agents.summarizer import SummarizerRunner
 from plan_based_researcher.agents.retrieve import RetrieveRunner
 from plan_based_researcher.agents.search import SearchRunner
 from plan_based_researcher.agents.writer import WriterRunner
@@ -45,6 +46,7 @@ class AgentFactory:
                 voyage_api_key=voyage_api_key,
             ),
             "writer": WriterRunner(api_key=api_key),
+            "summarizer": SummarizerRunner(api_key=api_key),
         }
 
     def create(self, name: str) -> AgentRunner:

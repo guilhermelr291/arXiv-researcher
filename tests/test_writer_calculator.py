@@ -114,6 +114,7 @@ class ProductGraphNodesTest(unittest.TestCase):
         )
         names = set(compiled.nodes) - {"__start__", "__end__"}
         expected = {
+            "compact",
             "gate",
             "planner",
             "dispatch",
